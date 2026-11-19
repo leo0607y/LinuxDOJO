@@ -1846,6 +1846,7 @@ def passwd(argv, quiet_hint=False):
         err("No password has been supplied.\npasswd: Authentication token manipulation error\npasswd: password unchanged")
         return 10
     salt = hashlib.sha256(os.urandom(8)).hexdigest()[:16]
+    # shadow の見た目を再現する教材用の値。実際の yescrypt ハッシュではなく、OS 認証には使えません。
     s[1] = "$y$j9T$" + salt + "$" + hashlib.sha256((salt + p1).encode()).hexdigest()[:43]
     s[2] = str(int(time.time() // 86400))
     write_db("shadow", sh)

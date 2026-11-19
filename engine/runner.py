@@ -511,6 +511,7 @@ def run_check(mission: Mission, token=None):
 
 
 def new_token():
+    # ローカルの学習セッションとプロセスを識別する値。外部 API の認証情報ではありません。
     return secrets.token_hex(8)
 
 

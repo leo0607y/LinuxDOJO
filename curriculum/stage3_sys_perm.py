@@ -15,6 +15,7 @@ def _oct(m):
 # ------------------------------------------------------------------ 3-1
 def s31(ctx):
     ctx.write("deploy.sh", "#!/bin/bash\necho 'deploying...'\n", mode=0o644)
+    # 権限設定の教材用ダミー鍵。PEM の見出しだけを模しており、暗号鍵として利用できません。
     ctx.write("secret.key", "-----BEGIN PRIVATE KEY-----\nMIIE...dummy...\n-----END PRIVATE KEY-----\n", mode=0o644)
     ctx.write("index.html", "<h1>Penguin Shop</h1>\n", mode=0o600)
 

@@ -167,6 +167,7 @@ grep の基本オプション:
 
 
 # ------------------------------------------------------------------ 2-3
+# grep の検索練習用に意図的に埋め込んだ架空パスワードです。実際の認証情報ではありません。
 SRC_FILES = {
     "src/app.py": "import os\nDB = os.environ['DB_URL']\n",
     "src/config/settings.py": "DEBUG = False\nPASSWORD=hunter2  # TODO: remove\n",
@@ -183,6 +184,7 @@ LEAKED = {"src/config/settings.py", "src/utils/legacy/old_db.py", "src/scripts/d
 def s23(ctx):
     for k, v in SRC_FILES.items():
         ctx.write(k, v)
+    # 読み取り権限を学ぶためのダミーパスワード。実サービスには対応しません。
     ctx.write("src/private/secret_vault.txt", "PASSWORD=you-cannot-read-me\n")
     os.chmod(ctx.p("src/private"), 0o000)  # 読めないディレクトリ → Permission denied が出る
 

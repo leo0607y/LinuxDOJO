@@ -6,6 +6,7 @@ modes:
   hidden : /api/token でトークンを返すだけの「どのポートか分からない」サーバー
   hog    : ポートを占有しているだけの消し忘れ開発サーバー
 一定時間 (--ttl 秒) で自動終了する。
+API と token はローカル課題の模擬データであり、外部サービスの API キー・認証情報は使用しない。
 """
 import argparse
 import json
