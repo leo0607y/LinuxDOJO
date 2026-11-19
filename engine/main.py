@@ -8,10 +8,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from engine import runner, save, ui  # noqa: E402
+from engine import guided, runner, save, ui  # noqa: E402
 from engine.ui import c, fmt, box  # noqa: E402
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 
 def ask(prompt="> "):
@@ -40,6 +40,15 @@ def docker_mode_label():
 # ------------------------------------------------------------------ header / title
 def header():
     d = save.load()
+    mode = d["learning"]["mode"]
+    if mode != "practice":
+        course = guided.lessons(mode)
+        progress = d["learning"][mode]
+        completed = set(progress["completed"]) & {step["id"] for step in course}
+        step = guided.current_step(mode, progress)
+        return box([f"学習モード: {guided.MODE_NAMES[mode]}",
+                    f"進み具合 {ui.progress_bar(len(completed) / len(course), 20)} {len(completed)}/{len(course)} レッスン",
+                    f"続き: {step['title']}", "ヒント・解答は何度見ても減点なし。自分のペースで進めましょう。"], color="green")
     ms = all_missions()
     n = len([m for m in ms if m.id in d["cleared"]])
     rank = save.rank_of(n)
@@ -57,13 +66,13 @@ def header():
 def title_screen():
     ui.clear()
     print(ui.title_art())
-    print(c("        〜 ターミナルで鍛える 実践型 Linux & Docker 学習RPG 〜", "bold", "bwhite"))
+    print(c("        〜 はじめの一文字から学ぶ Linux 教材 〜", "bold", "bwhite"))
     print(c(f"                                                     v{VERSION}", "gray"))
     peng = ui.PENGUIN.strip("\n").split("\n")
-    talk = ["", "  ようこそ、株式会社ペンギン商事 インフラ部へ！",
-            "  ここでは本物の bash を操作して、",
-            "  サーバーで起きる様々なトラブルを解決してもらうよ。",
-            "", f"  全 {len(all_missions())} ミッション。目指せ「伝説のシェル仙人」！", ""]
+    talk = ["", "  Linux が初めてでも大丈夫。文字の入力から始めよう。",
+            "  はじめて → 基礎練習 → 実践の3モード。",
+            "  モードごとに保存して、次回は続きから学べます。",
+            "", f"  実践では本物の bash で {len(all_missions())} 問に挑戦！", ""]
     for i in range(max(len(peng), len(talk))):
         left = peng[i] if i < len(peng) else ""
         right = talk[i] if i < len(talk) else ""
@@ -109,6 +118,9 @@ def play(m):
         d["player"]["created"] = time.strftime("%Y-%m-%d %H:%M")
     save.store(d)
     while m:
+        d = save.load()
+        d["learning"]["practice"]["mission"] = m.id
+        save.store(d)
         token = runner.new_token()
         briefing_splash(m)
         try:
@@ -304,6 +316,19 @@ def show_tip(i, tips):
 
 
 def how_to_play():
+    if guided.selected_mode() != "practice":
+        ui.clear()
+        print(box(["まず [1] 続きから を選び、表示された説明を読みましょう。",
+                   "入力待ちの $ は入力しません。その後ろにコマンドを書いて Enter を押します。",
+                   "英数字と記号・スペースは半角で入力します。大文字と小文字は区別されます。",
+                   "Backspace で消して入力し直せます。急がず1つずつ試しましょう。",
+                   "hint: 入力例を表示 / lesson: 説明を再表示 / reset: 課題を復元",
+                   "menu: 保存してメニューへ。途中でやめても現在の課題から再開できます。",
+                   "はじめて・基礎練習は模擬ターミナル。sudo や apt も実際の PC を変更しません。",
+                   "ヒントや解答を見ても減点はありません。繰り返し練習しましょう。",
+                   "[2] で復習するレッスンを選択、[7] でモードを切り替えられます。"], title="初めての遊び方", color="green"))
+        pause()
+        return
     ui.clear()
     lines = [
         c("① ミッションを選ぶと、専用のサブシェル（本物の bash）が起動します。", "bold"),
@@ -338,6 +363,19 @@ def how_to_play():
 
 
 def settings():
+    if guided.selected_mode() != "practice":
+        ui.clear()
+        print(box(["進み具合は自動で保存されます。終了するだけで保存できます。",
+                   "モードを切り替えるときはメインメニューの [7] を選びます。",
+                   "[r] は全モードの進捗と実践のクリア実績を消します。復習するだけなら [2] を使いましょう。"], title="初心者モードの設定", color="green"))
+        value = ask("  [r] 全進捗の初期化 / Enter: 戻る > ").lower()
+        if value == "r" and ask("  全モードの進捗を消す場合だけ yes と入力 > ") == "yes":
+            d = save.empty()
+            d["settings"] = save.load()["settings"]
+            save.store(d)
+            print("進捗を初期化しました。はじめてモードから学び直せます。")
+            pause()
+        return
     from engine import docker_backend
     while True:
         ui.clear()
@@ -373,39 +411,138 @@ def settings():
                 pause("Enter で続ける")
 
 
+def practice_resume():
+    d = save.load()
+    mission_id = d["learning"]["practice"].get("mission")
+    if mission_id and mission_id not in d["cleared"]:
+        for mission in all_missions():
+            if mission.id == mission_id:
+                return mission
+    return first_uncleared()
+
+
+def mode_select():
+    while True:
+        ui.clear()
+        d = save.load()
+        print(box(["どこから学ぶか、自分で選べます。いつでも変更できます。",
+                   "[1] はじめてモード（おすすめ）: 文字を入力して Enter を押すところから。",
+                   "    コマンドの意味を1つずつ説明し、一緒に練習します。",
+                   "[2] 基礎練習モード: ファイル操作・検索・権限・ソフト追加を反復。",
+                   "    入力例は hint でいつでも表示できます。減点はありません。",
+                   "[3] 実践モード: 本物の bash で59問のトラブル解決に挑戦。",
+                   "    はじめて・基礎練習の sudo / apt は安全な模擬操作です。",
+                   "    実践モードではコマンドが実際に動きます。",
+                   "モードごとに続きの位置を保存します。既存の実践クリア実績も残ります。"], title="学習モードを選ぶ", color="green"))
+        value = ask("  [1 / 2 / 3] 選択 / b: 戻る > ").lower()
+        if value in ("b", "q", ""):
+            return
+        if value in ("1", "2", "3"):
+            d["learning"]["mode"] = {"1": "intro", "2": "basic", "3": "practice"}[value]
+            save.store(d)
+            return
+
+
+def command_dictionary():
+    ui.clear()
+    print(box(["ターミナル: 文字でコンピューターへ指示を出す画面。",
+               "コマンド: 指示する道具の名前。Enter で実行します。",
+               "引数: コマンドに渡す対象。cat note.txt の note.txt が対象ファイルです。",
+               "オプション: 動作を変える指定。ls -a の -a は隠しファイルも表示します。",
+               "フォルダ（ディレクトリ）: ファイルをまとめる場所。パスはその住所です。",
+               "pwd: 今いる場所を表示 / ls: 名前一覧 / cd: フォルダ移動",
+               "cat: 内容を読む / echo: 文字を表示 / touch: 空ファイル作成",
+               "mkdir: フォルダ作成 / cp: コピー / mv: 移動・名前変更 / rm: 削除",
+               ">: 出力でファイルを上書き / >>: 末尾に追加（実践では本当に書き換わります）",
+               "grep: 一致する行を探す / wc -l: 行数 / chmod: 読む・書く・実行の権限を変える",
+               "sudo: 後ろのコマンドを管理者の権限で動かす。普段は必要な場合だけ使います。",
+               "インストール: ソフトを使えるように追加すること。削除はアンインストール。",
+               "apt: Ubuntu/Debian のソフト管理の道具。他の Linux では別の道具を使うこともあります。",
+               "apt update: ソフトの一覧更新 / apt install tree: tree というソフトを追加",
+               "install はここでは apt のサブコマンド（具体的な操作の指定）です。",
+               "update と upgrade（導入済みソフトの更新）は別操作です。",
+               "模擬モードは説明した一部の書式を練習する環境。本物の bash の全機能は使えません。"], title="はじめての用語・コマンド辞典", color="cyan"))
+    pause()
+
+
+def learning_dashboard(mode):
+    ui.clear()
+    print(header())
+    print("\n  モードごとの進み具合\n")
+    d = save.load()
+    for key in ("intro", "basic"):
+        course = guided.lessons(key)
+        done = len(set(d["learning"][key]["completed"]) & {s["id"] for s in course})
+        print(f"  {guided.MODE_NAMES[key]}: {done}/{len(course)} レッスン")
+    done = len([m for m in all_missions() if m.id in d["cleared"]])
+    print(f"  実践モード: {done}/{len(all_missions())} 問")
+    print("\n  [7] モード選択で切り替えられます。レッスンの復習は [2] から。")
+    pause()
+
+
 def main_menu():
     while True:
         ui.clear()
         print(ui.title_art())
         print(header())
-        nxt = first_uncleared()
+        mode = guided.selected_mode()
+        nxt = practice_resume() if mode == "practice" else None
         cont = f"続きから  {c('→ ' + nxt.id + ' ' + nxt.title, 'gray')}" if nxt else "続きから  " + c("（全問クリア済み！）", "gray")
+        if mode != "practice":
+            step = guided.current_step(mode)
+            cont = "続きから → " + step["title"]
+            if guided.completed_course(mode) and not guided.progress_for(mode).get("reviewing"):
+                cont = "このモードは学習完了！ → 次のモードを選ぶ（復習は [2]）"
         items = [("1", "▶ ", cont), ("2", "🗺 ", "ステージ選択"), ("3", "📊", "進捗ダッシュボード"),
                  ("4", "📖", "小ネタ図鑑（Extra 閲覧モード）"), ("5", "❓", "遊び方・操作コマンド一覧"),
-                 ("6", "⚙ ", "設定（Docker モード / セーブ初期化）"), ("q", "🚪", "終了")]
+                 ("6", "⚙ ", "設定（Docker モード / セーブ初期化）"),
+                 ("7", "🌱", "モード選択（はじめて / 基礎練習 / 実践）"), ("q", "🚪", "終了")]
+        if mode != "practice":
+            beginner_labels = {"2": "レッスン選択・復習", "4": "用語・コマンド辞典", "6": "設定（進捗の初期化）"}
+            items = [(key, icon, beginner_labels.get(key, label))
+                     for key, icon, label in items]
         print()
         for k, icon, label in items:
             print(f"   {c(f'[{k}]', 'bold', 'bcyan')} {icon} {label}")
         k = ask("\n  メニュー番号 > ").lower()
         if k in ("1", ""):
-            if nxt:
+            if mode != "practice":
+                if guided.completed_course(mode) and not guided.progress_for(mode).get("reviewing"):
+                    mode_select()
+                else:
+                    guided.play(mode)
+            elif nxt:
                 play(nxt)
             else:
                 stage_select()
         elif k == "2":
-            stage_select()
+            if mode == "practice":
+                stage_select()
+            else:
+                guided.lesson_select(mode)
         elif k == "3":
-            dashboard()
+            if mode == "practice":
+                dashboard()
+            else:
+                learning_dashboard(mode)
         elif k == "4":
-            tips_catalog()
+            if mode == "practice":
+                tips_catalog()
+            else:
+                command_dictionary()
         elif k == "5":
             how_to_play()
         elif k == "6":
             settings()
+        elif k == "7":
+            mode_select()
         elif k in ("q", "quit", "exit"):
             ui.clear()
             d = save.load()
             print(c("\n  またね！ 今日の学びが明日のトラブル対応を救う。🐧\n", "bold", "bcyan"))
+            if mode != "practice":
+                print("  学習の続きは保存済みです。次回も [1] 続きから で再開できます。\n")
+                return
             print(f"  現在のランク: {' '.join(save.rank_of(len(d['cleared']))[1:])}   総スコア: {save.total_score(d)} pt\n")
             return
 

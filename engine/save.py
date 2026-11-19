@@ -44,6 +44,16 @@ def empty():
         "titles": [],
         "stats": {"checks": 0, "hints": 0, "answers": 0, "resets": 0},
         "settings": {"docker_mode": "auto"},
+        "learning": learning_defaults(),
+    }
+
+
+def learning_defaults(mode="intro"):
+    return {
+        "mode": mode,
+        "intro": {"completed": [], "cwd": ".", "packages": [], "apt_updated": False},
+        "basic": {"completed": [], "cwd": ".", "packages": [], "apt_updated": False},
+        "practice": {"mission": None},
     }
 
 
@@ -51,6 +61,17 @@ def load():
     try:
         d = json.loads(SAVE.read_text())
         base = empty()
+        # 既存の実践プレイヤーは同じモードから再開。初めての人は導入から。
+        legacy_mode = "practice" if d.get("cleared") or d.get("player", {}).get("sessions", 0) else "intro"
+        defaults = learning_defaults(legacy_mode)
+        learning = d.setdefault("learning", {})
+        for key, value in defaults.items():
+            learning.setdefault(key, value)
+        if learning["mode"] not in ("intro", "basic", "practice"):
+            learning["mode"] = legacy_mode
+        for mode in ("intro", "basic", "practice"):
+            for key, value in defaults[mode].items():
+                learning[mode].setdefault(key, value)
         for k, v in base.items():
             d.setdefault(k, v)
         for k, v in base["stats"].items():
