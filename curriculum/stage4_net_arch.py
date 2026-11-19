@@ -189,6 +189,7 @@ Windows の人に渡すなら **zip**（エクスプローラーで開ける）�
 def s43(ctx):
     port = ctx.free_port(18000, 18999)
     ver = f"{random.randint(2, 4)}.{random.randint(0, 20)}.{random.randint(0, 9)}"
+    # ローカル教材のレスポンス照合用ランダム値。外部 API の認証トークンではありません。
     token = ctx.rand(10)
     ctx.data.update(port=port, ver=ver, token=token)
     start_server(ctx, "api", port, token=token, version=ver)
@@ -458,6 +459,7 @@ def s47(ctx):
     ctx.write("backup/index.html", "<h1>v1</h1>\n", age_days=30)
     ctx.write("backup/old_banner.png", "obsolete\n", age_days=30)
     ctx.write("backup/css/site.css", "body{}\n", age_days=30)
+    # SSH の権限設定用ダミー鍵ペア。鍵データは無効で、実際の SSH 認証には使えません。
     ctx.write(".ssh/id_ed25519", "-----BEGIN OPENSSH PRIVATE KEY-----\n(dummy key for training)\n-----END OPENSSH PRIVATE KEY-----\n", mode=0o644)
     ctx.write(".ssh/id_ed25519.pub", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIdummy penguin@local\n", mode=0o644)
     os.chmod(ctx.p(".ssh"), 0o755)
@@ -548,6 +550,7 @@ rsync の要点:
 # ------------------------------------------------------------------ 4-8
 def s48(ctx):
     port = ctx.free_port(20000, 29999)
+    # 宝探し課題用のランダムな合言葉。外部サービスの API キーではありません。
     token = "LQ-" + ctx.rand(12)
     ctx.data.update(port=port, token=token)
     start_server(ctx, "hidden", port, token=token)

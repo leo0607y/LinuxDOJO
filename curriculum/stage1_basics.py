@@ -208,6 +208,7 @@ CI/CD やデプロイスクリプトでは `mkdir -p /var/log/myapp` のよう�
 
 
 # ------------------------------------------------------------------ 1-5
+# 教材用の架空設定。以下の SECRET_KEY は実サービスでは使えないダミー値です。
 CFG = {
     "config/app.yaml": "app:\n  name: penguin-shop\n  port: 8080\n",
     "config/db/database.yaml": "db:\n  host: localhost\n  port: 5432\n",
@@ -403,6 +404,7 @@ register(
 
 
 # ------------------------------------------------------------------ 1-8
+# ファイル整理課題のダミー認証情報。API_KEY を含め、実サービスのキーやパスワードではありません。
 ENVS = {"messy_project/.env": "DB_PASSWORD=p@ssw0rd\n",
         "messy_project/api/.env.production": "API_KEY=prod-xxxxxxxx\n",
         "messy_project/frontend/.env.local": "NEXT_PUBLIC_DEBUG=true\n"}

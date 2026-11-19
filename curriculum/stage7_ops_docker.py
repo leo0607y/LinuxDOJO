@@ -501,6 +501,7 @@ def s74(ctx):
             g[3] = ",".join(t for t in team[1:])
     so.write_db("passwd", pw)
     so.write_db("group", gr)
+    # 模擬アカウント用の無効なダミーハッシュ。実ユーザーの shadow 情報ではありません。
     so.write_db("shadow", [[r[0], "$y$j9T$lqsaltlqsalt$" + "x" * 43 if int(r[2]) >= 1000 and r[0] != "nobody" else "*",
                             "19700", "0", "99999", "7", "", "", ""] for r in pw])
     ctx.data["u2_before"] = sorted(so.user_info(u2)["groups"])
@@ -551,6 +552,7 @@ def c74(ctx):
 
 
 register(
+    # solution 内の初期パスワードは模擬アカウントのテスト専用。実サービスでは使いません。
     id="7-4", stage=S, title="新メンバーのアカウントを作成せよ", sim=True,
     story="""
 開発サーバー `<<host>>` に新メンバー **<<newu>>** さんが加わる。さらに新プロジェクトの共有グループ `<<proj>>` を作り、

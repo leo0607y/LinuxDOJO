@@ -137,6 +137,7 @@ register(
 # ------------------------------------------------------------------ 5-3
 def s53(ctx):
     ctx.docker.reset()
+    # 訓練コンテナの設定探索用に生成する架空パスワード。実サービスの資格情報ではありません。
     pw = "pg_" + ctx.rand(8).lower()
     ctx.data["pw"] = pw
     conf = f"# order-db secret config\nDB_USER=penguin\nDB_PASSWORD={pw}\nDB_NAME=shop\n"
@@ -380,6 +381,7 @@ def c56(ctx):
 
 
 register(
+# この課題の解答例にある POSTGRES_PASSWORD: secret は訓練専用。本番環境で再利用しないこと。
     id="5-6", stage=S, title="docker compose で複数コンテナを束ねる", docker=True,
     story="""
 Web（nginx）と DB（PostgreSQL）の2つのコンテナを、毎回 `docker run` で長いオプション付きで起動するのは大変。

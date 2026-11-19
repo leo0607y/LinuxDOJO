@@ -21,6 +21,7 @@ class RealDockerTests(unittest.TestCase):
         self.backend._run = Mock()
 
     def test_inspect_normalizes_operational_state(self):
+        # TOKEN=a=b は Env の分割処理を検証するダミー値。外部 API のトークンではありません。
         probe = ["CMD-SHELL", "curl -f http://localhost:80/ || exit 1"]
         inspected = {
             "Id": "0123456789abcdef", "Name": "/lq-web",
