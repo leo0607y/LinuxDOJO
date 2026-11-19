@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# docker-compose (v1 形式) も docker compose として扱う
+exec "$(dirname "$0")/docker" compose "$@"
