@@ -11,7 +11,7 @@ sys.path.insert(0, str(ROOT))
 from engine import guided, runner, save, ui  # noqa: E402
 from engine.ui import c, fmt, box  # noqa: E402
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 
 def ask(prompt="> "):
@@ -496,7 +496,8 @@ def main_menu():
         items = [("1", "▶ ", cont), ("2", "🗺 ", "ステージ選択"), ("3", "📊", "進捗ダッシュボード"),
                  ("4", "📖", "小ネタ図鑑（Extra 閲覧モード）"), ("5", "❓", "遊び方・操作コマンド一覧"),
                  ("6", "⚙ ", "設定（Docker モード / セーブ初期化）"),
-                 ("7", "🌱", "モード選択（はじめて / 基礎練習 / 実践）"), ("q", "🚪", "終了")]
+                 ("7", "🌱", "モード選択（はじめて / 基礎練習 / 実践）"),
+                 ("8", "🔎", "総合復習・学習ロードマップ"), ("q", "🚪", "終了")]
         if mode != "practice":
             beginner_labels = {"2": "レッスン選択・復習", "4": "用語・コマンド辞典", "6": "設定（進捗の初期化）"}
             items = [(key, icon, beginner_labels.get(key, label))
@@ -536,6 +537,9 @@ def main_menu():
             settings()
         elif k == "7":
             mode_select()
+        elif k == "8":
+            from engine import readiness
+            readiness.run()
         elif k in ("q", "quit", "exit"):
             ui.clear()
             d = save.load()

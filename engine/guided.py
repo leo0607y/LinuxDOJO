@@ -1,5 +1,6 @@
 """初心者向けの段階学習と模擬ターミナル。ホストのシェル・sudo・apt は実行しない。"""
 from dataclasses import dataclass
+import fnmatch
 from pathlib import Path
 import shlex
 import shutil
@@ -36,6 +37,15 @@ class Terminal:
         self.progress.setdefault("cwd", ".")
         self.progress.setdefault("packages", [])
         self.progress.setdefault("apt_updated", False)
+        self.progress.setdefault("remote", False)
+        self.progress.setdefault("remote_cwd", ".")
+        self.progress.setdefault("ssh_known", False)
+        self.progress.setdefault("ssh_pending", False)
+        self.progress.setdefault("history", [])
+        self.progress.setdefault("last_status", 0)
+        self.progress.setdefault("command_events", [])
+        original_remote = self.progress["remote"]
+        self.progress["remote"] = False
         original_cwd = self.progress["cwd"]
         self.progress["cwd"] = "."
         for name, content in {"welcome.txt": "LinuxDOJOへようこそ！\n", ".memo": "見つけました！\n"}.items():
@@ -43,15 +53,38 @@ class Terminal:
             if not path.exists():
                 path.write_text(content)
         self.progress["cwd"] = original_cwd
+        remote_root = self.root / ".remote"
+        if remote_root.is_symlink():
+            raise TrainingError("模擬サーバーの保存先にシンボリックリンクは使えません。")
+        if remote_root.exists() and not remote_root.is_dir():
+            remote_root.unlink()
+        remote_root.mkdir(exist_ok=True)
+        self.progress["remote"] = True
+        for name, content in {"server-note.txt": "これは練習用サーバーのファイルです。\n", "download.txt": "server download\n"}.items():
+            target = self.path("/home/learner/" + name)
+            if not target.exists():
+                self.restore_file("/home/learner/" + name, content)
+        self.progress["remote"] = original_remote
         try:
             if not self.path(".").is_dir():
-                self.progress["cwd"] = "."
+                self.set_cwd(".")
         except TrainingError:
-            self.progress["cwd"] = "."
+            self.set_cwd(".")
 
     @property
     def cwd(self):
-        return self.progress["cwd"]
+        return self.progress["remote_cwd" if self.progress["remote"] else "cwd"]
+
+    @property
+    def active_root(self):
+        return self.root / ".remote" if self.progress["remote"] else self.root
+
+    @property
+    def hostname(self):
+        return "training-server" if self.progress["remote"] else "dojo-local"
+
+    def set_cwd(self, value):
+        self.progress["remote_cwd" if self.progress["remote"] else "cwd"] = value
 
     @property
     def display_cwd(self):
@@ -65,22 +98,24 @@ class Terminal:
                 value = value[len("/home/learner/"):]
             else:
                 raise TrainingError("この練習では /home/learner の中だけを使います。pwd で現在地を確認しましょう。")
-            path = self.root / value
+            path = self.active_root / value
         else:
-            path = self.root / self.cwd / value
+            path = self.active_root / self.cwd / value
         # 自動生成した教材ファイル以外のリンクをたどって、実環境を操作しない。
         if any(p.is_symlink() for p in [path, *path.parents] if p != self.root.parent):
             raise TrainingError("この模擬ターミナルではシンボリックリンクを扱いません。")
         resolved = path.resolve()
-        if resolved != self.root and self.root not in resolved.parents:
+        if resolved != self.active_root and self.active_root not in resolved.parents:
             raise TrainingError("練習フォルダの外には移動できません。cd /home/learner で練習の開始位置へ戻れます。")
+        if not self.progress["remote"] and (resolved == self.root / ".remote" or self.root / ".remote" in resolved.parents):
+            raise TrainingError("模擬サーバーのファイルは ssh で接続するか scp で転送して扱いましょう。")
         return resolved
 
     def ensure_directory(self, path):
         """教材のディレクトリと同名の練習ファイルがあっても復元する。"""
-        current = self.root
-        for part in path.relative_to(self.root).parts:
-            current = self.path("/home/learner/" + str((current / part).relative_to(self.root)))
+        current = self.active_root
+        for part in path.relative_to(self.active_root).parts:
+            current = self.path("/home/learner/" + str((current / part).relative_to(self.active_root)))
             if current.exists() and not current.is_dir():
                 current.unlink()
             current.mkdir(exist_ok=True)
@@ -94,6 +129,15 @@ class Terminal:
         target.chmod(0o644)
 
     def execute(self, line):
+        host = self.hostname
+        result = self._execute_line(line)
+        if line.strip():
+            self.progress["history"].append(line.strip())
+            self.progress["command_events"].append({"line": line.strip(), "code": result.code, "host": host})
+        self.progress["last_status"] = result.code
+        return result
+
+    def _execute_line(self, line):
         try:
             if "\u3000" in line:
                 return Result("全角スペースが入っています。コマンドと対象の間は、半角スペースで区切りましょう。", 1)
@@ -104,6 +148,25 @@ class Terminal:
                 return Result("$ は入力待ちの印です。$ を除いたコマンドだけ入力しましょう。", 1)
             if any(a in ("|", "||", "&&", ";", "&", "<", "2>") for a in args):
                 return Result("ここでは1回に1つのコマンドを練習します。パイプや複数コマンドは実践モードで扱います。", 1)
+            if self.progress["ssh_pending"]:
+                if args == ["no"]:
+                    self.progress["ssh_pending"] = False
+                    return Result("Host key verification failed. 接続を中止しました。管理者から別経路で指紋を確認しましょう。", 255)
+                if args == ["yes"]:
+                    self.progress.update(ssh_pending=False, ssh_known=True, remote=True, remote_cwd=".")
+                    return Result("接続先の指紋を確認済みとして模擬接続しました。learner@training-server（実通信なし）")
+                return Result("接続確認中です。指紋を別経路で確認できたら yes、不明なら no を入力します。", 1)
+            if args[0] != "echo" and any(x in (">", ">>") for x in args):
+                pos = next(i for i, x in enumerate(args) if x in (">", ">>"))
+                if pos == 0 or len(args) != pos + 2:
+                    raise TrainingError("出力先を1つ指定しましょう。例: grep ERROR app.log > errors.txt")
+                result = self._execute(args[:pos])
+                if result.code == 0:
+                    target = self.path(args[-1])
+                    with target.open("a" if args[pos] == ">>" else "w") as stream:
+                        stream.write(result.output + ("\n" if result.output else ""))
+                    return Result()
+                return result
             return self._execute(args)
         except (TrainingError, OSError, ValueError) as error:
             if isinstance(error, FileNotFoundError):
@@ -120,6 +183,45 @@ class Terminal:
 
     def _execute(self, args, admin=False):
         cmd, rest = args[0], args[1:]
+        if cmd == "false" and not rest:
+            return Result(code=1)
+        if cmd == "hostname" and not rest:
+            return Result(self.hostname)
+        if cmd == "history" and not rest:
+            return Result("\n".join(f"{i}  {value}" for i, value in enumerate(self.progress["history"] + ["history"], 1)))
+        if (cmd == "ls" and rest == ["--help"]) or (cmd == "man" and rest == ["ls"]):
+            return Result("LS（訓練用の要約）\n使い方: ls [オプション] [場所]\n-a 隠しファイルも表示\n-l 権限やサイズを詳しく表示\n本物の man は q で閉じます。この模擬画面は自動で入力待ちに戻ります。")
+        if cmd in ("head", "tail") and len(rest) == 3 and rest[0] == "-n" and rest[1].isdigit():
+            lines = self.path(rest[2]).read_text().splitlines()
+            count = int(rest[1])
+            return Result("\n".join(lines[:count] if cmd == "head" else lines[-count:] if count else []))
+        if cmd == "find" and len(rest) == 3 and rest[1] == "-name":
+            base = self.path(rest[0])
+            if not base.is_dir():
+                raise TrainingError("find の検索開始場所はフォルダを指定しましょう。")
+            found = []
+            def visit(folder, depth=0):
+                if depth > 12:
+                    return
+                for item in sorted(folder.iterdir()):
+                    if item.is_symlink() or (not self.progress["remote"] and item == self.root / ".remote"):
+                        continue
+                    if fnmatch.fnmatch(item.name, rest[2]):
+                        prefix = "./" if rest[0] == "." else rest[0].rstrip("/") + "/"
+                        found.append(prefix + str(item.relative_to(base)))
+                    if item.is_dir():
+                        visit(item, depth + 1)
+            visit(base)
+            return Result("\n".join(found))
+        if cmd == "ssh":
+            return self._ssh(rest)
+        if cmd == "scp":
+            return self._scp(rest)
+        if cmd == "exit" and not rest:
+            if self.progress["remote"]:
+                self.progress["remote"] = False
+                return Result("Connection to training-server closed. dojo-local に戻りました（模擬）。")
+            return Result("ここは手元の模擬端末です。menu で学習メニューへ戻れます。")
         if cmd == "sudo":
             if not rest:
                 raise TrainingError("sudo の後ろに実行するコマンドをスペースで続けます。例: sudo whoami")
@@ -127,6 +229,8 @@ class Terminal:
                 raise TrainingError("練習用 sudo は whoami と apt のみに使えます。実際の管理者権限は使いません。")
             return self._execute(rest, admin=True)
         if cmd == "echo":
+            if rest == ["$?"]:
+                return Result(str(self.progress["last_status"]))
             redirect = next((i for i, a in enumerate(rest) if a in (">", ">>")), None)
             if redirect is not None:
                 if len(rest) != redirect + 2:
@@ -144,7 +248,7 @@ class Terminal:
             dest = self.path(rest[0] if rest else "/home/learner")
             if not dest.is_dir():
                 raise TrainingError("移動先のフォルダがありません。ls で確認しましょう。")
-            self.progress["cwd"] = str(dest.relative_to(self.root))
+            self.set_cwd(str(dest.relative_to(self.active_root)))
             return Result()
         if cmd == "ls":
             flags = [x for x in rest if x.startswith("-")]
@@ -159,7 +263,7 @@ class Terminal:
                     raise FileNotFoundError()
                 items = sorted(p.iterdir()) if p.is_dir() else [p]
                 for item in items:
-                    if item.is_symlink():
+                    if item.is_symlink() or (not self.progress["remote"] and item == self.root / ".remote"):
                         continue
                     if item.name.startswith(".") and "a" not in options:
                         continue
@@ -188,7 +292,7 @@ class Terminal:
             if source.is_dir():
                 raise TrainingError("この練習ではファイルを1つずつコピー・移動します。")
             if dest.is_dir():
-                dest = self.path("/home/learner/" + str((dest / source.name).relative_to(self.root)))
+                dest = self.path("/home/learner/" + str((dest / source.name).relative_to(self.active_root)))
             if cmd == "cp":
                 shutil.copyfile(source, dest)
             else:
@@ -241,6 +345,83 @@ class Terminal:
         if cmd == "apt":
             return self._apt(rest, admin)
         raise TrainingError(f"{cmd}: この模擬ターミナルでは未対応の入力です。スペルを確認し、hint で今回のコマンドを見てみましょう。")
+
+    def _ssh(self, rest):
+        if self.progress["remote"]:
+            return Result("ここでは多段接続は扱いません。exit で手元へ戻ってから接続しましょう。", 255)
+        port, identity, target = "22", None, None
+        index = 0
+        while index < len(rest):
+            value = rest[index]
+            if value in ("-p", "-i") and index + 1 < len(rest):
+                if value == "-p":
+                    port = rest[index + 1]
+                else:
+                    identity = rest[index + 1]
+                index += 2
+            elif not value.startswith("-") and target is None:
+                target = value
+                index += 1
+            else:
+                return Result("使い方: ssh [-p ポート] [-i 練習用の鍵] learner@training-server", 255)
+        if target not in ("learner@training-server", "guest@training-server"):
+            return Result("この教材では training-server のみ模擬接続できます。実サーバーへの通信は行いません。", 255)
+        if port not in ("22", "2222"):
+            return Result(f"ssh: connect to host training-server port {port}: Connection refused（模擬）", 255)
+        if target.startswith("guest@"):
+            return Result("guest@training-server: Permission denied (publickey). ユーザー名と登録した公開鍵を確認しましょう（模擬）。", 255)
+        if identity:
+            try:
+                key = self.path(identity)
+                if key.read_text().strip() != "DUMMY-NOT-A-REAL-KEY":
+                    return Result("この練習では DUMMY-NOT-A-REAL-KEY という教材用の無効な鍵だけを使います。実際の秘密鍵は入力・コピーしないでください。", 255)
+                if stat.S_IMODE(key.stat().st_mode) & 0o077:
+                    return Result("WARNING: UNPROTECTED PRIVATE KEY FILE! 練習用の鍵を chmod 600 で自分だけが読めるようにしましょう。", 255)
+            except (TrainingError, OSError):
+                return Result("Identity file を読み取れません。鍵の名前と場所を確認しましょう（模擬）。", 255)
+        if not self.progress["ssh_known"]:
+            self.progress["ssh_pending"] = True
+            return Result("The authenticity of host 'training-server' can't be established.\nED25519 key fingerprint is SHA256:TRAINING-NOT-A-REAL-FINGERPRINT\n管理者から別経路で得た指紋と比較し、一致を確認できた場合だけ yes、不明なら no。\nこれは段階学習用の模擬確認です。実際の鍵や接続は使用しません。")
+        self.progress.update(remote=True, remote_cwd=".")
+        return Result("learner@training-server に模擬接続しました。hostname で接続先を確かめましょう（実通信なし）。")
+
+    def _side_path(self, value, remote):
+        original_remote = self.progress["remote"]
+        original_cwd = self.progress["remote_cwd"]
+        try:
+            self.progress["remote"] = remote
+            if remote:
+                self.progress["remote_cwd"] = "."
+            return self.path(value)
+        finally:
+            self.progress["remote"] = original_remote
+            self.progress["remote_cwd"] = original_cwd
+
+    def _scp(self, rest):
+        if self.progress["remote"]:
+            return Result("この練習では exit で手元の端末に戻り、そこで scp を使います。", 255)
+        if len(rest) != 2 or not self.progress["ssh_known"]:
+            return Result("scp は確認済みの training-server との転送だけを練習します。先に ssh で接続先の指紋を確認しましょう。", 255)
+        source_text, dest_text = rest
+        source_remote, dest_remote = ":" in source_text, ":" in dest_text
+        if source_remote == dest_remote:
+            return Result("転送元と転送先の一方だけに learner@training-server: を付けましょう。", 255)
+        def split(value, remote):
+            if remote:
+                host, value = value.split(":", 1)
+                if host != "learner@training-server" or not value:
+                    raise TrainingError("この練習では learner@training-server のみ使えます。")
+            return self._side_path(value, remote)
+        try:
+            source, dest = split(source_text, source_remote), split(dest_text, dest_remote)
+            if not source.is_file():
+                return Result("scp: 転送元ファイルがありません。手元とサーバーのどちらにあるか確認しましょう。", 1)
+            if dest.is_dir():
+                dest = self._side_path((dest_text.split(":", 1)[-1].rstrip("/") + "/" + source.name), dest_remote)
+            shutil.copyfile(source, dest)
+        except (TrainingError, OSError):
+            return Result("scp: 転送先の場所と権限を確認しましょう。練習用ホームの外やリンクへは転送できません。", 1)
+        return Result("転送しました（模擬）。元のファイルは残ります。実通信は行いません。")
 
     def _apt(self, rest, admin):
         if rest == ["--version"]:
@@ -297,7 +478,11 @@ def current_step(mode, progress=None):
     course = lessons(mode)
     progress = progress if progress is not None else progress_for(mode)
     cursor = progress.get("cursor", course[0]["id"])
-    return next((s for s in course if s["id"] == cursor), course[0])
+    step = next((s for s in course if s["id"] == cursor), course[0])
+    if not progress.get("reviewing") and step["id"] in progress.get("completed", []):
+        index = course.index(step)
+        return next((s for s in course[index + 1:] if s["id"] not in progress.get("completed", [])), step)
+    return step
 
 
 def completed_course(mode, progress=None):
@@ -313,16 +498,27 @@ def matches(line, step):
 
 
 def prepare_step(terminal, step):
+    for key in ("remote", "ssh_known", "ssh_pending", "last_status"):
+        if key in step:
+            terminal.progress[key] = step[key]
+    if "remote_files" in step:
+        original_remote = terminal.progress["remote"]
+        terminal.progress["remote"] = True
+        try:
+            for name, content in step["remote_files"].items():
+                terminal.restore_file("/home/learner/" + name, content)
+        finally:
+            terminal.progress["remote"] = original_remote
     # 各課題は教材用の初期ファイルを復元する。学習者の本来のファイルには触れない。
     for name, content in {"welcome.txt": "LinuxDOJOへようこそ！\n", ".memo": "見つけました！\n"}.items():
         terminal.restore_file("/home/learner/" + name, content)
     if "cwd" in step:
         target = terminal.path("/home/learner/" + step["cwd"].lstrip("/"))
         terminal.ensure_directory(target)
-        terminal.progress["cwd"] = str(target.relative_to(terminal.root))
+        terminal.set_cwd(str(target.relative_to(terminal.active_root)))
     for name in step.get("remove", []):
         target = terminal.path(name)
-        if target == terminal.root or target in terminal.path(".").parents or target == terminal.path("."):
+        if target == terminal.active_root or target in terminal.path(".").parents or target == terminal.path("."):
             raise TrainingError("課題の開始場所や練習のルートは削除できません。")
         if target.is_dir():
             shutil.rmtree(target)
@@ -365,11 +561,11 @@ def play(mode, start=None):
         print("  hint: 入力例 / lesson: 説明を再表示 / reset: この課題を復元 / menu: 保存して戻る")
         while True:
             try:
-                line = input(f"\n 練習 {terminal.display_cwd} $ ").strip()
+                line = input(f"\n 練習 learner@{terminal.hostname} {terminal.display_cwd} $ ").strip()
             except (EOFError, KeyboardInterrupt):
                 remember(mode, progress)
                 return
-            if line in ("menu", "exit", "quit"):
+            if line in ("menu", "quit") or (line == "exit" and not terminal.progress["remote"]):
                 remember(mode, progress)
                 return
             if line in ("hint", "answer", "help"):

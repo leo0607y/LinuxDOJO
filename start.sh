@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # ============================================================
 #  LinuxQuest 起動ランチャー
+#    start               初回登録後、どこからでも起動
+#    bash install-start.sh  start コマンドを登録（sudo 不要）
 #    ./start.sh          ゲームを起動
 #    ./start.sh --test   全ミッションの自動テストを実行
 #    ./start.sh --check  動作環境チェックのみ
