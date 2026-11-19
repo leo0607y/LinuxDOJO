@@ -5,6 +5,7 @@
 !/LICENSE
 !/LICENSE.*
 !/start.sh
+!/install-start.sh
 !/engine/
 !/curriculum/
 !/tests/
