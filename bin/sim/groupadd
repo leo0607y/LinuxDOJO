@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# LinuxQuest 学習用シミュレーター（本物のシステム管理コマンドには一切触れない / root 不要）
+LQ_HOME="${LQ_HOME:-$(cd "$(dirname "$0")/../.." && pwd)}"
+exec "${LQ_PYTHON:-python3}" -c 'import sys; sys.path.insert(0, sys.argv[1]); from engine import sim_ops; sys.exit(sim_ops.main(sys.argv[2], sys.argv[3:]) or 0)' "$LQ_HOME" "$(basename "$0")" "$@"

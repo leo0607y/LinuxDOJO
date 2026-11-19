@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# 学習用 crontab シミュレーター（本物のユーザー crontab には触れません）
+# テーブルは $LQ_STATE/sim_crontab に保存されます。
+LQ_ROOT="${LQ_HOME:-$(cd "$(dirname "$(readlink -f "$0")")/../.." && pwd)}"
+PYTHONDONTWRITEBYTECODE=1 exec "${LQ_PYTHON:-python3}" "$LQ_ROOT/engine/sim_cron.py" "$@"
