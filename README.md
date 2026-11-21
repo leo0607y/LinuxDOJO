@@ -591,3 +591,7 @@ python3 -m unittest discover -s tests # 全ユニットテスト（全レッス�
 | 色が付かない / 消したい | `NO_COLOR=1 ./start.sh` で色なし表示 |
 | `dig` や `lsof` が無い | `sudo apt install dnsutils lsof`（`./start.sh --check` で確認） |
 | 進捗をリセットしたい | メニュー →「設定」→ `[r]`、または `save_data.json` を削除 |
+
+---
+
+🔰 **開発の引き継ぎ・教材拡張の進捗**は [docs/HANDOFF.md](docs/HANDOFF.md) にまとめています（別のAI・別セッションはここから再開）。

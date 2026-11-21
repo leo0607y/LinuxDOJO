@@ -91,3 +91,11 @@ Thumbs.db
 !/curriculum/units/
 /curriculum/units/*
 !/curriculum/units/*.py
+
+# handoff docs and audit tools
+!/docs/
+/docs/*
+!/docs/*.md
+!/tools/
+/tools/*
+!/tools/*.py
