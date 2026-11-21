@@ -13,3 +13,9 @@ from curriculum import stage11_storage_recovery  # noqa: F401
 from curriculum import stage12_observability_ops  # noqa: F401
 from curriculum import stage13_network_services  # noqa: F401
 from curriculum import extra_tips  # noqa: F401
+from curriculum import stage14_boot_kernel  # noqa: F401
+from curriculum import stage15_storage_build  # noqa: F401
+from curriculum import stage16_access_control  # noqa: F401
+from curriculum import stage17_net_pkg_admin  # noqa: F401
+from curriculum import stage18_process_container_misc  # noqa: F401
+from curriculum import stage19_gap_fill  # noqa: F401

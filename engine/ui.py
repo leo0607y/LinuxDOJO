@@ -142,8 +142,9 @@ def table(headers, rows, colors=None):
 
 
 def clear():
+    """画面とスクロールバックの両方を消す。前の画面まで遡ってスクロールできないようにする。"""
     if sys.stdout.isatty():
-        sys.stdout.write("\x1b[2J\x1b[H")
+        sys.stdout.write("\x1b[H\x1b[2J\x1b[3J")
         sys.stdout.flush()
 
 
