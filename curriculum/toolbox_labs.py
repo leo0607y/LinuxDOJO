@@ -11,7 +11,9 @@ import secrets
 import shutil
 import sqlite3
 import stat
+import re
 import subprocess
+import tempfile
 import tarfile
 
 LABS = {}
@@ -663,3 +665,109 @@ tar -xzf release.tar.gz -C deployed
 ./deployed/run.sh
 jq -r .version deployed/release.json > version.txt''',
     ["tar -czf release.tar.gz -C source .; sha256sum release.tar.gz > release.sha256; mkdir -p deployed; tar -xzf release.tar.gz -C deployed; jq -r .version deployed/release.json > version.txt"])
+
+
+WRITER = """#!/usr/bin/env bash
+# usage: ./writer.sh COUNT  -- app.log へ連番の行を COUNT 行追記する(開き直す通常のアプリ相当)
+set -euo pipefail
+n=$(cat writer.seq)
+for _ in $(seq "$1"); do
+  n=$((n + 1))
+  printf 'seq %06d event\\n' "$n" >> app.log
+done
+echo "$n" > writer.seq
+"""
+
+
+def logrotate_setup(root):
+    put(root, "writer.sh", WRITER, 0o755)
+    put(root, "app.log", "".join(f"seq {n:06d} event\n" for n in range(1, 41)))
+    put(root, "writer.seq", "40\n")
+    remember(root, {"inode": (root / "app.log").stat().st_ino}, ["writer.sh"])
+
+
+def logrotate_lines(root):
+    import gzip
+    names = ["app.log.3.gz", "app.log.2.gz", "app.log.1", "app.log"]
+    lines = []
+    for name in names:
+        path = root / name
+        if not path.is_file():
+            continue
+        data = path.read_bytes()
+        if name.endswith(".gz"):
+            require(data[:2] == b"\x1f\x8b", name + " が実gzipではありません。")
+            try:
+                data = gzip.decompress(data)
+            except (OSError, EOFError):
+                raise ValueError(name + " を展開できません。")
+        else:
+            require(data[:2] != b"\x1f\x8b", name + " は delaycompress により未圧縮のはずです。")
+        lines += data.decode().splitlines()
+    return lines
+
+
+def logrotate_check(root):
+    data = fixture(root)
+    conf = read(root, "rotate.conf")
+    for pattern, message in ((r"^\s*(daily|size\s+\S+)\s*$", "daily か size で回転条件を指定します。"),
+                             (r"^\s*rotate\s+3\s*$", "世代は rotate 3。"),
+                             (r"^\s*compress\s*$", "compress が必要です。"),
+                             (r"^\s*delaycompress\s*$", "delaycompress が必要です。"),
+                             (r"^\s*missingok\s*$", "missingok が必要です。"),
+                             (r"^\s*notifempty\s*$", "notifempty が必要です。"),
+                             (r"^\s*copytruncate\s*$", "書込み継続のため copytruncate が必要です。")):
+        require(re.search(pattern, conf, re.M), message)
+    require("app.log" in conf, "rotate.conf の対象に app.log を指定します。")
+    require("considering log" in read(root, "dry-run.txt") and "app.log" in read(root, "dry-run.txt"),
+            "logrotate -d の予行出力を dry-run.txt に保存します。")
+    # 構文は実logrotateの予行で検証する。状態ファイルは使い捨てで本物の state を汚さない。
+    with tempfile.TemporaryDirectory() as scratch:
+        run(root, "logrotate", "-d", "-s", str(Path(scratch) / "state"), "rotate.conf")
+    require((root / "state").is_file(), "-s state で実rotateの状態ファイルを作ります。")
+    require((root / "app.log.1").is_file() and (root / "app.log.2.gz").is_file()
+            and (root / "app.log.3.gz").is_file(), "app.log.1(非圧縮)・.2.gz・.3.gz が揃うまで回転します。")
+    extra = [p.name for p in root.glob("app.log.*")
+             if p.name not in ("app.log.1", "app.log.2.gz", "app.log.3.gz")]
+    require(not extra, "世代が多すぎます/不要: " + ", ".join(extra))
+    lines = logrotate_lines(root)
+    total = int(read(root, "writer.seq"))
+    seqs = []
+    for line in lines:
+        match = re.fullmatch(r"seq (\d{6}) event", line)
+        require(match, "壊れたログ行があります: " + line[:40])
+        seqs.append(int(match.group(1)))
+    require(seqs and seqs == list(range(seqs[0], seqs[-1] + 1)), "ログ行の欠落・重複・順序違いがあります。")
+    require(seqs[-1] == total, "最新の追記行が失われています(copytruncate中の取りこぼし)。")
+    require(seqs[0] > 1, "4回以上回転して古い世代を実際に破棄するまで確認します。")
+    require((root / "app.log").stat().st_ino == data["inode"], "app.log のinodeが変わっています(copytruncateで元ファイルを使い続けます)。")
+    require(len((root / "app.log").read_text().splitlines()) <= 20, "app.log が最後の回転後も大きいままです。")
+    require(sum(p.stat().st_size for p in root.glob("app.log*")) < 20000, "保存量が制限を超えています。")
+    require(os.access(root / "app.log", os.W_OK), "app.log に書込みできません。")
+
+
+add("logrotate", "logrotateで世代管理し、書込み中のログを失わず回転する", "bash logrotate gzip", "bash logrotate gzip",
+    "app.log を rotate.conf で管理(対象は二重引用符付きで \"app.log\" {...} と書く)。daily(または size)・rotate 3・compress+delaycompress・missingok・notifempty・\n"
+    "copytruncate を設定。logrotate -d -s state rotate.conf の出力を dry-run.txt に保存してから、\n"
+    "./writer.sh 20 で追記しつつ logrotate -s state -f rotate.conf を5回実行。\n"
+    "app.log.1 は非圧縮、.2.gz と .3.gz は gzip、世代は最大3、app.log の inode は維持、行の欠落なし。",
+    logrotate_setup, logrotate_check,
+    '''cat > rotate.conf <<'CONF'
+"app.log" {
+    daily
+    rotate 3
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}
+CONF
+logrotate -d -s state rotate.conf > dry-run.txt 2>&1
+for i in 1 2 3 4 5; do
+  ./writer.sh 20
+  logrotate -s state -f rotate.conf
+done
+./writer.sh 5''',
+    ["printf '\"app.log\" {\\n daily\\n rotate 3\\n compress\\n delaycompress\\n missingok\\n notifempty\\n create\\n}\\n' > rotate.conf; logrotate -d -s state rotate.conf > dry-run.txt 2>&1; for i in 1 2 3 4 5; do ./writer.sh 20; logrotate -s state -f rotate.conf; done",
+     "printf '\"app.log\" {\\n daily\\n rotate 3\\n compress\\n delaycompress\\n missingok\\n notifempty\\n copytruncate\\n}\\n' > rotate.conf; logrotate -d -s state rotate.conf > dry-run.txt 2>&1; for i in 1 2; do ./writer.sh 20; logrotate -s state -f rotate.conf; done"])

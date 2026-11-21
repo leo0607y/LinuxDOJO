@@ -2068,9 +2068,9 @@ def cmd_compose(args):
     if sub == "down":
         cs = svc_containers()
         for c in cs:
-            print(f" ✔ Container {c['name']}  Removed")
+            print(f" [+] Container {c['name']}  Removed")
             st["containers"].pop(c["id"])
-        print(f" ✔ Network {project}_default  Removed")
+        print(f" [+] Network {project}_default  Removed")
         save(st)
         return 0
     if sub in ("stop", "start", "restart"):
@@ -2079,7 +2079,7 @@ def cmd_compose(args):
                 c["status"], c["finished"] = "exited", time.time()
             else:
                 evaluate_start(st, c)
-            print(f" ✔ Container {c['name']}  {'Stopped' if sub == 'stop' else 'Started'}")
+            print(f" [+] Container {c['name']}  {'Stopped' if sub == 'stop' else 'Started'}")
         save(st)
         return 0
     doc = load_compose(files)
@@ -2090,7 +2090,7 @@ def cmd_compose(args):
         die(f"unknown docker command: \"compose {sub}\"", 1)
     detach = "-d" in rest or "--detach" in rest
     print(f"[+] Running {len(doc['services']) + 1}/{len(doc['services']) + 1}")
-    print(f" ✔ Network {project}_default  Created")
+    print(f" [+] Network {project}_default  Created")
     order = list(doc["services"])
     for name in list(order):
         deps = doc["services"][name].get("depends_on") or []
@@ -2124,7 +2124,7 @@ def cmd_compose(args):
         old = find_container(st, cname)
         conf = json.dumps([image, env, ports, [m["dst"] for m in mounts], cmd], sort_keys=True)
         if old and old.get("compose_conf") == conf and old["status"] == "running":
-            print(f" ✔ Container {cname}  Running")
+            print(f" [+] Container {cname}  Running")
             continue
         if old:
             st["containers"].pop(old["id"])
@@ -2135,7 +2135,7 @@ def cmd_compose(args):
         c = new_container(st, cname, image, cmd, env, ports, mounts, labels)
         c["compose_conf"] = conf
         evaluate_start(st, c)
-        print(f" ✔ Container {cname}  {'Recreated' if old else 'Started'}")
+        print(f" [+] Container {cname}  {'Recreated' if old else 'Started'}")
     save(st)
     if not detach:
         for c in svc_containers():

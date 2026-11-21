@@ -35,7 +35,7 @@ TIPS = [
   ・`mkdir -p project/{src/{components,utils},tests}` → 入れ子もOK
   ・`touch file{1..5}.txt` → file1.txt〜file5.txt ／ `echo {a..e}` → a b c d e ／ `{01..10}` でゼロ埋め
   ・`echo {1..10..2}` → 1 3 5 7 9（ステップ指定）
-⚠ `{a, b}` のように **スペースを入れると展開されません**。
+注意: `{a, b}` のように **スペースを入れると展開されません**。
 """,
         "example": "echo cp nginx.conf{,.bak}     # echo を付けると展開結果だけ確認できる\nmkdir -p demo/{src,test,docs}\ntouch demo/src/file{1..3}.py\nls -R demo",
     },
@@ -46,7 +46,7 @@ TIPS = [
   ・`find . -name '*.log' | xargs rm` … 見つけたファイルをまとめて削除
   ・`cat urls.txt | xargs -n 1 curl -sO` … 1行ずつ curl（`-n 1` で1引数ずつ）
   ・`ls *.jpg | xargs -P 4 -I{} convert {} {}.png` … `-P 4` で4並列、`-I{}` で置換位置を指定
-⚠ ファイル名に **スペース** があると `my file.txt` が `my` と `file.txt` に分かれて事故る！
+注意: ファイル名に **スペース** があると `my file.txt` が `my` と `file.txt` に分かれて事故る！
   → `find . -name '*.tmp' -print0 | xargs -0 rm` … NUL文字(\\0)区切りで受け渡すので安全
   → 別解: `find . -name '*.tmp' -exec rm {} +`（find だけで完結）
 """,
@@ -210,7 +210,7 @@ def se2(ctx):
 def ce2(ctx):
     for f in KEEP:
         if not ctx.exists(f):
-            ctx.fail(f"🚨 消してはいけない `{f}` が消えています（`reset_mission` でやり直し）。")
+            ctx.fail(f"警告: 消してはいけない `{f}` が消えています（`reset_mission` でやり直し）。")
     left = [f for f in TMPS if ctx.exists(f)]
     if left:
         ctx.fail(f"まだ `.tmp` ファイルが残っています: 「{left[0]}」など {len(left)} 件。スペース入りのファイル名が `xargs` で分割されていませんか？")
@@ -289,7 +289,7 @@ register(
   ・`cmd | tee out.txt | grep NG` … 全結果を保存しつつ、パイプの続きで絞り込み（ファイルには **絞り込み前** の全結果）
   ・`tee -a` … 追記 ／ `tee f1 f2` … 複数ファイルに同時保存
   ・`cmd 2>&1 | tee log` … エラーも含めて保存
-⚠ `./healthcheck.sh | grep NG | tee health.log` と順番を変えると、ファイルには NG の行だけが残ります。
+注意: `./healthcheck.sh | grep NG | tee health.log` と順番を変えると、ファイルには NG の行だけが残ります。
 """,
     tip="""
 長時間かかる作業（OSアップデート、DBマイグレーション）は `sudo apt upgrade 2>&1 | tee upgrade_$(date +%F).log` のように
@@ -312,7 +312,7 @@ def se4(ctx):
 
 def ce4(ctx):
     if ctx.exists("deploy.ok"):
-        ctx.fail("🚨 テストが失敗しているのに `deploy.ok` が作られています！ 失敗したらそれ以降を実行しない繋ぎ方にしましょう（`rm deploy.ok` してやり直し）。")
+        ctx.fail("警告: テストが失敗しているのに `deploy.ok` が作られています！ 失敗したらそれ以降を実行しない繋ぎ方にしましょう（`rm deploy.ok` してやり直し）。")
     t = ctx.read("alert.log")
     if t is None or "FAILED" not in t:
         ctx.fail("`alert.log` に `FAILED` が書き込まれていません。失敗時に実行される側に `echo FAILED > alert.log` を書きましょう。")
@@ -339,7 +339,7 @@ CI もどきを1行で組みたい。「lint が通ったら test、test も通�
   次のコマンドを実行すると上書きされるので、確認は **直後に**。
 ・`A && B && C || D` の流れ:
   lint 成功(0) → test 失敗(<<code>>) → `touch deploy.ok` はスキップ → 直前の結果が失敗なので `|| D` が実行される
-⚠ `A && B || C` は if-then-else と完全には同じではありません。**B が失敗した場合も C が実行される** ので、
+注意: `A && B || C` は if-then-else と完全には同じではありません。**B が失敗した場合も C が実行される** ので、
   厳密に分けたいときは `if A; then B; else C; fi` と書きます。
 """,
     tip="""

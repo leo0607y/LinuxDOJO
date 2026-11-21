@@ -2,7 +2,7 @@
 
 目標は、日常のファイル操作、調査、開発環境、リモート作業、小規模なサービス運用を、説明できる根拠と復旧手段を持って行えることです。159個の主要コマンドを27の到達目標にまとめ、既存501問、本物のツールを動かす実習、専用VM実習をつなぎます。コマンド名を暗記した数では修了にしません。
 
-実操作が不足するユーザー/sudo管理、永続ネットワーク、ファイアウォール、別VMへの復元は[再監査で確認した不足](coverage.md#再監査で確認したコア内の不足)にまとめています。コアの全到達目標を自動実習だけで完結できる状態ではありません。
+再監査で見つかった不足（ユーザー/sudo、永続ネットワーク、ファイアウォール、別VMへの復元、署名付きrepo更新、logrotate）には実習を追加しました。VMの5件は静的検証のみで実VM未実施です。さらに見つかった未対応の領域を含め、[coverage.md](coverage.md#再監査で見つかった不足と対応状況)にまとめています。コアの全到達目標を自動実習だけで完結できる状態ではありません。
 
 対象の中心はUbuntu/Debian系のCLI環境です。DNF系ではパッケージ名・サービス名・設定配置の違いを確認します。GUI・GPU・無線・プリンター、全ディストリビューション、各クラウドの運用まで一律に習得できるという意味ではありません。対応の詳細と未検証部分は[網羅性の監査表](coverage.md)にあります。
 
@@ -76,11 +76,24 @@ python3 -m engine.vm_labs list
 python3 -m engine.vm_labs export --output ./vm-lab-bundle
 ```
 
-VM内の `sudo dojo-vm-lab list` で利用できるモジュールを確認します。`packages` と `software` は[ソフト導入・運用実習](../labs/vm/SOFTWARE.md)の順序で進めます。前者は実debの導入・設定変更・版更新・故障修復・removeとpurge、後者は実systemdのservice/timer・ログ・故障復旧・再起動・撤去です。各 `check` は段階を区別するため、最後の状態だけ作って途中の経験を省略しません。
+VM内の `sudo dojo-vm-lab list` で利用できるモジュールを確認します。1課題ずつ `setup`、`check`、`break`、修正、`check` の順に進めます。
+設定・データ・サービスは課題専用のものに限定します。管理操作は使い捨てVMで実行して初めて実機の経験になります。教材をエクスポートしただけでは修了しません。
 
-SSHの実認証・転送は `sudo dojo-vm-lab ssh setup` の後、通常のubuntuユーザーで `~/dojo-ssh-client/TASK.txt` を読みます。VM内の専用sshdへ、鍵認証・ホスト鍵照合・scp転送を行い、権限故障を直してrsyncで取得します。これは実SSH接続ですがVM内のloopbackが対象です。別VMとの疎通はnetwork実習で確認します。
+| モジュール | 内容 | 参照 |
+|---|---|---|
+| `packages` | 実debの導入・設定変更・版更新・故障修復・removeとpurge | [ソフト導入・運用実習](../labs/vm/SOFTWARE.md) |
+| `software` | 実systemdのservice/timer・ログ・故障復旧・再起動・撤去 | [ソフト導入・運用実習](../labs/vm/SOFTWARE.md) |
+| `ssh` | VM内の専用sshdへの鍵認証・ホスト鍵照合・scp転送・権限故障の復旧・rsync取得 | `sudo dojo-vm-lab ssh setup` の後、ubuntuユーザーで `~/dojo-ssh-client/TASK.txt` を読む |
+| `permissions` | ACLの実効権限と既定ACL | [VM手順](../labs/vm/README.md) |
+| `network` | 2台でのDNSとHTTPの比較 | [VM手順](../labs/vm/README.md) |
+| `performance` | 実測とサービス設定の故障調査 | [VM手順](../labs/vm/README.md) |
+| `storage` | 専用ext4のinode枯渇と再起動後のマウント | [VM手順](../labs/vm/README.md) |
+| `boot` | 専用systemdサービスの故障と復旧 | [VM手順](../labs/vm/README.md) |
+| `webstack` | Nginx・TLS・SQLite・502の復旧 | [VM手順](../labs/vm/README.md) |
 
-続いて `permissions`、`network`、`performance`、`storage`、`boot`、`webstack` を進めます。設定・データ・サービスは課題専用のものに限定します。管理操作は使い捨てVMで実行して初めて実機の経験になります。教材をエクスポートしただけでは修了しません。
+各 `check` は段階を区別するため、最後の状態だけ作って途中の経験を省略しません。
+`ssh` は実SSH接続ですが、対象はVM内のloopbackです。別VMとの疎通は `network` で確認します。
+上の順番は、`packages`、`software`、`ssh` の後に `permissions`、`network`、`performance`、`storage`、`boot`、`webstack` を進める想定です。
 
 ## ソフト導入後に共通して確認すること
 

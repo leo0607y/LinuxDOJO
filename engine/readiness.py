@@ -206,7 +206,7 @@ def play(scenario):
                 print(message)
                 if good:
                     record_result(scenario, assisted)
-                    print(ui.c("✓ 総合復習クリア！ " + ("手本ありで達成。reset で自力の復習もできます。" if assisted else "ヒントなしで達成できました。"), "bgreen"))
+                    print(ui.c(f"{ui.OK} 総合復習クリア！ " + ("手本ありで達成。reset で自力の復習もできます。" if assisted else "ヒントなしで達成できました。"), "bgreen"))
                     print(scenario["explanation"])
                     print("本物の bash で試す次の問題: " + " / ".join(scenario["practice"]))
                 continue
@@ -322,13 +322,13 @@ def mastery_lines(d=None):
     rows, ratio = mastery(d)
     lines = [f"Linux 自由自在度  {ui.progress_bar(ratio, 20)} {ratio * 100:.0f}%"]
     for name, done, total in rows:
-        lines.append(f"  {ui.pad(name, 40)} {ui.progress_bar(done / total if total else 0, 10)} {done}/{total}")
+        lines.append(f"  {ui.pad(ui.clip(name, 40), 40)} {ui.progress_bar(done / total if total else 0, 10)} {done}/{total}")
     records = d["learning"].get("readiness", {}).get("completed", {})
     challenge_ids = {s["id"] for s in scenarios()}
     independent = sum(records.get(key, {}).get("assisted") is False for key in challenge_ids)
     lines.append(f"  手本なしで解けた総合課題: {independent}/{len(challenge_ids)}（hint / answer を使った課題は復習できます）")
     if ratio >= 1 and independent == len(challenge_ids):
-        lines.append(ui.c("🐧 すべて制覇！ Linux 自由自在マスターです。", "bold", "bmagenta"))
+        lines.append(ui.c("すべて制覇！ Linux 自由自在マスターです。", "bold", "bmagenta"))
     else:
         lines.append("全分野の学習と、手本なしの総合課題に取り組み、実践モードで本物の bash でも確かめましょう。")
     return lines
@@ -350,9 +350,9 @@ def _choose_in_group(title, items):
     while True:
         ui.clear()
         completed = save.load()["learning"].get("readiness", {}).get("completed", {})
-        print(f"\n  🎪 {title} — ★ は難しさ（★ 基本 / ★★ 組み合わせ / ★★★ 総合）\n")
+        print(f"\n  {title} — * は難しさ（* 基本 / ** 組み合わせ / *** 総合）\n")
         for index, scenario in enumerate(items, 1):
-            stars = "★" * scenario.get("level", 1)
+            stars = "*" * scenario.get("level", 1)
             print(f"  [{index:>2}] {ui.pad(stars, 4)} {ui.pad(scenario['title'], 44)} {_status(completed, scenario['id'])}")
         try:
             choice = input("\n  課題番号 / Enter: 次の未達成 / b: 戻る > ").strip().lower()
@@ -381,7 +381,7 @@ def run():
         solo = sum(1 for _, items in groups for s in items if completed.get(s["id"], {"assisted": True})["assisted"] is False)
         print(ui.box(["目的だけを読み、自分で手順を組み立てる力試しです。正解の手順は1つではありません。",
                       f"全 {total} 課題（自力達成 {solo}）。hint や answer を使った達成は △ で記録します。", "",
-                      *mastery_lines(d)], title="🎪 課題まつり・Linux 自由自在マップ", color="green"))
+                      *mastery_lines(d)], title="課題まつり・Linux 自由自在マップ", color="green"))
         for index, (title, items) in enumerate(groups, 1):
             done = sum(1 for s in items if s["id"] in completed)
             mine = sum(1 for s in items if s["id"] in completed and not completed[s["id"]]["assisted"])

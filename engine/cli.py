@@ -64,7 +64,7 @@ def stage_label(m):
     s = runner.STAGES[m.stage]
     idx = [x.id for x in runner.missions_of(m.stage)].index(m.id) + 1
     total = len(runner.missions_of(m.stage))
-    return f"{s[2]} {s[0]}「{s[1]}」 第{idx}問 / 全{total}問"
+    return f"{s[0]}「{s[1]}」 第{idx}問 / 全{total}問"
 
 
 def cmd_mission(brief=False):
@@ -72,22 +72,30 @@ def cmd_mission(brief=False):
     d = _data()
     lines = [c(stage_label(m), "gray"), ""]
     lines += [fmt(x) for x in m.render(m.story, d).strip().split("\n")]
-    lines += ["", c("🎯 達成条件", "bold", "byellow")]
+    lines += ["", c(f"{ui.HEAD} 達成条件", "bold", "byellow")]
     for o in m.objectives:
         lines.append("  " + c("▶ ", "byellow") + fmt(m.render(o, d)))
-    lines += ["", c("📂 作業ディレクトリ: ", "bold") + c(str(runner.stage_dir(m.stage).relative_to(ROOT)) + "/", "bcyan")]
+    lines += ["", c(f"{ui.HEAD} 作業ディレクトリ: ", "bold") + c(str(runner.stage_dir(m.stage).relative_to(ROOT)) + "/", "bcyan")]
     if m.docker:
         from engine import docker_backend
         mode = docker_backend.detect_mode()
         if mode == "mock":
-            lines.append(c("🐳 Docker: シミュレーションモード", "bold", "bmagenta") +
+            lines.append(c(f"{ui.INFO} Docker: シミュレーションモード", "bold", "bmagenta") +
                          c("（docker 未導入/権限なしのため、学習用の模擬 docker CLI で動作中）", "gray"))
         else:
-            lines.append(c("🐳 Docker: 本物の Docker デーモンを使用中", "bold", "bgreen"))
+            lines.append(c(f"{ui.INFO} Docker: 本物の Docker デーモンを使用中", "bold", "bgreen"))
     print()
     print(box(lines, title=f"MISSION {m.id}  {m.title}", color="magenta", title_color="bmagenta"))
-    print(c("  コマンド: ", "gray") + "  ".join(c(x, "bcyan") for x in
-          ["mission", "hint", "answer", "check", "submit <答>", "reset_mission", "menu", "skip", "lqhelp"]))
+    cmds = ["mission", "hint", "answer", "check", "submit <答>", "reset_mission", "menu", "skip", "lqhelp"]
+    # 幅に収まるよう手で折り返す（コマンド名だけ色を付ける）
+    line, w = c("  コマンド: ", "gray"), 12
+    for x in cmds:
+        if w + ui.width(x) + 2 > ui.term_width() - 2:
+            print(line)
+            line, w = "            ", 12
+        line += c(x, "bcyan") + "  "
+        w += ui.width(x) + 2
+    print(line)
     print()
 
 
@@ -120,7 +128,7 @@ def cmd_hint(args):
     if target > lv:
         _set_hint_level(target)
         save.bump("hints")
-    labels = ["💡 ヒント1（考え方）", "🔧 ヒント2（使うコマンド）", "🧪 ヒント3（具体的なオプション例）"]
+    labels = [f"{ui.HINT} 1: 考え方", f"{ui.HINT} 2: 使うコマンド", f"{ui.HINT} 3: 具体的なオプション例"]
     lines = []
     for i in range(target):
         lines.append(c(labels[i], "bold", "byellow"))
@@ -178,20 +186,20 @@ def celebrate(m):
     lines.append(f"獲得スコア: {c(str(res['score']), 'bold', 'byellow')} / {m.points} pt"
                  + (c("  (ヒント使用)", "gray") if _hint_level() else "")
                  + (c("  (解答閲覧)", "gray") if _answer_viewed() else ""))
-    lines += ["", c("📘 実務ワンポイント解説", "bold", "bcyan")]
+    lines += ["", c(f"{ui.HEAD} 実務ワンポイント解説", "bold", "bcyan")]
     lines += [fmt(x) for x in m.render(m.tip, d).strip().split("\n")]
-    lines += ["", c("✅ 模範解答の一例", "bold", "bcyan")]
+    lines += ["", c(f"{ui.HEAD} 模範解答の一例", "bold", "bcyan")]
     lines += ["  " + c(x, "bcyan") for x in m.render(m.answer, d).strip().split("\n")]
-    print(box(lines, title="★ CLEAR ★", color="green", title_color="byellow"))
+    print(box(lines, title="CLEAR", color="green", title_color="byellow"))
     if res["activity"]["earned"]:
         print(c(f"\n  +{res['activity']['earned']} XP！", "bold", "byellow"))
     print("  " + save.activity_line(save.load()))
     if res["titles"] and not already:
         for t in res["titles"]:
-            print(c(f"\n  🎊 称号を獲得しました: {t}", "bold", "bmagenta"))
+            print(c(f"\n  称号を獲得しました: {t}", "bold", "bmagenta"))
     if res["rankup"] and not already:
         r = res["rankup"]
-        print(c(f"\n  ⬆️  ランクアップ！ {r[1]} {r[2]} に昇格しました！", "bold", "byellow"))
+        print(c(f"\n  ランクアップ！ {r[1]} {r[2]} に昇格しました！", "bold", "byellow"))
     print()
     if not _tty():
         return 0
@@ -216,7 +224,7 @@ def cmd_check(quiet_fail=False):
         return celebrate(m)
     if not quiet_fail:
         print()
-        print(box([c("まだ達成条件を満たしていません。", "bold", "bred"), "", *[fmt(x) for x in msg.split("\n")]],
+        print(box([c(f"{ui.NG} まだ達成条件を満たしていません。", "bold", "bred"), "", *[fmt(x) for x in msg.split("\n")]],
                   title="CHECK: 未達成", color="red", title_color="bred"))
         print(c("  ヒントが必要なら hint 、条件の確認は mission 、やり直しは reset_mission\n", "gray"))
     return 1
@@ -228,7 +236,7 @@ def cmd_submit(args):
         print(c("使い方: submit <答え>   例: submit 8080", "yellow"))
         return 1
     (STATE / "submitted").write_text(text + "\n")
-    print(c(f"  📨 「{text}」を提出しました。判定します…", "gray"))
+    print(c(f"  {ui.INFO} 「{text}」を提出しました。判定します…", "gray"))
     return cmd_check()
 
 
@@ -237,7 +245,7 @@ def cmd_reset():
     token = os.environ.get("LQ_SESSION") or runner.new_token()
     runner.prepare(m, token)
     save.bump("resets")
-    print(c(f"\n  ♻️  ミッション {m.id} のサンドボックスを初期状態に戻しました。", "bold", "bgreen"))
+    print(c(f"\n  {ui.OK} ミッション {m.id} のサンドボックスを初期状態に戻しました。", "bold", "bgreen"))
     cmd_mission()
     return 0
 
@@ -249,7 +257,7 @@ def cmd_autocheck():
     ok, _ = runner.run_check(m)
     if ok:
         (STATE / "notified").write_text("1")
-        print(c("  ✨ 達成条件を満たしたようです！ ", "bold", "byellow") + c("check", "bold", "bcyan")
+        print(c(f"  {ui.OK} 達成条件を満たしたようです！ ", "bold", "byellow") + c("check", "bold", "bcyan")
               + c(" と入力して判定しましょう。", "bold", "byellow"))
     return 0
 

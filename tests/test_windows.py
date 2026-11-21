@@ -150,7 +150,7 @@ class WindowsFilesTests(unittest.TestCase):
             path = Path(tmp) / "save.json"
             with patch.object(save, "SAVE", path):
                 d = save.empty()
-                d["titles"].append("🏅 ファイルシステムの開拓者")
+                d["titles"].append("ファイルシステムの開拓者")
                 save.store(d)
                 self.assertIn("開拓者", path.read_bytes().decode("utf-8"))
                 self.assertEqual(save.load()["titles"], d["titles"])

@@ -103,12 +103,12 @@ def briefing_splash(m):
     ui.clear()
     st = runner.STAGES[m.stage]
     print()
-    print(c(f"  {st[2]}  {st[0]}「{st[1]}」", "bold", "bcyan"))
+    print(c(f"  {st[0]}「{st[1]}」", "bold", "bcyan"))
     print(c(f"  MISSION {m.id}  {m.title}", "bold", "bmagenta"))
     print(ui.hr())
-    print(c("  ⏳ サンドボックスを準備しています…", "gray"))
+    print(c(f"  {ui.INFO} サンドボックスを準備しています…", "gray"))
     if m.docker:
-        print(c(f"  🐳 Docker モード: {docker_mode_label()}", "gray"))
+        print(c(f"  {ui.INFO} Docker モード: {docker_mode_label()}", "gray"))
     sys.stdout.flush()
 
 
@@ -127,7 +127,7 @@ def play(m):
         try:
             runner.prepare(m, token)
         except Exception as e:
-            print(c(f"\n  ❌ ミッションの準備に失敗しました: {type(e).__name__}: {e}", "bred"))
+            print(c(f"\n  {ui.NG} ミッションの準備に失敗しました: {type(e).__name__}: {e}", "bred"))
             if m.docker:
                 print(c("  Docker 関連のエラーの場合、設定メニューで Docker モードを「シミュレーション」にすると遊べます。", "yellow"))
             runner.kill_session(token)
@@ -190,13 +190,14 @@ def stage_select():
         ui.clear()
         print(header())
         d = save.load()
-        print(c("\n  🗺  ステージ選択\n", "bold", "bwhite"))
-        for s, (name, desc, icon) in runner.STAGES.items():
+        sel_w = max(20, min(44, ui.term_width() - 40))
+        print(c("\n  ステージ選択\n", "bold", "bwhite"))
+        for s, (name, desc) in runner.STAGES.items():
             ms = runner.missions_of(s)
             done = len([m for m in ms if m.id in d["cleared"]])
             key = "x" if s == runner.EXTRA else str(s)
             pct = int(100 * done / len(ms)) if ms else 0
-            print(f"   {c(f'[{key}]', 'bold', 'bcyan')} {icon} {ui.pad(name, 8)} {ui.pad(desc, 44)} "
+            print(f"   {ui.pad(c(f'[{key}]', 'bold', 'bcyan'), 4)} {ui.pad(name, 8)} {ui.pad(ui.clip(desc, sel_w), sel_w)} "
                   f"{ui.progress_bar(done / len(ms), 8)} {pct:>3}%  {c(f'{done}/{len(ms)}', 'gray')}")
         print(c("\n   [b] 戻る", "gray"))
         k = ask("\n  ステージ番号 > ").lower()
@@ -213,15 +214,16 @@ def mission_select(stage):
         ui.clear()
         print(header())
         d = save.load()
-        name, desc, icon = runner.STAGES[stage]
-        print(c(f"\n  {icon} {name}「{desc}」\n", "bold", "bwhite"))
+        name, desc = runner.STAGES[stage]
+        ttl_w = max(20, min(50, ui.term_width() - 36))
+        print(c(f"\n  {name}「{desc}」\n", "bold", "bwhite"))
         ms = runner.missions_of(stage)
         for i, m in enumerate(ms, 1):
             cl = d["cleared"].get(m.id)
-            mark = c("✔", "bold", "bgreen") if cl else c("○", "gray")
+            mark = c(ui.DONE, "bold", "bgreen") if cl else c(ui.TODO, "gray")
             score = c(f"{cl['score']:>3}pt", "byellow") if cl else c("  ---", "gray")
-            dk = " 🐳" if m.docker else ""
-            print(f"   {c(f'[{i}]', 'bold', 'bcyan')} {mark} {c(m.id, 'gray'):<6} {ui.pad(m.title, 50)} {score}{dk}")
+            dk = " [Docker]" if m.docker else ""
+            print(f"   {ui.pad(c(f'[{i}]', 'bold', 'bcyan'), 4)} {mark} {ui.pad(c(m.id, 'gray'), 6)} {ui.pad(ui.clip(m.title, ttl_w), ttl_w)} {score}{dk}")
         print(c("\n   [b] 戻る   （Enter のみで、この中の最初の未クリア問題から開始）", "gray"))
         k = ask("\n  問題番号 > ").lower()
         if k in ("b", "q"):
@@ -245,25 +247,25 @@ def dashboard():
     ui.clear()
     print(header())
     d = save.load()
-    print(c("\n  📊 進捗ダッシュボード\n", "bold", "bwhite"))
+    print(c("\n  進捗ダッシュボード\n", "bold", "bwhite"))
     rows = []
-    for s, (name, desc, icon) in runner.STAGES.items():
+    for s, (name, desc) in runner.STAGES.items():
         ms = runner.missions_of(s)
         done = [m for m in ms if m.id in d["cleared"]]
         sc = sum(d["cleared"][m.id]["score"] for m in done)
         mx = sum(m.points for m in ms)
-        rows.append([f"{icon} {name}", desc, ui.progress_bar(len(done) / len(ms), 10) + f" {int(100 * len(done) / len(ms)):>3}%",
+        rows.append([name, ui.clip(desc, max(20, ui.term_width() - 62)), ui.progress_bar(len(done) / len(ms), 10) + f" {int(100 * len(done) / len(ms)):>3}%",
                      f"{len(done)}/{len(ms)}", f"{sc}/{mx}"])
     print(ui.table(["ステージ", "内容", "達成率", "クリア", "スコア"], rows))
     st = d["stats"]
     n = len(d["cleared"])
-    print(c("\n  🎖  ランク", "bold", "bwhite"))
+    print(c(f"\n  {ui.HEAD} ランク", "bold", "bwhite"))
     for th, lv, nm in save.rank_table():
         cur = save.rank_of(n)[1] == lv
-        mark = c("▶", "byellow", "bold") if cur else (c("✔", "bgreen") if n >= th else c("・", "gray"))
+        mark = c(">", "byellow", "bold") if cur else (c(ui.DONE, "bgreen") if n >= th else c(ui.TODO, "gray"))
         print(f"    {mark} {c(lv, 'bold' if cur else 'gray'):<8} {c(nm, 'byellow' if cur else ('white' if n >= th else 'gray'))}"
               + c(f"  ({th}問クリア)", "gray"))
-    print(c("\n  🏅 称号", "bold", "bwhite"))
+    print(c(f"\n  {ui.HEAD} 称号", "bold", "bwhite"))
     if d["titles"]:
         for t in d["titles"]:
             print("    " + c(t, "bmagenta"))
@@ -272,7 +274,7 @@ def dashboard():
     from engine import security_progress
     print("\n" + "\n".join(security_progress.lines(d)))
     perfect = len([v for v in d["cleared"].values() if v.get("hints", 0) == 0 and not v.get("answer")])
-    print(c("\n  📈 プレイ統計", "bold", "bwhite"))
+    print(c(f"\n  {ui.HEAD} プレイ統計", "bold", "bwhite"))
     print(f"    総プレイ時間 {c(fmt_time(d['player'].get('play_seconds', 0)), 'bcyan')}   "
           f"プレイ回数 {c(d['player'].get('sessions', 0), 'bcyan')}   "
           f"ノーヒントクリア {c(perfect, 'bcyan')} 問")
@@ -285,7 +287,7 @@ def tips_catalog():
     from curriculum.extra_tips import TIPS
     while True:
         ui.clear()
-        print(c("\n  📖 小ネタ図鑑 ― 現場で一目置かれる Linux 時短テクニック 10選\n", "bold", "bwhite"))
+        print(c("\n  小ネタ図鑑 ― 現場で一目置かれる Linux 時短テクニック 10選\n", "bold", "bwhite"))
         for i, t in enumerate(TIPS, 1):
             print(f"   {c(f'[{i:>2}]', 'bold', 'bcyan')} {t['title']}")
         print(c("\n   [p] 実践モード（ミニ課題5問）に挑戦   [b] 戻る", "gray"))
@@ -356,12 +358,12 @@ def how_to_play():
         "   1問 100pt。ヒント1段階ごとに -10pt、解答閲覧で半分。クリア数に応じてランクが上がり、",
         "   ステージを全問クリアすると称号が手に入ります。進捗は save_data.json に自動保存されます。",
         "",
-        c("⚠ 注意", "bold", "byellow"),
+        c(f"{ui.WARN} 注意", "bold", "byellow"),
         "   サブシェルは本物の bash です。作業は workspace/ の中で行いましょう（外に出るとプロンプトが赤くなります）。",
         f"   Stage 5 の Docker は現在「{docker_mode_label()}」モードです（設定メニューで変更可）。",
     ]
     print()
-    print(box(lines, title="❓ 遊び方", color="green", title_color="bgreen"))
+    print(box(lines, title="遊び方", color="green", title_color="bgreen"))
     pause()
 
 
@@ -384,7 +386,7 @@ def settings():
         ui.clear()
         d = save.load()
         cur = d["settings"].get("docker_mode", "auto")
-        print(c("\n  ⚙  設定\n", "bold", "bwhite"))
+        print(c("\n  設定\n", "bold", "bwhite"))
         real_ok = docker_backend.real_available()
         print(f"   Docker デーモン: {c('利用可能', 'bgreen') if real_ok else c('利用不可（未インストール or 権限なし）', 'yellow')}")
         print(f"   現在の Docker モード: {c(cur, 'bold', 'bcyan')}  → 実際の動作: {c(docker_mode_label(), 'bold')}\n")
@@ -402,7 +404,7 @@ def settings():
             docker_backend._MODE = None
             os.environ.pop("LQ_DOCKER_MODE", None)
             if k == "3" and not real_ok:
-                print(c("  ⚠ Docker デーモンが使えないため、実際にはシミュレーションモードで動作します。", "yellow"))
+                print(c(f"  {ui.WARN} Docker デーモンが使えないため、実際にはシミュレーションモードで動作します。", "yellow"))
                 pause("Enter で続ける")
         if k == "r":
             yn = ask(c("  本当に全ての進捗を消去しますか？ 消去するなら yes と入力 > ", "bred"))
@@ -506,8 +508,10 @@ def learning_dashboard(mode):
     from engine import readiness
     print()
     for line in readiness.mastery_lines(d):
-        print("  " + line)
-    print("\n  [7] モード選択で切り替えられます。レッスンの復習は [2]、課題まつりは [8] から。")
+        for part in ui.wrap("  " + line, ui.term_width() - 2):
+            print(part)
+    print("\n  [7] モード選択で切り替えられます。")
+    print("  レッスンの復習は [2]、課題まつりは [8] から。")
     pause()
 
 
@@ -524,19 +528,18 @@ def main_menu():
             cont = "続きから → " + step["title"]
             if guided.completed_course(mode) and not guided.progress_for(mode).get("reviewing"):
                 cont = "このモードは学習完了！ → 次のモードを選ぶ（復習は [2]）"
-        items = [("1", "▶ ", cont), ("2", "🗺 ", "ステージ選択"), ("3", "📊", "進捗ダッシュボード"),
-                 ("4", "📖", "小ネタ図鑑（Extra 閲覧モード）"), ("5", "❓", "遊び方・操作コマンド一覧"),
-                 ("6", "⚙ ", "設定（Docker モード / セーブ初期化）"),
-                 ("7", "🌱", "モード選択（はじめて / 基礎 / 応用 / 達人 / 実践）"),
-                 ("8", "🎪", "課題まつり（総合復習）・自由自在マップ"),
-                 ("9", "🔧", "Linux常用コース（目的検索・本物のツール実習）"), ("q", "🚪", "終了")]
+        items = [("1", cont), ("2", "ステージ選択"), ("3", "進捗ダッシュボード"),
+                 ("4", "小ネタ図鑑（Extra 閲覧モード）"), ("5", "遊び方・操作コマンド一覧"),
+                 ("6", "設定（Docker モード / セーブ初期化）"),
+                 ("7", "モード選択（はじめて / 基礎 / 応用 / 達人 / 実践）"),
+                 ("8", "課題まつり（総合復習）・自由自在マップ"),
+                 ("9", "Linux常用コース（目的検索・本物のツール実習）"), ("q", "終了")]
         if mode != "practice":
             beginner_labels = {"2": "レッスン選択・復習", "4": "用語・コマンド辞典", "6": "設定（進捗の初期化）"}
-            items = [(key, icon, beginner_labels.get(key, label))
-                     for key, icon, label in items]
+            items = [(key, beginner_labels.get(key, label)) for key, label in items]
         print()
-        for k, icon, label in items:
-            print(f"   {c(f'[{k}]', 'bold', 'bcyan')} {icon} {label}")
+        for k, label in items:
+            print(f"   {c(f'[{k}]', 'bold', 'bcyan')} {label}")
         k = ask("\n  メニュー番号 > ").lower()
         if k in ("1", ""):
             if mode != "practice":
@@ -578,7 +581,7 @@ def main_menu():
         elif k in ("q", "quit", "exit"):
             ui.clear()
             d = save.load()
-            print(c("\n  またね！ 今日の学びが明日のトラブル対応を救う。🐧\n", "bold", "bcyan"))
+            print(c("\n  またね！ 今日の学びが明日のトラブル対応を救う。\n", "bold", "bcyan"))
             if mode != "practice":
                 print("  学習の続きは保存済みです。次回も [1] 続きから で再開できます。\n")
                 return
@@ -613,14 +616,14 @@ def main():
             main_menu()
             return 0
         except KeyboardInterrupt:
-            print(c("\n\n  中断しました。進捗は保存されています。またね！🐧\n", "bcyan"))
+            print(c("\n\n  中断しました。進捗は保存されています。またね！\n", "bcyan"))
             return 0
         except Exception:
             import traceback
             log = runner.WORKSPACE / "error.log"
             with open(log, "a", encoding="utf-8") as f:
                 f.write(time.strftime("[%Y-%m-%d %H:%M:%S]\n") + traceback.format_exc() + "\n")
-            print(c(f"\n  ⚠ 予期せぬエラーが発生しました（詳細: {log}）。メニューに戻ります。", "bred"))
+            print(c(f"\n  {ui.WARN} 予期せぬエラーが発生しました（詳細: {log}）。メニューに戻ります。", "bred"))
             pause("Enter で続ける")
 
 

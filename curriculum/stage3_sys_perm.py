@@ -66,7 +66,7 @@ register(
     tip="""
 SSH は秘密鍵のパーミッションが緩いと `WARNING: UNPROTECTED PRIVATE KEY FILE!` と言って **接続を拒否** します。
 `chmod 600 ~/.ssh/id_ed25519` は必修。
-⚠ 困ったときの `chmod 777` は「誰でも書き換え可能」＝改ざん・マルウェア設置の温床になるので、本番では絶対に避けましょう。
+注意: 困ったときの `chmod 777` は「誰でも書き換え可能」＝改ざん・マルウェア設置の温床になるので、本番では絶対に避けましょう。
 """,
     setup=s31, check=c31,
     solution='chmod 755 deploy.sh\nchmod 600 secret.key\nchmod 644 index.html\nsubmit "$(umask)"',
@@ -185,7 +185,7 @@ register(
 ・**シンボリックリンク** (`ln -s`) … 「パスへのショートカット」。実体が消えると **リンク切れ** になる。ディレクトリにも張れる。
 ・**ハードリンク** (`ln`) … 同じ実体（inode）に別名を付ける。どちらかを消してももう片方から読める。ディレクトリや別ディスクには不可。
 `ls -li` の先頭の数字が inode 番号。ハードリンク同士は同じ番号になります。
-⚠ 既存の `current`（ディレクトリへのリンク）に `ln -sf new current` すると、リンクを辿って
+注意: 既存の `current`（ディレクトリへのリンク）に `ln -sf new current` すると、リンクを辿って
   `versions/app-2.0.0/app-2.1.0` という **リンク先の中** に作られてしまいます。`-n`（no-dereference）でリンク自体を置き換えましょう。
 リンク切れの発見には `find . -xtype l` が便利です。
 """,
@@ -249,7 +249,7 @@ register(
 ・`env` / `printenv` … 環境変数の一覧 ／ `echo $VAR` … 値の表示 ／ `unset VAR` … 削除
 PATH は「コマンドを探すディレクトリ」を `:` で繋いだリストで、**左から順に** 探されます。
 `export PATH="$PWD/mytools/bin:$PATH"` は「新しいディレクトリ + 元の PATH」という意味。
-⚠ `export PATH=mytools/bin` のように元の値を消すと、`ls` も `cat` も見つからなくなります（そのシェルを閉じれば元通り）。
+注意: `export PATH=mytools/bin` のように元の値を消すと、`ls` も `cat` も見つからなくなります（そのシェルを閉じれば元通り）。
 `which コマンド` / `type コマンド` で、実際にどのファイルが実行されるか確認できます。
 """,
     tip="""
@@ -367,7 +367,7 @@ register(
 `tail -f backup_progress.log` で進捗を眺めてみましょう（Ctrl+C で tail だけ終了）。
 """,
     tip="""
-⚠ `&` や `bg` のジョブは **端末（SSH）を閉じると道連れで終了** することがあります（SIGHUP）。
+注意: `&` や `bg` のジョブは **端末（SSH）を閉じると道連れで終了** することがあります（SIGHUP）。
 SSH 切断後も処理を続けたいなら `nohup ./job.sh > job.log 2>&1 &` や、`tmux` / `screen` のセッション内で実行するのが鉄則。
 すでに実行中のジョブなら `disown %1` で端末から切り離せます（Extra Stage の小ネタ集も参照）。
 """,
@@ -449,7 +449,7 @@ while [ $SECONDS -lt 10800 ]; do sleep 2; done
 def c38(ctx):
     for f in ("var/log/app/app.log", "var/log/app/access.log", "var/lib/app/data.db"):
         if not ctx.exists(f):
-            ctx.fail(f"🚨 必要なファイル `{f}` まで消えています！犯人の巨大ファイルだけを消しましょう（`reset_mission` でやり直し）。")
+            ctx.fail(f"警告: 必要なファイル `{f}` まで消えています！犯人の巨大ファイルだけを消しましょう（`reset_mission` でやり直し）。")
     if ctx.exists("var/cache/app/tmp/core.20251118.dump"):
         ctx.fail("ディスクを圧迫している巨大ファイルがまだ残っています。`du` で犯人を突き止めましょう。")
     if not os.access(ctx.p("deploy.sh"), os.X_OK):
@@ -465,7 +465,7 @@ def c38(ctx):
 register(
     id="3-8", stage=S, title="【実践】ディスク逼迫と起動しないアプリ",
     story="""
-🚨 深夜のアラート:「本番アプリが落ちている。再起動スクリプト `deploy.sh` も動かない！」
+警告: 深夜のアラート:「本番アプリが落ちている。再起動スクリプト `deploy.sh` も動かない！」
 調べると、① `var/` 配下のどこかに **巨大なゴミファイル** があってディスクが逼迫し、② `deploy.sh` には **実行権限が無い** らしい。
 犯人を突き止めて片付け、アプリを **バックグラウンドで** 起動させよ。
 """,
@@ -486,7 +486,7 @@ register(
 """,
     tip="""
 `df -h` で「どのディスクが一杯か」→ `du -sh /* 2>/dev/null | sort -h` で「どこが大きいか」→ 掘り下げ、が定番の調査手順。
-⚠ 実行中のプロセスが掴んだまま削除したファイルは、**プロセスが終わるまで容量が解放されません**。
+注意: 実行中のプロセスが掴んだまま削除したファイルは、**プロセスが終わるまで容量が解放されません**。
 `lsof +L1` で「削除済みだが開かれているファイル」を探し、プロセスを再起動しましょう。
 ncdu（要インストール）を使えば、対話的にディスク使用量を掘り下げられて便利です。
 """,

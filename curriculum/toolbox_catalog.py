@@ -120,7 +120,7 @@ _NATIVE = {
     "git": ["git"], "python": ["python", "python-packages"], "build": ["build"],
     "database": ["sqlite"], "automation": ["shell", "incident"],
     "recovery": ["incident", "release"], "productivity": ["fzf"],
-    "containers": ["docker"],
+    "containers": ["docker"], "logging": ["logrotate"],
 }
 for _item in TOPICS:
     _item["labs"] = _NATIVE.get(_item["id"], [])

@@ -63,7 +63,7 @@ def s12(ctx):
                 boxes.append(d)
     target = random.choice(boxes)
     ctx.data["box"] = target
-    ctx.write(f"{target}/treasure.txt", "🎁 おめでとう！ここが宝箱です。\n")
+    ctx.write(f"{target}/treasure.txt", "おめでとう！ここが宝箱です。\n")
     ctx.write("warehouse/README.txt", "倉庫の地図: area-a〜c / shelf-1〜3 / box-1〜4\n宝箱 (treasure.txt) はどこかの box の中にあります。\n")
     for d in random.sample(boxes, 6):
         if d != target:
@@ -255,7 +255,7 @@ register(
     answer="cp -r config config_backup\ncp nginx.conf nginx.conf.bak\nls -la config_backup config_backup/db",
     explanation="""
 `cp -r`（または `-R`）はディレクトリを再帰的に、隠しファイルも含めて丸ごとコピーします。
-⚠ 落とし穴: コピー先 `config_backup` が **既に存在する** と、`config_backup/config/` の中にコピーされます。
+注意: 落とし穴: コピー先 `config_backup` が **既に存在する** と、`config_backup/config/` の中にコピーされます。
   中身だけを既存ディレクトリへ入れたいなら `cp -r config/. config_backup/` と書きます。
 `cp -a`（archive）は `-r` に加えてパーミッション・所有者・タイムスタンプも保持するので、バックアップにはより適しています。
 `cp -i` を付けると上書き前に確認してくれます。
@@ -294,9 +294,9 @@ def s16(ctx):
 def c16(ctx):
     for k, v in IMPORTANT.items():
         if ctx.read(k) != v:
-            ctx.fail(f"🚨 `{k}` が消えています！重要データを誤削除しました。`reset_mission` でやり直しましょう。")
+            ctx.fail(f"警告: `{k}` が消えています！重要データを誤削除しました。`reset_mission` でやり直しましょう。")
     if not ctx.exists("report.tmp.bak"):
-        ctx.fail("🚨 `report.tmp.bak` まで消えています。`*.tmp` は「.tmp で終わる」ファイルだけにマッチします。")
+        ctx.fail("警告: `report.tmp.bak` まで消えています。`*.tmp` は「.tmp で終わる」ファイルだけにマッチします。")
     if ctx.exists("tmp_cache"):
         ctx.fail("`tmp_cache/` がまだ残っています（中に書き込み禁止のファイルもあるので注意）。")
     left = [p.name for p in ctx.work.glob("*.tmp")]
@@ -327,7 +327,7 @@ register(
 Linux の `rm` には **ゴミ箱がありません**。消したら基本的に戻りません。
 """,
     tip="""
-⚠ 伝説の事故: `rm -rf $DIR/` で変数 `DIR` が空だと `rm -rf /` になります。
+注意: 伝説の事故: `rm -rf $DIR/` で変数 `DIR` が空だと `rm -rf /` になります。
 スクリプトでは `rm -rf "${DIR:?DIR is empty}"` と書くと、変数が空のときに停止してくれます。
 また `rm -rf * .tmp`（スペースが混入）は **全ファイル削除** になる恐怖のタイプミス。
 本番では「`ls` で確認 → 同じ引数で `rm`」のクセを徹底しましょう。

@@ -243,7 +243,7 @@ def menu():
     from engine import ui
     while True:
         ui.clear()
-        print(ui.box([ui.c("🔧 Linux常用コース", "bold", "bwhite"), "",
+        print(ui.box([ui.c("Linux常用コース", "bold", "bwhite"), "",
                       "目的から課題を探し、本物の道具で練習します。",
                       "既存の実践モードとは別に、専用フォルダへ保存します。"], color="green"))
         for key, label in (("1", "目的・コマンドから探す"), ("2", "実機実習を選ぶ"),

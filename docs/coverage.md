@@ -16,20 +16,39 @@
 
 `audit_coverage.py` の428/528は教材ソースに名前が出た割合です。本表の159コマンドも到達目標の検索語であり、名前の数だけでは網羅率を計算しません。`engine.toolbox audit` は参照先の整合性を検査します。理解や実機修了の判定ではありません。
 
-## 再監査で確認したコア内の不足
+## 再監査で見つかった不足と対応状況
 
-2026-11-21に課題とVM実装を再照合した結果、**27分野への案内があることと、その全到達目標を実操作で検証できることは一致していません**。「日常CLIの基礎と主要ツールは広い範囲を扱う」が現状で、小規模サーバー管理までほぼ網羅したという評価は早すぎます。
+2026-11-21の再監査で、27分野への案内があることと、その全到達目標を実操作で検証できることは一致していないと判明しました。見つかった6件に、次の実習を追加しました。**追加したVM実習5件は、この開発機に qemu も sudo が無いため、構文検査・誤った文脈での拒否・静的な安全確認までしか行っていません。実VMでの実行は未実施です。** 実VMで初回に確認する項目は `labs/vm/README.md` に記載しています。
 
-| 優先 | 不足する実操作 | すでにあるものとの差 |
+| 不足していた実操作 | 追加した実習 | 検証状況 |
 |---|---|---|
-| 高 | ユーザー・グループ・sudoの作成→反映→許可/拒否→撤去 | VM permissionsのユーザーはsetupが自動作成するnologinアカウント。利用者が操作するのはACLで、useradd/usermod/visudoの管理実習ではない。7-4は模擬、16/28は設定・記録 |
-| 高 | NIC・固定IP/DHCP・デフォルト経路・DNSクライアント設定の適用と永続化 | 13-1/17-1は実OSへ適用しない。VM networkは実DNS/HTTPを検証するが、壊すのはdnsmasqの回答。NICや経路を誤設定して戻す課題ではない。IPv6の実操作も不足 |
-| 高 | 基本ファイアウォールの実適用・許可/拒否・接続を保った復旧 | 17-2/19-10等に設定検査はあるが、VMで実ルールを適用する課題はない。サーバー管理の基礎として補う必要がある |
-| 高 | バックアップから別VMへサービス全体を復元 | 実tar/rsync/SQLiteの退避・復元はある。13-8の再構築は計画作成で、webstackの別VM復元は追加の手動課題。サービス・設定・データの再構築を一括判定する実習はない |
-| 中 | OS更新・リポジトリ署名・依存不整合からの復旧 | VM packagesは実ローカルdebの導入/更新/削除。外部repo、実署名エラー、依存競合、OS更新全体の運用とは別 |
-| 中 | ログ保存量・実ローテーション・書込み継続の確認 | journal閲覧は実機対応。23-13/14はlogrotate/journaldの設定検査で、実rotateや保存制限の反映は未検証 |
+| ユーザー・グループ・sudoの作成→反映→許可/拒否→撤去 | VM `users` | 静的のみ。`sudo -n -l` で許可/拒否を判定し、拒否側のコマンドは実行しない |
+| NIC・固定IP・経路・DNSクライアント・IPv6の適用と永続化 | VM `netconfig` | 静的のみ。dummy NIC `dojo0` だけを操作し、既定経路と本線は変更しない |
+| 基本ファイアウォールの実適用・許可/拒否・接続を保った復旧 | VM `firewall` | 静的のみ。専用nftテーブルと netns+veth で判定し、自動ロールバック付き適用スクリプトを用意 |
+| バックアップから別VMへサービス全体を復元 | VM `restore`（app と client の2台） | 静的のみ。UIDがVM間で異なる状況を固定して再現 |
+| OS更新・リポジトリ署名・依存不整合からの復旧 | VM `osupdate` | 静的のみ。ローカルの署名付きaptリポジトリを使い、署名回避は不合格 |
+| ログ保存量・実ローテーション・書込み継続の確認 | native `logrotate` | ホストの実 logrotate/gzip で実行し、単体テストが通過（logrotate が無い環境ではskip） |
 
-実CPU/OOM/I/O障害の切り分け、実cron、対話的なtmuxのdetach/attachにも実習の深さが足りません。デスクトップの日本語入力・無線・音声・アプリ関連付けなども自動実習がなく、「Linux常用PC」全体を対象にする場合は別途補完が必要です。後掲の修了確認には、現時点では手動確認で補う項目が含まれています。
+この表は「不足を実装した」記録であり、「小規模サーバー管理まで網羅した」という評価ではありません。実CPU/OOM/I/O障害の切り分け、実cron、対話的なtmuxのdetach/attach、デスクトップの日本語入力・無線・音声・アプリ関連付けは、引き続き実習の深さが足りません。後掲の修了確認には、手動確認で補う項目が含まれています。
+
+## 追加監査で見つかった未対応の領域
+
+上の6件とは別に、2026-11-21の監査で次の領域は「実操作の課題がない、または読解止まり」と判定しました。既存501問の多くは採取済み出力や設定を読む方式のため、語が教材に出ることは実操作の証拠としていません。優先度順です。
+
+| 優先 | 領域 | 現状 | 追加するなら |
+|---|---|---|---|
+| 1 | sshdの堅牢化（鍵のみ、root禁止、ProxyJump） | 読解止まり | 専用sshdを別ポートで立て、`sshd -t`→reload→許可/拒否を確認（VM） |
+| 2 | fstab誤記・LVM・swap・LUKS | storageは容量/inodeのみ | ループバックで作成→fstab誤記→`nofail`で復旧（VM） |
+| 3 | 実cron / at | 実cronは深さ不足、atは課題なし | 専用ユーザーのcrontabでPATH・環境・flock・ログを検証（native可） |
+| 4 | journaldの永続化と保存制限 | 設定検査のみ | `Storage=persistent`と`SystemMaxUse`を設定し再起動後を確認（VM） |
+| 5 | sysctl・カーネルモジュール | 読解のみ | `sysctl.d`で永続化、modprobeのblacklist（VM） |
+| 6 | GRUB/initramfs・レスキュー | bootはunit復旧のみ | VMのスナップショット前提で手動実習（高リスク） |
+| 7 | cgroup・ulimit・OOM | 読解のみ | `MemoryMax`付きunitをOOM killさせ、journal/dmesgで特定（VM） |
+| 8 | bash堅牢化（`set -euo pipefail`、trap） | trapは記録止まり | 失敗注入下のスクリプト修正（native可、最も低コスト） |
+| 9 | NTP/chrony・timezone・locale | timedatectlの手順のみ | 時刻ずれを再現し同期へ戻す（VM） |
+| 10 | fail2ban・auditd・AppArmor/SELinux | 実習なし | ログイン失敗の自動ban、監査ルールと`ausearch`（VM） |
+
+他にtcpdump（loopbackでnative可）、debの自作、MTA、tmuxの対話的なdetach/attach、`at`が浅いか未対応です。これらが埋まるまで、「Linuxの不足はない」とは言えません。
 
 ## コアの到達目標と課題
 
@@ -46,9 +65,9 @@ native欄のIDは `python3 -m engine.toolbox start ID` で開始します。VM�
 | [同期・世代管理・別の場所への復元](LINUX_DAILY_USE.md#backup) | dry-run、差分、除外、別の場所へ復元 | 6-8、9-7、11-6、13-8、17-10、23-3、23-4 | `rsync`, `archive` | 実ツール、計画課題は記録 |
 | [OSを識別して導入・更新・削除・提供元を確認](LINUX_DAILY_USE.md#packages) | 実deb導入→設定→更新→修復→remove/purge | 12-5、17-8、24-12、29-11、29-12、29-13、29-14 | —（VM/手動） | 既存は記録/設定、VM packages |
 | [所有者・グループ・権限・ACLを直す](LINUX_DAILY_USE.md#permissions) | 許可と拒否の両方を別利用者で確認 | 3-1、3-2、9-2、9-4、12-7、16-4、16-6、16-10 | —（VM/手動） | 通常modeは実ツール、ACL/利用者はVM permissions |
-| [ユーザー・グループ・ログインとsudo](LINUX_DAILY_USE.md#users) | 専用利用者・グループ・sudoを管理 | 7-4、16-10、16-11、28-1、28-2、28-3、28-4 | —（VM/手動） | 7-4は模擬、他は記録/設定。VM permissionsはACL操作のみ、ユーザー管理は手動 |
+| [ユーザー・グループ・ログインとsudo](LINUX_DAILY_USE.md#users) | 専用利用者・グループ・sudoを管理 | 7-4、16-10、16-11、28-1、28-2、28-3、28-4 | —（VM） | 7-4は模擬、他は記録/設定。VM `users`（静的検証のみ、実VM未実施）がuseradd/visudo/sudo許可拒否を扱う |
 | [プロセス・ジョブ・資源・シグナル](LINUX_DAILY_USE.md#process) | 対象PID、通常終了、資源、失敗を区別 | 3-5、3-6、3-7、12-1、12-2、12-3、12-4、27-1、27-9、27-10 | `incident` | 実ツール+記録、VM performance |
-| [IP・経路・DNS・待受を順に調べる](LINUX_DAILY_USE.md#network) | IP・経路・DNS・待受・応答を切り分け | 4-5、4-6、13-1、13-2、13-6、17-1、29-7、32-15 | `curl` | localhost実ツール+記録、VM networkはDNS/HTTP。NIC・経路の適用は未実装 |
+| [IP・経路・DNS・待受を順に調べる](LINUX_DAILY_USE.md#network) | IP・経路・DNS・待受・応答を切り分け | 4-5、4-6、13-1、13-2、13-6、17-1、29-7、32-15 | `curl` | localhost実ツール+記録、VM networkはDNS/HTTP、VM `netconfig` がNIC・固定IP・経路・IPv6（静的検証のみ、実VM未実施） |
 | [curlで取得・API・HTTPエラーを確認](LINUX_DAILY_USE.md#http) | 正常/失敗応答、本文、終了コードを分ける | 4-3、4-4、8-2、32-5、32-6、32-7、32-8 | `curl` | localhost実ツール |
 | [TLSの名前・期限・信頼・鍵を検証](LINUX_DAILY_USE.md#tls) | 信頼・名前・期限・鍵対応を検証 | 13-3、20-10、20-11、20-12、20-14、20-16 | `tls` | 実OpenSSL+記録、VM webstack |
 | [SSH接続・鍵・転送・踏み台・認証失敗](LINUX_DAILY_USE.md#ssh) | 鍵・ホスト識別・接続・転送・拒否を確認 | 4-7、9-3、20-6、20-9、34-1、34-5、34-6、34-10、34-11、34-12、34-18 | `ssh` | 実鍵/ssh -G+記録、VM sshは実認証/転送 |
@@ -59,7 +78,7 @@ native欄のIDは `python3 -m engine.toolbox start ID` で開始します。VM�
 | [SQLiteの検索・更新・退避・復元](LINUX_DAILY_USE.md#database) | transaction、退避、復元、整合性確認 | 13-5、32-24 | `sqlite` | 既存は記録、nativeは実sqlite3 |
 | [Nginxの設定検証・公開・502・TLS](LINUX_DAILY_USE.md#web) | 構文検査、proxy、TLS、502復旧、再起動 | 13-4、20-14、21-14 | —（VM/手動） | 既存は記録/設定、VM webstack |
 | [systemdで起動・停止・自動起動・復旧](LINUX_DAILY_USE.md#services) | service/timer、ログ、復旧、自動起動、撤去 | 7-1、7-2、7-3、11-5、14-2、18-2、28-20、28-22、28-23 | —（VM/手動） | Stage7は模擬、他は記録/設定、VM boot/software |
-| [ログを時間・サービスで絞り、保存を制御](LINUX_DAILY_USE.md#logging) | 時間・unit・保存量を絞って調べる | 7-2、10-2、17-6、17-12、23-13、23-14、29-24 | —（VM/手動） | 一部実ツール、主に記録、VM software/performance |
+| [ログを時間・サービスで絞り、保存を制御](LINUX_DAILY_USE.md#logging) | 時間・unit・保存量を絞って調べる | 7-2、10-2、17-6、17-12、23-13、23-14、29-24 | `logrotate` | 実logrotate+記録、VM software/performance |
 | [シェル・cron・timer・失敗時の後始末](LINUX_DAILY_USE.md#automation) | 限定環境、終了コード、重複、trap、ログ | 6-1、6-2、6-3、6-4、6-7、17-11、24-8、24-9、28-20、29-20 | `shell`, `incident` | 実bash、cron/systemdは模擬/設定、VM software |
 | [容量・inode・マウント・UUID・fstab](LINUX_DAILY_USE.md#storage) | 容量とinode、UUID、マウント、保持データ | 3-8、11-1、11-2、11-3、11-7、15-2、15-10、26-9、26-20 | —（VM/手動） | 記録/設定、VM storageは実ext4イメージ |
 | [Dockerを実機で導入し構築・運用・撤去](LINUX_DAILY_USE.md#containers) | 実daemonでbuild/compose/volumeと復旧 | 5-1、5-2、5-3、5-4、5-5、5-6、5-7、7-5、7-6、7-7、22-15 | `docker` | 実Docker/模擬を切替 |

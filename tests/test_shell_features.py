@@ -292,7 +292,7 @@ class MasteryTests(unittest.TestCase):
              contextlib.redirect_stdout(out):
             readiness.run()
         self.assertIn("自由自在度", out.getvalue())
-        self.assertIn("★", out.getvalue())
+        self.assertIn("*", out.getvalue())
 
 
 if __name__ == "__main__":

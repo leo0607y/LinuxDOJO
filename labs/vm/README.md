@@ -165,13 +165,18 @@ TASK.txtの順に操作し、終了後は `sudo dojo-vm-lab ssh reset` で専用
 |---|---|---|
 | storage | 専用ext4イメージ、inode枯渇、保持データ、再起動後のループマウント | 物理ディスク、パーティション変更、LVM/RAID、破損したルートFS |
 | boot | 専用systemdサービスの設定喪失と復旧、再起動後の稼働 | OS起動不能、GRUB、initramfs、レスキューメディア |
-| network | 2台間のDNS/HTTP、名前解決と疎通の比較 | 経路故障の自動注入、IPv6、組織のファイアウォール設計 |
+| network | 2台間のDNS/HTTP、名前解決と疎通の比較 | 経路故障の自動注入、組織のファイアウォール設計（NIC・経路・IPv6は `netconfig`、ファイアウォールは `firewall` を参照） |
 | performance | 小さな専用プロセスのログ・入出力・straceによる調査 | 大規模負荷の性能設計、CPU/メモリ/I/O全体のボトルネック測定 |
 | permissions | 専用ユーザーと実際のACLによる許可・拒否の確認 | SELinux/AppArmorポリシーの設計・運用 |
 | webstack | Nginx→Python→SQLite、TLSの名前検証、502、再起動後の復旧 | PostgreSQL等のDBサーバー運用、公開CA更新、冗長化 |
 | packages | 実debの導入・設定・更新・故障復旧・remove・purge | 外部リポジトリ署名鍵の更新、RPMの実操作 |
 | software | 実service/timerの導入・設定故障・journal・再起動・撤去 | 常駐アプリごとのreload仕様・クラスタ運用 |
 | ssh | 実鍵認証・ホスト鍵検証・scp/rsync・権限障害の復旧 | インターネット公開・組織の鍵管理・踏み台設計 |
+| users | useradd/usermod/visudo、sudoの許可と拒否（`sudo -n -l` で判定し、拒否側は実行しない） | LDAP/SSSD等の集中認証、PAM設計 |
+| netconfig | dummy NIC `dojo0` への固定IP・静的経路・DNSクライアント・IPv6の永続化（systemd-networkd） | 本線NICの設定変更、DHCPサーバー運用、Wi-Fi |
+| firewall | 専用nftablesテーブルの適用、許可/拒否、タイマー付きの安全な適用と自動ロールバック | 組織のFW設計、`flush ruleset` を伴う全体入替、ufw/firewalld |
+| restore | app と client の2台で、tar+SQLiteのバックアップからサービス全体を復元（UID差・権限・unit・データを判定） | 本番規模のDR、レプリケーション |
+| osupdate | ローカルの署名付きaptリポジトリ、keyring欠落とholdからの復旧（署名検証を無効化する回避は不合格） | 外部ミラー運用、ディストリビューション全体のアップグレード、RPM |
 
 不足部分は、次の成果物を作る手動実習として続けます。これらは現時点で自動の故障投入・修了判定を実装していません。
 
@@ -179,7 +184,7 @@ TASK.txtの順に操作し、終了後は `sudo dojo-vm-lab ssh reset` で専用
 2. **LVMと容量拡張**：さらに別の使い捨てVMへ追加した空の仮想ディスクだけを対象に、PV/VG/LV・ファイルシステム・マウントの関係を図示します。対象ディスクの識別情報と導入前後の`lsblk`/`pvs`/`vgs`/`lvs`/`df`を記録し、データ保持と容量拡張を確認します。ホストや既存データのあるディスクを教材対象にしません。
 3. **起動復旧**：ホスト側のスナップショット復元が動作することを先に確認した別VMで、公式のレスキュー手順を読み、コンソールからのログ取得と復旧計画を作成します。この教材のbootモジュールを実行しただけでGRUB復旧を経験した扱いにはしません。
 4. **MACとディストリビューション差**：UbuntuのAppArmorと、別の使い捨てVMでのSELinuxについて、既存の公式プロファイル・監査ログ・許可と拒否の違いを比較します。単に無効化してサービスが動く状態は、ポリシーを修正した成果に数えません。
-5. **再構築**：新規VMへWeb構成を作り直し、SQLiteのバックアップAPIで取得したデータを復元します。URL・TLS・既存データ・起動時のサービスを別VMから検証し、構築手順に含まれない手作業を洗い出します。
+5. **Web構成全体の再構築**：`restore` は専用の小さなサービスの別VM復元を判定します。nginx・TLS・SQLiteを含むWeb構成全体を新規VMへ作り直す場合は、URL・TLS・既存データ・起動時のサービスを別VMから検証し、構築手順に含まれない手作業を洗い出します。
 
 ## 5. スナップショットへ戻る
 
@@ -198,7 +203,15 @@ multipass start linuxdojo-app linuxdojo-client
 
 ## この実装で検証したこと・まだ実測が必要なこと
 
-2026-11-21には専用Ubuntu 24.04.5 KVM VMで9モジュールを実行しました。boot・storage・webstack・softwareの故障復旧と再起動後、SSHの実認証・転送と再起動後、実aptの更新・撤去、permissions・performanceを確認しました。networkは2台のVMでDNS故障前後と修復後を検証済みです。詳細は教材本体の `docs/coverage.md` の「実装と検証記録」を参照します。これは教材の特定環境での検証で、全ホスト・全Multipassドライバーの動作確認ではありません。
+2026-11-21には専用Ubuntu 24.04.5 KVM VMで既存9モジュールを実行しました（上記の新規5モジュールは含みません）。boot・storage・webstack・softwareの故障復旧と再起動後、SSHの実認証・転送と再起動後、実aptの更新・撤去、permissions・performanceを確認しました。networkは2台のVMでDNS故障前後と修復後を検証済みです。詳細は教材本体の `docs/coverage.md` の「実装と検証記録」を参照します。これは教材の特定環境での検証で、全ホスト・全Multipassドライバーの動作確認ではありません。
+
+**追加した `users`・`netconfig`・`firewall`・`restore`・`osupdate` の5モジュールは、開発環境にqemuもsudoも無かったため、構文検査・誤った文脈での全actionの拒否・静的な安全確認までしか行っておらず、実VMでは一度も実行していません。** 初回の実VM実行では、各モジュールのヘッダーと次の点を確認してください。
+
+- users: `runuser -u dojo-alice -- sudo -n -l <cmd>` の終了コードが許可で0、拒否で非0になるか。
+- netconfig: `networkctl reconfigure dojo0` が作成直後に効くか、`resolvectl` の出力形式、IPv6のDADの待ち時間。
+- firewall: `ip netns list` の出力判定、`systemd-run` の90秒ロールバックが発火するか、ufw有効時の挙動。
+- restore: UID 981/967 が空いているか、`systemctl show -p EnvironmentFiles` の出力形式。
+- osupdate: `-o Dir::Etc::sourceparts` が効くか、`_apt` がfile:リポジトリを読めるか、`gpg --dearmor` したkeyringで警告が出ないか。
 
 エクスポート、生成内容の整合性、ゲストスクリプトの構文、VM外で動作を拒否するガードは自動テストします。
 開発環境でMultipassが使えない場合、ゲストのパッケージ導入・デバイス作成・再起動・実際の復旧成功までは検証済みとはしません。

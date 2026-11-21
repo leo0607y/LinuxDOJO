@@ -1231,7 +1231,7 @@ def play(mode, start=None):
                     return
                 if line == "hint" or (not in_editor and line == "help"):
                     text, last = hint_text(step, hint_level)
-                    print(f"  💡 ヒント {hint_level + 1}: {text}")
+                    print(f"  {ui.HINT} {hint_level + 1}: {text}")
                     print("  （もう一度 hint で次のヒント）" if not last else "  （これが最後のヒントです）")
                     hint_level += 1
                     continue
@@ -1255,7 +1255,7 @@ def play(mode, start=None):
                     if result.code == 0 and not in_editor:
                         print("  実行できました。今回の課題も試しましょう。hint で入力例を見られます。")
                     continue
-                print(ui.c("\n  ✓ できました！ " + step["success"], "bgreen"))
+                print(ui.c(f"\n  {ui.OK} できました！ " + step["success"], "bgreen"))
                 others = [answer for answer in answers(step) if not matches(line, {"command": answer})]
                 if others:
                     print("  ほかの書き方でも正解です: " + " / ".join(others))
@@ -1301,7 +1301,7 @@ def lesson_select(mode):
                 members = [s["id"] for s in course if s.get("unit") == unit]
                 done = len(set(members) & set(progress.get("completed", [])))
                 print(ui.c(f"\n  ■ {unit}  {done}/{len(members)}", "bold", "bcyan"))
-            mark = "✓" if step["id"] in progress.get("completed", []) else "・"
+            mark = ui.DONE if step["id"] in progress.get("completed", []) else ui.TODO
             print(f"  [{index}] {mark} {step['title']}")
         try:
             value = input("\n  番号 / Enter: 続きから / b: 戻る > ").strip()

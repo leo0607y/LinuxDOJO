@@ -135,7 +135,7 @@ Web サーバーを **Apache から nginx へ移行** することになった�
 まだ古い `apache2` が動いていて、`nginx` は止まったままだ。
 **systemd**（`systemctl`）を使ってサービスを切り替え、**サーバーを再起動しても nginx が自動で立ち上がる** 状態にしてほしい。
 
-📝 この訓練サーバーでは、root 権限が必要なコマンドは本物そっくりの模擬コマンドで動きます（作業ディレクトリの `README.md` 参照）。
+この訓練サーバーでは、root 権限が必要なコマンドは本物そっくりの模擬コマンドで動きます（作業ディレクトリの `README.md` 参照）。
 """,
     objectives=["`systemctl status nginx` / `systemctl status apache2` で現在の状態（Active / Loaded の enabled・disabled）を確認する",
                 "`apache2` を **停止** し、**自動起動も解除** する",
@@ -285,7 +285,7 @@ def c72(ctx):
 register(
     id="7-2", stage=S, title="journalctl で障害の真犯人を突き止めろ", sim=True,
     story="""
-🚨 今朝のメンテナンス再起動のあと、サーバー `<<host>>` の **注文API（order-api.service）が上がってこない**！
+警告: 今朝のメンテナンス再起動のあと、サーバー `<<host>>` の **注文API（order-api.service）が上がってこない**！
 サービスのログは **systemd のジャーナル** に集約されている。ただし昨日にも別のトラブルがあったらしく、ログには新旧の
 エラーが混ざっている。**今回の起動以降** のエラーに絞り込んで原因を突き止め、再発しない形で復旧せよ。
 """,
@@ -544,7 +544,7 @@ def c74(ctx):
         ctx.fail(f"`{u2}` さんのアカウントが消えています…！ `reset_mission` でやり直しましょう。")
     lost = [g for g in d["u2_before"] if g not in i2["groups"]]
     if lost:
-        ctx.fail(f"🚨 `{u2}` さんが元々の所属グループ（{', '.join(lost)}）から外れてしまっています！ `usermod -G` は **`-a` を付けないと"
+        ctx.fail(f"警告: `{u2}` さんが元々の所属グループ（{', '.join(lost)}）から外れてしまっています！ `usermod -G` は **`-a` を付けないと"
                  f"「指定したグループだけ」に置き換え** ます。`sudo usermod -aG {','.join(lost)} {u2}` で戻しましょう。")
     for g in ("docker", proj):
         if g not in i2["groups"]:

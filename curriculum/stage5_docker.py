@@ -93,7 +93,7 @@ def s52(ctx):
 def c52(ctx):
     cs = ctx.docker.containers()
     if not find(cs, "lq-cache"):
-        ctx.fail("🚨 動いていた `lq-cache` まで消えています！ 削除するのは停止した `lq-api` だけです（`reset_mission` でやり直し）。")
+        ctx.fail("警告: 動いていた `lq-cache` まで消えています！ 削除するのは停止した `lq-api` だけです（`reset_mission` でやり直し）。")
     ctx.need_submit(ctx.data["code"], "エラーコード")
     if find(cs, "lq-api"):
         ctx.fail("エラーコードは正解！ 原因を記録したので、停止したままの `lq-api` コンテナを削除して片付けましょう。")
@@ -119,7 +119,7 @@ register(
   `-f` で追従（tail -f と同じ）、`--tail 50` で末尾50行、`-t` でタイムスタンプ付き、`--since 10m` で直近10分
 ・`docker rm 名前` … 停止したコンテナを削除（実行中なら `docker rm -f` か、先に `docker stop`）
 ・まとめて掃除: `docker container prune`（停止コンテナを全削除）、`docker system prune`（停止コンテナ＋未使用ネットワーク＋dangling イメージ＋ビルドキャッシュ）
-  ⚠ `docker system prune -a` は **使っていないイメージも全部消す** ので、次回の起動でダウンロードし直しになります。
+  注意: `docker system prune -a` は **使っていないイメージも全部消す** ので、次回の起動でダウンロードし直しになります。
 """,
     tip="""
 本番では `--restart unless-stopped` を付けて、落ちても自動で再起動するようにするのが一般的です。
@@ -175,7 +175,7 @@ DBコンテナ `lq-db` の接続パスワードが分からなくなった。設
 ・`docker cp lq-db:/etc/app/secret.conf .` … コンテナ⇔ホスト間でファイルをコピー
 """,
     tip="""
-⚠ `docker exec` でコンテナ内のファイルを書き換えても、**コンテナを作り直すと消えます**（コンテナは使い捨てが原則）。
+注意: `docker exec` でコンテナ内のファイルを書き換えても、**コンテナを作り直すと消えます**（コンテナは使い捨てが原則）。
 恒久的な設定変更は Dockerfile やボリューム、環境変数で行いましょう。
 パスワードを設定ファイルや環境変数に平文で置くのは本番では避け、Docker secrets やクラウドのシークレット管理サービスを使うのがベストです。
 """,
@@ -188,7 +188,7 @@ DBコンテナ `lq-db` の接続パスワードが分からなくなった。設
 # ------------------------------------------------------------------ 5-4
 def s54(ctx):
     ctx.docker.reset()
-    ctx.write("html/index.html", "<!DOCTYPE html>\n<html><body><h1>🐧 Penguin Shop - 開発版</h1></body></html>\n")
+    ctx.write("html/index.html", "<!DOCTYPE html>\n<html><body><h1>Penguin Shop - 開発版</h1></body></html>\n")
     ctx.write("html/about.html", "<h1>About</h1>\n")
 
 
@@ -321,7 +321,7 @@ register(
     explanation="""
 Dockerfile の各命令は **レイヤー** になり、内容が変わっていない層は前回の結果（キャッシュ）が再利用されます。
 ただし **ある層が変わると、それ以降の層はすべて作り直し** になります。
-  ✗ `COPY . .` → `RUN pip install` … app.py を1文字変えただけで COPY 層が変わり、毎回 pip install が走る
+  NG `COPY . .` → `RUN pip install` … app.py を1文字変えただけで COPY 層が変わり、毎回 pip install が走る
   ○ `COPY requirements.txt .` → `RUN pip install` → `COPY . .` … 依存が変わらない限り pip install は CACHED
 軽量化のポイント:
   ・`python:3.12`（約1GB）→ `python:3.12-slim`（約130MB）→ `alpine` 系（さらに小さいが musl 由来の互換性問題に注意）
@@ -399,7 +399,7 @@ Web（nginx）と DB（PostgreSQL）の2つのコンテナを、毎回 `docker r
 `compose.yaml`（旧名 `docker-compose.yml`）は、複数コンテナの構成（イメージ・ポート・環境変数・ボリューム・依存関係）を宣言的に書くファイルです。
   ・`docker compose up -d` … 全サービスを作成・起動（設定が変わったサービスだけ再作成）
   ・`docker compose ps [-a]` … サービスの状態 ／ `docker compose logs [-f] サービス` … ログ
-  ・`docker compose down` … 全コンテナとネットワークを削除（`-v` でボリュームも削除 ⚠データ消失）
+  ・`docker compose down` … 全コンテナとネットワークを削除（`-v` でボリュームも削除 注意: データ消失）
   ・`docker compose restart web` / `stop` / `start` … サービス単位の操作
   ・`docker compose exec db psql -U penguin shop` … サービスのコンテナ内でコマンド実行
 同じ compose ファイル内のサービス同士は **サービス名で通信** できます（web から `db:5432` で接続可能）。
@@ -464,7 +464,7 @@ def c57(ctx):
 register(
     id="5-7", stage=S, title="【実践】起動直後に落ちるコンテナを救え", docker=True,
     story="""
-🚨 障害発生！ 注文API `lq-order` のコンテナが **起動直後に落ちる**。前任者のメモ（`障害報告.txt`）にある起動コマンドには、
+警告: 障害発生！ 注文API `lq-order` のコンテナが **起動直後に落ちる**。前任者のメモ（`障害報告.txt`）にある起動コマンドには、
 どうやら **設定ミスが2つ** あるらしい。`docker logs` と `docker inspect` で原因を突き止め、正しいパラメータで起動し直せ。
 """,
     objectives=["`docker ps -a` / `docker logs lq-order` で落ちた原因を調べる",

@@ -15,7 +15,7 @@ PACKAGES = ("python3", "curl", "ca-certificates", "acl", "attr", "sysstat", "str
             "coreutils", "findutils", "lvm2", "parted", "e2fsprogs", "nftables", "dnsmasq",
             "nginx", "openssl", "sqlite3", "dnsutils", "tcpdump", "iproute2", "rsync", "jq",
             "openssh-client", "openssh-server", "git", "vim", "nano", "tmux", "ripgrep",
-            "fzf", "fd-find", "bat", "tree", "ncdu", "gcc", "make", "libc6-dev", "python3-venv")
+            "fzf", "fd-find", "bat", "tree", "ncdu", "gcc", "make", "libc6-dev", "python3-venv", "gnupg")
 
 
 def lab_catalog(source=None):

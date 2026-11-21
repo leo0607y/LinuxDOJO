@@ -118,7 +118,7 @@ def main(argv):
     if ids:
         missions = [m for m in missions if m.id in ids]
     from engine import docker_backend
-    print(c(f"\n🧪 LinuxQuest 全ミッション自動テスト  (対象 {len(missions)} 問 / Docker: {docker_backend.detect_mode()} モード)\n", "bold", "bcyan"))
+    print(c(f"\nLinuxQuest 全ミッション自動テスト  (対象 {len(missions)} 問 / Docker: {docker_backend.detect_mode()} モード)\n", "bold", "bcyan"))
     t0 = time.time()
     total = passed = 0
     failed = []
@@ -132,7 +132,7 @@ def main(argv):
         print(f"  [{mark}] {m.id:<5} {m.title}  " + c(f"({len(res)} checks, {time.time() - t1:.1f}s)", "gray"))
         for name, ok, detail in res:
             if not ok:
-                print(c(f"         ✗ {name}: {detail}", "red"))
+                print(c(f"         [NG] {name}: {detail}", "red"))
         if not good:
             failed.append(m.id)
     # セーブデータが汚れていないことを確認

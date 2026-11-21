@@ -937,7 +937,7 @@ def systemctl(argv):
     elif cmd == "list-timers":
         out.append("NEXT LEFT LAST PASSED UNIT ACTIVATES\n\n0 timers listed.")
     elif cmd in ("poweroff", "reboot", "halt", "suspend"):
-        err(dim(f"[LinuxQuest 模擬] 訓練サーバーなので {cmd} は実行しません 😉"))
+        err(dim(f"[LinuxQuest 模擬] 訓練サーバーなので {cmd} は実行しません"))
         return 1
     else:
         err(f"Unknown command verb '{cmd}'.")

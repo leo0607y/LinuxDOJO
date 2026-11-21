@@ -25,6 +25,18 @@ CODES = {
 
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
+# 画面共通のテキストマーカー（絵文字は使わない）。表示は必ずここの定数を使う。
+OK = "[OK]"          # 成功・達成
+NG = "[NG]"          # 失敗・不一致
+WARN = "[!]"         # 注意・警告
+HINT = "[ヒント]"    # ヒント
+INFO = "[i]"         # 補足・進行中の通知
+HEAD = "■"           # セクション見出しの先頭
+DONE = "[x]"         # 完了済みの一覧マーク
+TODO = "[ ]"         # 未完了の一覧マーク
+FOOT_BACK = "Enter: 戻る"
+FOOT_QUIT = "q: 戻る"
+
 
 def c(text, *styles):
     """文字列に ANSI スタイルを付与する。"""
@@ -48,7 +60,7 @@ def width(s):
         ea = unicodedata.east_asian_width(ch)
         if ea in ("W", "F"):
             w += 2
-        elif ch in "​️":
+        elif ch in "\u200b\ufe0f":
             continue
         else:
             w += 1
@@ -63,6 +75,20 @@ def pad(s, w, align="left"):
         left = gap // 2
         return " " * left + s + " " * (gap - left)
     return s + " " * gap
+
+
+def clip(s, w):
+    """表示幅 w に収まるよう末尾を「…」で切り詰める（ANSI を含まない文字列用）。"""
+    if width(s) <= w:
+        return s
+    out, cw = "", 0
+    for ch in s:
+        chw = width(ch)
+        if cw + chw > w - 1:
+            break
+        out += ch
+        cw += chw
+    return out + "…"
 
 
 def term_width():
