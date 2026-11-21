@@ -33,10 +33,11 @@ class ReadinessTests(unittest.TestCase):
             if command in omit:
                 continue
             result = terminal.execute(command)
-            self.assertEqual(result.code, 0, f"{scenario['id']}: {command}: {result.output}")
+            expected = scenario.get("expected_codes", {}).get(command, 0)
+            self.assertEqual(result.code, expected, f"{scenario['id']}: {command}: {result.output}")
 
     def test_all_eight_scenarios_begin_unsolved_and_accept_the_actual_solution(self):
-        scenarios = readiness.scenarios()
+        from curriculum.readiness import SCENARIOS as scenarios  # 課題まつりは test_festival で検証
         self.assertEqual(len(scenarios), 8)
         self.assertEqual(len({s["id"] for s in scenarios}), 8)
         for scenario in scenarios:
@@ -50,7 +51,8 @@ class ReadinessTests(unittest.TestCase):
                 self.assertTrue(ok, message)
 
     def test_incorrect_final_file_contents_are_rejected_even_after_solution_commands(self):
-        for scenario in readiness.scenarios():
+        from curriculum.readiness import SCENARIOS
+        for scenario in SCENARIOS:
             with self.subTest(scenario=scenario["id"]):
                 terminal = self.prepare(scenario)
                 self.solve(scenario, terminal)

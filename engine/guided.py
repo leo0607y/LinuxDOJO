@@ -1,19 +1,44 @@
 """初心者向けの段階学習と模擬ターミナル。ホストのシェル・sudo・apt は実行しない。"""
 from dataclasses import dataclass
 import fnmatch
+import os
 from pathlib import Path
+import re
 import shlex
 import shutil
 import stat
 
-from engine import runner, save, ui
+from engine import runner, save, textcmd, ui, vim_sim
 
-MODE_NAMES = {"intro": "はじめてモード", "basic": "基礎練習モード", "practice": "実践モード"}
+MODE_NAMES = {"intro": "はじめてモード", "basic": "基礎練習モード", "advanced": "応用練習モード", "practice": "実践モード"}
+GUIDED_MODES = ("intro", "basic", "advanced")
 PACKAGES = {
     "tree": ("フォルダの構造を枝分かれの図で表示するコマンド", "2.1.1-training"),
     "curl": ("URL からデータを取得するコマンド", "8.5.0-training"),
     "jq": ("JSON 形式のデータを読みやすく整理するコマンド", "1.7-training"),
+    "vim": ("高機能なテキストエディタ。サーバーで設定ファイルを書き換えるときによく使う", "9.1-training"),
 }
+# 最初から入っている扱いのコマンド（which で場所を表示できる）
+BUILTIN_COMMANDS = ("echo", "pwd", "ls", "cat", "cd", "mkdir", "touch", "cp", "mv", "rm", "chmod",
+                    "grep", "wc", "head", "tail", "find", "history", "hostname", "whoami", "sudo",
+                    "apt", "ssh", "scp", "man", "false", "sort", "uniq", "cut", "env", "printenv",
+                    "export", "unset", "ps", "kill", "pgrep", "df", "du", "free", "diff")
+DEFAULT_ENV = {"HOME": "/home/learner", "USER": "learner", "SHELL": "/bin/bash",
+               "PATH": "/usr/local/bin:/usr/bin:/bin", "LANG": "ja_JP.UTF-8"}
+# 模擬のプロセス一覧。実際の PC のプロセスは読まず、止めもしない。
+DEFAULT_PROCESSES = [
+    {"pid": 1, "user": "root", "cmd": "/sbin/init", "cpu": 0.0, "mem": 0.3},
+    {"pid": 512, "user": "root", "cmd": "/usr/sbin/sshd -D", "cpu": 0.0, "mem": 0.2},
+    {"pid": 845, "user": "root", "cmd": "/usr/sbin/cron -f", "cpu": 0.0, "mem": 0.1},
+    {"pid": 2001, "user": "learner", "cmd": "-bash", "cpu": 0.0, "mem": 0.1},
+]
+SHELL_PID = 2001
+SIGNALS = {"-9": "KILL", "-KILL": "KILL", "-SIGKILL": "KILL", "-15": "TERM", "-TERM": "TERM", "-SIGTERM": "TERM"}
+VAR_RE = re.compile(r"\$(\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*)")
+ASSIGN_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+GLOB_CHARS = set("*?[")
+# パイプの後ろで、前のコマンドの出力を入力として読むコマンド
+READS_STDIN = ("cat", "grep", "sort", "uniq", "cut", "wc", "head", "tail")
 
 
 @dataclass
@@ -28,6 +53,9 @@ class TrainingError(Exception):
 
 class Terminal:
     """限定した書式を解釈する練習環境。外部コマンドの実行や実環境の参照はしない。"""
+    # Windows はファイル権限の仕組みが Linux と違うため、権限は進捗データ上で模擬する。
+    VIRTUAL_MODES = os.name == "nt"
+
     def __init__(self, root, progress):
         if Path(root).is_symlink():
             raise TrainingError("練習フォルダにシンボリックリンクは使えません。")
@@ -44,6 +72,10 @@ class Terminal:
         self.progress.setdefault("history", [])
         self.progress.setdefault("last_status", 0)
         self.progress.setdefault("command_events", [])
+        self.progress.setdefault("editor", None)
+        self.progress.setdefault("env", dict(DEFAULT_ENV))
+        self.progress.setdefault("shell_vars", {})
+        self.progress.setdefault("processes", [dict(p) for p in DEFAULT_PROCESSES])
         original_remote = self.progress["remote"]
         self.progress["remote"] = False
         original_cwd = self.progress["cwd"]
@@ -51,7 +83,8 @@ class Terminal:
         for name, content in {"welcome.txt": "LinuxDOJOへようこそ！\n", ".memo": "見つけました！\n"}.items():
             path = self.path(name)
             if not path.exists():
-                path.write_text(content)
+                path.write_text(content, encoding="utf-8")
+                self.created(path, False)
         self.progress["cwd"] = original_cwd
         remote_root = self.root / ".remote"
         if remote_root.is_symlink():
@@ -111,11 +144,66 @@ class Terminal:
             raise TrainingError("模擬サーバーのファイルは ssh で接続するか scp で転送して扱いましょう。")
         return resolved
 
+    def _mode_key(self, path):
+        return path.relative_to(self.root).as_posix()
+
+    def mode_of(self, path):
+        """ファイルの権限 (例: 0o644) を返す。存在しなければ FileNotFoundError。"""
+        if not self.VIRTUAL_MODES:
+            return stat.S_IMODE(path.stat().st_mode)
+        path.stat()
+        default = 0o755 if path.is_dir() else 0o644
+        return self.progress.setdefault("modes", {}).get(self._mode_key(path), default)
+
+    def set_mode(self, path, mode):
+        if not self.VIRTUAL_MODES:
+            path.chmod(mode)
+            return
+        path.stat()
+        modes = self.progress.setdefault("modes", {})
+        if mode == (0o755 if path.is_dir() else 0o644):
+            modes.pop(self._mode_key(path), None)  # 既定の権限は保存しない
+        else:
+            modes[self._mode_key(path)] = mode
+
+    def created(self, path, existed, mode=0o644):
+        """新しく作ったファイルの権限を、PC の umask によらず決める（本物の既定値 644 に合わせる）。"""
+        if not existed:
+            self.forget_mode(path)
+            self.set_mode(path, mode)
+
+    def _write_output(self, target, text, append):
+        path = self.path(target)
+        existed = path.exists()
+        with path.open("a" if append else "w", encoding="utf-8") as stream:
+            stream.write(text)
+        self.created(path, existed)
+
+    def forget_mode(self, path):
+        """削除・移動したファイル（フォルダなら中身も）の模擬権限を消す。"""
+        if not self.VIRTUAL_MODES:
+            return {}
+        modes = self.progress.setdefault("modes", {})
+        key = self._mode_key(path)
+        removed = {}
+        for name in list(modes):
+            if name == key or name.startswith(key + "/"):
+                removed[name[len(key):]] = modes.pop(name)
+        return removed
+
+    def move_mode(self, source, dest):
+        if not self.VIRTUAL_MODES:
+            return
+        self.forget_mode(dest)
+        modes = self.progress.setdefault("modes", {})
+        for suffix, mode in self.forget_mode(source).items():
+            modes[self._mode_key(dest) + suffix] = mode
+
     def ensure_directory(self, path):
         """教材のディレクトリと同名の練習ファイルがあっても復元する。"""
         current = self.active_root
         for part in path.relative_to(self.active_root).parts:
-            current = self.path("/home/learner/" + str((current / part).relative_to(self.active_root)))
+            current = self.path("/home/learner/" + (current / part).relative_to(self.active_root).as_posix())
             if current.exists() and not current.is_dir():
                 current.unlink()
             current.mkdir(exist_ok=True)
@@ -125,10 +213,66 @@ class Terminal:
         self.ensure_directory(target.parent)
         if target.is_dir():
             shutil.rmtree(target)
-        target.write_text(content)
-        target.chmod(0o644)
+        self.forget_mode(target)
+        target.write_text(content, encoding="utf-8")
+        self.set_mode(target, 0o644)
+
+    def prompt_text(self):
+        editor = self.progress.get("editor")
+        if editor:
+            mode = "-- INSERT --" if editor["mode"] == "insert" else "NORMAL"
+            return f"vim {editor['name']} [{mode}] > "
+        return f"練習 learner@{self.hostname} {self.display_cwd} $ "
+
+    def open_editor(self, name, lines=None, **state):
+        path = self.path(name)
+        if path.is_dir():
+            raise TrainingError("フォルダは vim で開けません。ファイル名を指定しましょう。")
+        exists = path.exists()
+        if lines is None:
+            lines = path.read_text(encoding="utf-8").splitlines() if exists else []
+        editor = vim_sim.new_state(name, path.relative_to(self.active_root).as_posix(),
+                                   self.progress["remote"], lines, exists)
+        editor.update(state)
+        self.progress["editor"] = editor
+        return editor
+
+    def _editor_input(self, line):
+        editor = self.progress["editor"]
+        message, code, action = vim_sim.handle(editor, line)
+        if action in ("write", "write_quit"):
+            try:
+                path = self._side_path("/home/learner/" + editor["key"], editor["remote"])
+                if not path.parent.is_dir():
+                    raise FileNotFoundError()
+                existed = path.exists()
+                path.write_text("".join(x + "\n" for x in editor["lines"]), encoding="utf-8")
+                self.created(path, existed)
+            except (TrainingError, OSError):
+                return Result(vim_sim.render(editor, f'E212: Can\'t open file for writing（"{editor["name"]}" を保存できません。保存先のフォルダを確認しましょう）'), 1)
+            editor.update(modified=False, new_file=False)
+            message = f'"{editor["name"]}" {len(editor["lines"])}L written（保存しました）'
+        if action in ("quit", "write_quit"):
+            self.progress["editor"] = None
+            return Result((message + "\n" if message else "") + "vim を終了して、ターミナルに戻りました。", code)
+        return Result(vim_sim.render(editor, message), code)
+
+    def _vim(self, cmd, rest):
+        if "vim" not in self.progress["packages"]:
+            return Result(f"Command '{cmd}' not found, but can be installed with:\n"
+                          "sudo apt install vim\n"
+                          "（訓練用の表示です。この練習では vim がまだ入っていません）", 127)
+        if rest == ["--version"]:
+            return Result("VIM - Vi IMproved 9.1（訓練用シミュレーター）")
+        if len(rest) != 1 or rest[0].startswith("-"):
+            raise TrainingError("この練習では vim ファイル名 の形で開きます。例: vim memo.txt")
+        editor = self.open_editor(rest[0])
+        note = "新しいファイルです。" if editor["new_file"] else "ファイルを開きました。"
+        return Result(vim_sim.render(editor, note + "今はノーマルモードです。文字を書くには i を入力します。"))
 
     def execute(self, line):
+        if self.progress.get("editor"):
+            return self._editor_input(line)
         host = self.hostname
         result = self._execute_line(line)
         if line.strip():
@@ -137,17 +281,107 @@ class Terminal:
         self.progress["last_status"] = result.code
         return result
 
+    # ---- シェルの展開（変数・ワイルドカード）
+    def variable(self, name):
+        if name in self.progress["shell_vars"]:
+            return self.progress["shell_vars"][name]
+        return self.progress["env"].get(name, "")
+
+    def expand_variables(self, line):
+        """$NAME / ${NAME} を値に置き換える。'...' の中は本物と同じく置き換えない。"""
+        output, quote, index = [], None, 0
+        while index < len(line):
+            char = line[index]
+            if char == "\\" and quote != "'" and index + 1 < len(line):
+                output.append(line[index:index + 2])
+                index += 2
+                continue
+            if char in "'\"" and quote in (None, char):
+                quote = None if quote == char else char
+            elif char == "$" and quote != "'":
+                match = VAR_RE.match(line, index)
+                if match:
+                    value = self.variable(match.group(1).strip("{}"))
+                    if quote == '"':
+                        output.append(value.replace("\\", "\\\\").replace('"', '\\"'))
+                    elif value:
+                        output.append(shlex.quote(value))
+                    index = match.end()
+                    continue
+            output.append(char)
+            index += 1
+        return "".join(output)
+
+    def expand_globs(self, args):
+        """* ? [ ] を、練習フォルダの中で一致する名前に広げる。一致がなければそのまま。"""
+        if not args or args[0] in ("find", "export", "unset"):
+            return args
+        output = [args[0]]
+        for arg in args[1:]:
+            if arg.startswith("-") or not GLOB_CHARS & set(arg):
+                output.append(arg)
+                continue
+            head, _, pattern = arg.rpartition("/")
+            if GLOB_CHARS & set(head):
+                output.append(arg)
+                continue
+            if arg.startswith("/") and not head:
+                head = "/"
+            base = self.path(head or ".")
+            names = []
+            if base.is_dir():
+                for item in sorted(base.iterdir()):
+                    if item.is_symlink() or (not self.progress["remote"] and item == self.root / ".remote"):
+                        continue
+                    if item.name.startswith(".") and not pattern.startswith("."):
+                        continue
+                    if fnmatch.fnmatchcase(item.name, pattern):
+                        names.append((head.rstrip("/") + "/" if head else "") + item.name)
+            output.extend(names or [arg])
+        return output
+
+    def _read_input(self, cmd, files, stdin):
+        if files:
+            return "".join(self.path(x).read_text(encoding="utf-8") for x in files)
+        if stdin is not None:
+            return stdin + "\n" if stdin else ""
+        raise TrainingError(f"{cmd} の後ろにファイル名を書くか、| で前のコマンドの結果を渡します。")
+
+    def _pipeline(self, stages):
+        if any(not stage for stage in stages):
+            raise TrainingError("| の前と後ろにコマンドを書きます。例: cat access.log | grep 404")
+        if any(x in (">", ">>") for stage in stages[:-1] for x in stage):
+            raise TrainingError("> や >> での保存は、パイプの一番最後に書きます。")
+        last = stages[-1]
+        redirect = None
+        if any(x in (">", ">>") for x in last):
+            pos = next(i for i, x in enumerate(last) if x in (">", ">>"))
+            if pos == 0 or len(last) != pos + 2:
+                raise TrainingError("保存先を1つ指定しましょう。例: grep ERROR app.log | sort > sorted.txt")
+            redirect = (last[pos], last[-1])
+            stages[-1] = last[:pos]
+        output, result = None, Result()
+        for stage in stages:
+            result = self._execute(self.expand_globs(stage), stdin=output)
+            output = result.output
+        if redirect:
+            self._write_output(redirect[1], output + ("\n" if output else ""), redirect[0] == ">>")
+            return Result(code=result.code)
+        return result
+
     def _execute_line(self, line):
         try:
             if "\u3000" in line:
                 return Result("全角スペースが入っています。コマンドと対象の間は、半角スペースで区切りましょう。", 1)
+            line = self.expand_variables(line)
+            segments = split_pipes(line)
             args = shlex.split(line)
             if not args:
                 return Result("コマンドを入力して Enter を押してください。", 1)
             if args[0] in ("$", "#") or args[0].endswith("$"):
                 return Result("$ は入力待ちの印です。$ を除いたコマンドだけ入力しましょう。", 1)
-            if any(a in ("|", "||", "&&", ";", "&", "<", "2>") for a in args):
-                return Result("ここでは1回に1つのコマンドを練習します。パイプや複数コマンドは実践モードで扱います。", 1)
+            if any(a in ("||", "&&", ";", "&", "<", "2>") for a in args):
+                return Result("ここでは && や ; でつなぐ複数コマンドは扱いません。1つずつ入力するか、| でつなぎましょう。実践モードでは本物の bash で使えます。", 1)
             if self.progress["ssh_pending"]:
                 if args == ["no"]:
                     self.progress["ssh_pending"] = False
@@ -156,20 +390,23 @@ class Terminal:
                     self.progress.update(ssh_pending=False, ssh_known=True, remote=True, remote_cwd=".")
                     return Result("接続先の指紋を確認済みとして模擬接続しました。learner@training-server（実通信なし）")
                 return Result("接続確認中です。指紋を別経路で確認できたら yes、不明なら no を入力します。", 1)
+            if len(segments) > 1:
+                return self._pipeline([shlex.split(segment) for segment in segments])
+            args = self.expand_globs(args)
             if args[0] != "echo" and any(x in (">", ">>") for x in args):
                 pos = next(i for i, x in enumerate(args) if x in (">", ">>"))
                 if pos == 0 or len(args) != pos + 2:
                     raise TrainingError("出力先を1つ指定しましょう。例: grep ERROR app.log > errors.txt")
                 result = self._execute(args[:pos])
                 if result.code == 0:
-                    target = self.path(args[-1])
-                    with target.open("a" if args[pos] == ">>" else "w") as stream:
-                        stream.write(result.output + ("\n" if result.output else ""))
+                    self._write_output(args[-1], result.output + ("\n" if result.output else ""), args[pos] == ">>")
                     return Result()
                 return result
             return self._execute(args)
         except (TrainingError, OSError, ValueError) as error:
-            if isinstance(error, FileNotFoundError):
+            if isinstance(error, textcmd.UsageError):
+                message = str(error)
+            elif isinstance(error, FileNotFoundError):
                 message = "ファイルまたはフォルダが見つかりません。ls で名前を確認しましょう。"
             elif isinstance(error, FileExistsError):
                 message = "同じ名前がすでにあります。ls で確認しましょう。"
@@ -181,8 +418,21 @@ class Terminal:
                 message = str(error)
             return Result(message, 1)
 
-    def _execute(self, args, admin=False):
+    def _execute(self, args, admin=False, stdin=None):
         cmd, rest = args[0], args[1:]
+        if ASSIGN_RE.match(cmd) and not rest:
+            name, _, value = cmd.partition("=")
+            if name in self.progress["env"]:
+                self.progress["env"][name] = value
+            else:
+                self.progress["shell_vars"][name] = value
+            return Result()
+        handled = self._text_command(cmd, rest, stdin)
+        if handled is not None:
+            return handled
+        handled = self._system_command(cmd, rest, admin)
+        if handled is not None:
+            return handled
         if cmd == "false" and not rest:
             return Result(code=1)
         if cmd == "hostname" and not rest:
@@ -191,10 +441,6 @@ class Terminal:
             return Result("\n".join(f"{i}  {value}" for i, value in enumerate(self.progress["history"] + ["history"], 1)))
         if (cmd == "ls" and rest == ["--help"]) or (cmd == "man" and rest == ["ls"]):
             return Result("LS（訓練用の要約）\n使い方: ls [オプション] [場所]\n-a 隠しファイルも表示\n-l 権限やサイズを詳しく表示\n本物の man は q で閉じます。この模擬画面は自動で入力待ちに戻ります。")
-        if cmd in ("head", "tail") and len(rest) == 3 and rest[0] == "-n" and rest[1].isdigit():
-            lines = self.path(rest[2]).read_text().splitlines()
-            count = int(rest[1])
-            return Result("\n".join(lines[:count] if cmd == "head" else lines[-count:] if count else []))
         if cmd == "find" and len(rest) == 3 and rest[1] == "-name":
             base = self.path(rest[0])
             if not base.is_dir():
@@ -208,11 +454,26 @@ class Terminal:
                         continue
                     if fnmatch.fnmatch(item.name, rest[2]):
                         prefix = "./" if rest[0] == "." else rest[0].rstrip("/") + "/"
-                        found.append(prefix + str(item.relative_to(base)))
+                        found.append(prefix + item.relative_to(base).as_posix())
                     if item.is_dir():
                         visit(item, depth + 1)
             visit(base)
             return Result("\n".join(found))
+        if cmd in ("vim", "vi"):
+            return self._vim(cmd, rest)
+        if cmd in PACKAGES and rest == ["--version"]:
+            if cmd not in self.progress["packages"]:
+                return Result(f"Command '{cmd}' not found, but can be installed with:\nsudo apt install {cmd}", 127)
+            return Result(f"{cmd} {PACKAGES[cmd][1]}（訓練用シミュレーター）")
+        if cmd == "diff" and len(rest) == 2:
+            old, new = (self.path(x).read_text(encoding="utf-8").splitlines() for x in rest)
+            return Result(*textcmd.diff(rest[0], old, rest[1], new))
+        if cmd == "which" and rest:
+            found = []
+            for name in rest:
+                if name in BUILTIN_COMMANDS or name in self.progress["packages"] or (name == "vi" and "vim" in self.progress["packages"]):
+                    found.append(f"/usr/bin/{name}")
+            return Result("\n".join(found), 0 if len(found) == len(rest) else 1)
         if cmd == "ssh":
             return self._ssh(rest)
         if cmd == "scp":
@@ -225,9 +486,9 @@ class Terminal:
         if cmd == "sudo":
             if not rest:
                 raise TrainingError("sudo の後ろに実行するコマンドをスペースで続けます。例: sudo whoami")
-            if rest[0] not in ("whoami", "apt"):
-                raise TrainingError("練習用 sudo は whoami と apt のみに使えます。実際の管理者権限は使いません。")
-            return self._execute(rest, admin=True)
+            if rest[0] not in ("whoami", "apt", "kill"):
+                raise TrainingError("練習用 sudo は whoami・apt・kill にだけ使えます。実際の管理者権限は使いません。")
+            return self._execute(rest, admin=True, stdin=stdin)
         if cmd == "echo":
             if rest == ["$?"]:
                 return Result(str(self.progress["last_status"]))
@@ -235,9 +496,7 @@ class Terminal:
             if redirect is not None:
                 if len(rest) != redirect + 2:
                     raise TrainingError("保存先を1つ指定します。例: echo hello > note.txt")
-                dest = self.path(rest[-1])
-                with dest.open("a" if rest[redirect] == ">>" else "w") as f:
-                    f.write(" ".join(rest[:redirect]) + "\n")
+                self._write_output(rest[-1], " ".join(rest[:redirect]) + "\n", rest[redirect] == ">>")
                 return Result()
             return Result(" ".join(rest))
         if cmd == "pwd" and not rest:
@@ -248,7 +507,7 @@ class Terminal:
             dest = self.path(rest[0] if rest else "/home/learner")
             if not dest.is_dir():
                 raise TrainingError("移動先のフォルダがありません。ls で確認しましょう。")
-            self.set_cwd(str(dest.relative_to(self.active_root)))
+            self.set_cwd(dest.relative_to(self.active_root).as_posix())
             return Result()
         if cmd == "ls":
             flags = [x for x in rest if x.startswith("-")]
@@ -269,11 +528,10 @@ class Terminal:
                         continue
                     label = item.name + ("/" if item.is_dir() else "")
                     if "l" in options:
-                        label = f"{stat.filemode(item.stat().st_mode)} learner {item.stat().st_size:>4} {label}"
+                        kind = stat.S_IFDIR if item.is_dir() else stat.S_IFREG
+                        label = f"{stat.filemode(kind | self.mode_of(item))} learner {item.stat().st_size:>4} {label}"
                     output.append(label)
             return Result("\n".join(output))
-        if cmd == "cat" and rest:
-            return Result("".join(self.path(x).read_text() for x in rest).rstrip("\n"))
         if cmd == "mkdir" and rest:
             parents = "-p" in rest
             for value in rest:
@@ -285,45 +543,48 @@ class Terminal:
             return Result()
         if cmd == "touch" and rest:
             for value in rest:
-                self.path(value).touch()
+                path = self.path(value)
+                existed = path.exists()
+                path.touch()
+                self.created(path, existed)
             return Result()
-        if cmd in ("cp", "mv") and len(rest) == 2:
-            source, dest = (self.path(x) for x in rest)
-            if source.is_dir():
-                raise TrainingError("この練習ではファイルを1つずつコピー・移動します。")
-            if dest.is_dir():
-                dest = self.path("/home/learner/" + str((dest / source.name).relative_to(self.active_root)))
-            if cmd == "cp":
-                shutil.copyfile(source, dest)
-            else:
-                source.rename(dest)
+        if cmd in ("cp", "mv") and len(rest) >= 2:
+            if any(x.startswith("-") for x in rest):
+                raise TrainingError(f"この練習の {cmd} はオプションなしで、ファイルをコピー・移動します。")
+            *sources, target = rest
+            target_path = self.path(target)
+            if len(sources) > 1 and not target_path.is_dir():
+                raise TrainingError(f"複数のファイルを {cmd} するときは、最後に送り先のフォルダを書きます。")
+            for value in sources:
+                source = self.path(value)
+                if source.is_dir():
+                    raise TrainingError("この練習ではフォルダではなく、ファイルをコピー・移動します。")
+                dest = target_path
+                if dest.is_dir():
+                    dest = self.path("/home/learner/" + (dest / source.name).relative_to(self.active_root).as_posix())
+                if cmd == "cp":
+                    existed = dest.exists()
+                    shutil.copyfile(source, dest)
+                    # 本物の cp と同じく、新しいコピーは元の権限を引き継ぐ（既存の宛先は権限を変えない）。
+                    self.created(dest, existed, self.mode_of(source))
+                else:
+                    os.replace(source, dest)
+                    self.move_mode(source, dest)
             return Result()
         if cmd == "rm" and rest:
             if any(x.startswith("-") for x in rest):
                 raise TrainingError("この練習の rm はファイルのみ削除します。-r や -f は使いません。")
             for value in rest:
-                self.path(value).unlink()
+                target = self.path(value)
+                target.unlink()
+                self.forget_mode(target)
             return Result()
-        if cmd == "chmod" and len(rest) == 2:
-            mode, filename = rest
-            p = self.path(filename)
-            if mode in ("u+x", "+x"):
-                p.chmod(p.stat().st_mode | stat.S_IXUSR)
-            elif mode in ("644", "755", "600"):
-                p.chmod(int(mode, 8))
-            else:
-                raise TrainingError("この練習では chmod u+x、644、755、600 を使えます。")
+        if cmd == "chmod" and len(rest) >= 2:
+            spec, *names = rest
+            for name in names:
+                path = self.path(name)
+                self.set_mode(path, chmod_mode(spec, self.mode_of(path)))
             return Result()
-        if cmd == "grep" and len(rest) in (2, 3):
-            ignore_case = len(rest) == 3 and rest[0] == "-i"
-            if len(rest) == 3 and not ignore_case:
-                raise TrainingError("この練習では grep 文字列 ファイル、または grep -i を使います。")
-            pattern, filename = rest[-2:]
-            lines = self.path(filename).read_text().splitlines()
-            matches = [s for s in lines if (pattern.lower() in s.lower() if ignore_case else pattern in s)]
-            return Result("\n".join(matches), 0 if matches else 1)
-        if cmd == "wc" and len(rest) == 2 and rest[0] == "-l":
-            return Result(f"{self.path(rest[1]).read_text().count(chr(10))} {rest[1]}")
         if cmd == "tree" and len(rest) <= 1:
             if "tree" not in self.progress["packages"]:
                 return Result("tree: コマンドがまだ入っていません。sudo apt install tree で追加できます（訓練用）。", 127)
@@ -345,6 +606,150 @@ class Terminal:
         if cmd == "apt":
             return self._apt(rest, admin)
         raise TrainingError(f"{cmd}: この模擬ターミナルでは未対応の入力です。スペルを確認し、hint で今回のコマンドを見てみましょう。")
+
+    def _text_command(self, cmd, rest, stdin):
+        """パイプでも使うテキスト処理。対象外のコマンドなら None。"""
+        if cmd not in READS_STDIN or (cmd == "cat" and not rest and stdin is None):
+            return None
+        if cmd == "cat":
+            flags, _, files = textcmd.split_flags(rest, "n")
+            text = self._read_input(cmd, files, stdin)
+            lines = text.splitlines()
+            if "n" in flags:
+                return Result("\n".join(f"{i:>6}\t{x}" for i, x in enumerate(lines, 1)))
+            return Result(text.rstrip("\n"))
+        if cmd == "grep":
+            flags, _, rest = textcmd.split_flags(rest, "ivcnE")
+            if not rest:
+                raise TrainingError("grep の後ろに探す文字を書きます。例: grep ERROR app.log")
+            pattern, files = rest[0], rest[1:]
+            if len(files) > 1:
+                outputs, code = [], 1
+                for name in files:
+                    out, found = textcmd.grep(flags, pattern, self._read_input(cmd, [name], None).splitlines(), label=name)
+                    if out:
+                        outputs.append(out)
+                    code = min(code, found)
+                return Result("\n".join(outputs), code)
+            out, code = textcmd.grep(flags, pattern, self._read_input(cmd, files, stdin).splitlines())
+            return Result(out, code)
+        if cmd in ("head", "tail"):
+            count, from_start, files = textcmd.line_count(rest)
+            out, code = textcmd.head_tail(cmd, count, self._read_input(cmd, files, stdin).splitlines(), from_start)
+            return Result(out, code)
+        if cmd == "wc":
+            flags, _, files = textcmd.split_flags(rest, "lwc")
+            if len(files) > 1:
+                rows = [textcmd.wc(flags, self._read_input(cmd, [name], None), name)[0] for name in files]
+                rows.append(textcmd.wc(flags, self._read_input(cmd, files, None), "total")[0])
+                return Result("\n".join(rows))
+            label = files[0] if len(files) == 1 else None
+            out, code = textcmd.wc(flags, self._read_input(cmd, files, stdin), label)
+            return Result(out, code)
+        if cmd == "sort":
+            flags, values, files = textcmd.split_flags(rest, "rnu", with_value="tk")
+            return Result(*textcmd.sort(flags, self._read_input(cmd, files, stdin).splitlines(), values))
+        if cmd == "uniq":
+            flags, _, files = textcmd.split_flags(rest, "c")
+            return Result(*textcmd.uniq(flags, self._read_input(cmd, files, stdin).splitlines()))
+        flags, values, files = textcmd.split_flags(rest, "", with_value="df")
+        return Result(*textcmd.cut(values, self._read_input(cmd, files, stdin).splitlines()))
+
+    def _system_command(self, cmd, rest, admin):
+        """環境変数・プロセス・ディスクの模擬。対象外のコマンドなら None。"""
+        env = self.progress["env"]
+        if cmd == "export":
+            if not rest:
+                return Result("\n".join(f'declare -x {k}="{v}"' for k, v in sorted(env.items())))
+            for item in rest:
+                name, sep, value = item.partition("=")
+                if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name):
+                    raise TrainingError("変数名は英字・数字・_ で書きます。例: export GREETING=hello")
+                env[name] = value if sep else self.progress["shell_vars"].get(name, env.get(name, ""))
+                self.progress["shell_vars"].pop(name, None)
+            return Result()
+        if cmd == "unset" and rest:
+            for name in rest:
+                env.pop(name, None)
+                self.progress["shell_vars"].pop(name, None)
+            return Result()
+        if cmd == "env" and not rest:
+            return Result("\n".join(f"{k}={v}" for k, v in sorted(env.items())))
+        if cmd == "printenv":
+            if not rest:
+                return Result("\n".join(f"{k}={v}" for k, v in sorted(env.items())))
+            values = [env[name] for name in rest if name in env]
+            return Result("\n".join(values), 0 if len(values) == len(rest) else 1)
+        processes = self.progress["processes"]
+        if cmd == "ps":
+            if rest in (["aux"], ["-ef"], ["-e"], ["ax"]):
+                rows = ["USER         PID %CPU %MEM COMMAND"]
+                rows += [f"{p['user']:<10} {p['pid']:>5} {p['cpu']:>4.1f} {p['mem']:>4.1f} {p['cmd']}" for p in processes]
+                rows.append(f"{'learner':<10} {9999:>5}  0.0  0.0 ps {' '.join(rest)}")
+                return Result("\n".join(rows))
+            if not rest:
+                rows = ["    PID TTY          TIME CMD"]
+                rows += [f"{p['pid']:>7} pts/0    00:00:00 {p['cmd'].split()[0].lstrip('-').rsplit('/', 1)[-1]}"
+                         for p in processes if p["user"] == "learner"]
+                rows.append(f"{9999:>7} pts/0    00:00:00 ps")
+                return Result("\n".join(rows))
+            raise TrainingError("この練習では ps（自分の端末）と ps aux（すべて）を使えます。")
+        if cmd == "pgrep" and len(rest) == 1:
+            pids = [str(p["pid"]) for p in processes if rest[0] in p["cmd"]]
+            return Result("\n".join(pids), 0 if pids else 1)
+        if cmd == "kill":
+            return self._kill(rest, admin)
+        if cmd == "df" and rest in (["-h"], []):
+            return Result("Filesystem      Size  Used Avail Use% Mounted on\n"
+                          "/dev/sda1        20G   17G  2.1G  90% /\n"
+                          "tmpfs           1.0G     0  1.0G   0% /dev/shm\n"
+                          "（訓練用の固定の表示です。実際の PC のディスクは調べていません）")
+        if cmd == "free" and rest in (["-h"], []):
+            return Result("               total        used        free      shared  buff/cache   available\n"
+                          "Mem:           3.8Gi       1.2Gi       1.1Gi        12Mi       1.5Gi       2.4Gi\n"
+                          "Swap:          1.0Gi          0B       1.0Gi\n"
+                          "（訓練用の固定の表示です）")
+        if cmd == "du":
+            flags, _, targets = textcmd.split_flags(rest, "sh")
+            rows = []
+            for name in targets or ["."]:
+                path = self.path(name)
+                items = [path] if path.is_file() else [path] + [x for x in path.rglob("*") if not x.is_symlink()
+                                                                and ".remote" not in x.relative_to(self.root).parts]
+                # 本物の du と同じく、ファイルやフォルダは 4K 単位の「ブロック」で数える。
+                size = sum(4096 * max(1, -(-x.stat().st_size // 4096)) if x.is_file() else 4096 for x in items)
+                rows.append(f"{_human(size) if 'h' in flags else size // 1024}\t{name}")
+            return Result("\n".join(rows))
+        return None
+
+    def _kill(self, rest, admin):
+        signal = "TERM"
+        if rest[:1] == ["-s"] and len(rest) > 1:
+            signal, rest = rest[1].upper().replace("SIG", ""), rest[2:]
+        elif rest and rest[0].startswith("-"):
+            if rest[0] not in SIGNALS:
+                raise TrainingError("この練習では kill PID（TERM）と kill -9 PID（KILL）を使えます。")
+            signal, rest = SIGNALS[rest[0]], rest[1:]
+        if not rest or not all(x.isdigit() for x in rest):
+            raise TrainingError("kill の後ろに止めたいプロセスの番号（PID）を書きます。番号は ps で調べます。")
+        messages, code = [], 0
+        for value in rest:
+            pid = int(value)
+            target = next((p for p in self.progress["processes"] if p["pid"] == pid), None)
+            if target is None:
+                messages.append(f"bash: kill: ({pid}) - No such process（その番号のプロセスはありません）")
+                code = 1
+            elif pid in (1, SHELL_PID):
+                messages.append(f"kill: ({pid}) - この練習では、システムの起点と自分の端末は止めません。")
+                code = 1
+            elif target["user"] != "learner" and not admin:
+                messages.append(f"bash: kill: ({pid}) - Operation not permitted（ほかのユーザーのプロセスです）")
+                code = 1
+            elif signal == "TERM" and target.get("ignores_term"):
+                continue  # 本物と同じく kill 自体は成功するが、プロセスは終了しない
+            else:
+                self.progress["processes"].remove(target)
+        return Result("\n".join(messages), code)
 
     def _ssh(self, rest):
         if self.progress["remote"]:
@@ -373,9 +778,9 @@ class Terminal:
         if identity:
             try:
                 key = self.path(identity)
-                if key.read_text().strip() != "DUMMY-NOT-A-REAL-KEY":
+                if key.read_text(encoding="utf-8").strip() != "DUMMY-NOT-A-REAL-KEY":
                     return Result("この練習では DUMMY-NOT-A-REAL-KEY という教材用の無効な鍵だけを使います。実際の秘密鍵は入力・コピーしないでください。", 255)
-                if stat.S_IMODE(key.stat().st_mode) & 0o077:
+                if self.mode_of(key) & 0o077:
                     return Result("WARNING: UNPROTECTED PRIVATE KEY FILE! 練習用の鍵を chmod 600 で自分だけが読めるようにしましょう。", 255)
             except (TrainingError, OSError):
                 return Result("Identity file を読み取れません。鍵の名前と場所を確認しましょう（模擬）。", 255)
@@ -400,6 +805,10 @@ class Terminal:
     def _scp(self, rest):
         if self.progress["remote"]:
             return Result("この練習では exit で手元の端末に戻り、そこで scp を使います。", 255)
+        if len(rest) == 4 and rest[0] == "-P":
+            if rest[1] not in ("22", "2222"):
+                return Result(f"ssh: connect to host training-server port {rest[1]}: Connection refused（模擬）", 255)
+            rest = rest[2:]
         if len(rest) != 2 or not self.progress["ssh_known"]:
             return Result("scp は確認済みの training-server との転送だけを練習します。先に ssh で接続先の指紋を確認しましょう。", 255)
         source_text, dest_text = rest
@@ -418,7 +827,9 @@ class Terminal:
                 return Result("scp: 転送元ファイルがありません。手元とサーバーのどちらにあるか確認しましょう。", 1)
             if dest.is_dir():
                 dest = self._side_path((dest_text.split(":", 1)[-1].rstrip("/") + "/" + source.name), dest_remote)
+            existed = dest.exists()
             shutil.copyfile(source, dest)
+            self.created(dest, existed, self.mode_of(source))
         except (TrainingError, OSError):
             return Result("scp: 転送先の場所と権限を確認しましょう。練習用ホームの外やリンクへは転送できません。", 1)
         return Result("転送しました（模擬）。元のファイルは残ります。実通信は行いません。")
@@ -435,23 +846,88 @@ class Terminal:
             self.progress["apt_updated"] = True
             return Result("取得できるソフトの一覧を更新しました（模擬）。ソフト自体を更新する upgrade とは別です。")
         if action == "search" and len(rest) == 2:
-            return Result("\n".join(f"{name} - {desc}" for name, (desc, _) in PACKAGES.items() if rest[1] in name))
+            return Result("\n".join(f"{name} - {desc}" for name, (desc, _) in PACKAGES.items() if rest[1] in name or rest[1] in desc))
         if action == "show" and len(rest) == 2 and rest[1] in PACKAGES:
             name = rest[1]
             desc, version = PACKAGES[name]
             return Result(f"Package: {name}\nVersion: {version}\n説明: {desc}")
-        if action in ("install", "remove") and len(rest) == 2 and rest[1] in PACKAGES:
-            name = rest[1]
+        names = [x for x in rest[1:] if x != "-y"]
+        if action in ("install", "remove") and names and all(x in PACKAGES for x in names) and len(set(names)) == len(names):
             if action == "install":
                 if not self.progress["apt_updated"]:
                     return Result("先に sudo apt update で一覧を更新しましょう（模擬）。", 100)
-                if name not in self.progress["packages"]:
-                    self.progress["packages"].append(name)
-                return Result(f"{name} を追加しました（模擬）。実際の PC にはインストールしていません。")
-            if name in self.progress["packages"]:
-                self.progress["packages"].remove(name)
-            return Result(f"{name} を削除しました（模擬）。")
-        raise TrainingError("対応する例: apt search tree / apt show tree / sudo apt update / sudo apt install tree / sudo apt remove tree")
+                for name in names:
+                    if name not in self.progress["packages"]:
+                        self.progress["packages"].append(name)
+                return Result(f"{' '.join(names)} を追加しました（模擬）。実際の PC にはインストールしていません。")
+            for name in names:
+                if name in self.progress["packages"]:
+                    self.progress["packages"].remove(name)
+            return Result(f"{' '.join(names)} を削除しました（模擬）。")
+        if action in ("install", "remove", "show") and names:
+            unknown = next((x for x in names if x not in PACKAGES), names[0])
+            return Result(f"E: Unable to locate package {unknown}（この練習で扱えるのは {' / '.join(PACKAGES)} です）", 100)
+        raise TrainingError("対応する例: apt search vim / apt show vim / sudo apt update / sudo apt install vim / sudo apt remove vim")
+
+
+def split_pipes(line):
+    """引用符の外にある | で区切る。'a|b' のように引用符の中の | は文字として残す。"""
+    segments, current, quote, index = [], [], None, 0
+    while index < len(line):
+        char = line[index]
+        if char == "\\" and quote != "'" and index + 1 < len(line):
+            current.append(line[index:index + 2])
+            index += 2
+            continue
+        if char in "'\"" and quote in (None, char):
+            quote = None if quote == char else char
+        elif char == "|" and quote is None:
+            if line[index + 1:index + 2] == "|":
+                raise TrainingError("|| でつなぐ書き方はここでは扱いません。1つずつ入力しましょう。")
+            segments.append("".join(current))
+            current = []
+            index += 1
+            continue
+        current.append(char)
+        index += 1
+    segments.append("".join(current))
+    return segments
+
+
+_WHO = {"u": 0o700, "g": 0o070, "o": 0o007}
+_PERM = {"r": 0o444, "w": 0o222, "x": 0o111}
+
+
+def chmod_mode(spec, current):
+    """chmod の指定（644 / u+x / go-rw / a=r,u+w など）から新しい権限を計算する。"""
+    if re.fullmatch(r"[0-7]{3}", spec):
+        return int(spec, 8)
+    mode = current
+    for part in spec.split(","):
+        match = re.fullmatch(r"([ugoa]*)([+\-=])([rwx]*)", part)
+        if not match:
+            raise TrainingError("chmod は 644 のような3桁の数字か、u+x・go-w・a=r のような記号で指定します。")
+        who, op, perms = match.groups()
+        # 本物では u/g/o を省略すると umask の影響を受ける。この練習では a（全員）として扱う。
+        mask = sum(_WHO[w] for w in set(who.replace("a", "ugo") or "ugo"))
+        bits = sum(_PERM[x] for x in set(perms)) & mask
+        if op == "+":
+            mode |= bits
+        elif op == "-":
+            mode &= ~bits
+        else:
+            mode = (mode & ~mask) | bits
+    return mode
+
+
+def _human(size):
+    """du -h に近い表示。本物と同じく最小単位は K。"""
+    size = max(size, 1) / 1024
+    for unit in ("K", "M", "G"):
+        if size < 1024 or unit == "G":
+            return f"{size:.1f}{unit}" if size < 10 else f"{size:.0f}{unit}"
+        size /= 1024
+    return f"{size:.0f}G"
 
 
 def lessons(mode):
@@ -460,7 +936,11 @@ def lessons(mode):
 
 
 def selected_mode():
-    return save.load()["learning"]["mode"]
+    mode = save.load()["learning"]["mode"]
+    if mode == "practice" and not runner.practice_supported():
+        # 保存されたモードは変えず、この環境で使える段階へ案内する。
+        return next((m for m in GUIDED_MODES if not completed_course(m)), "advanced")
+    return mode
 
 
 def progress_for(mode):
@@ -490,14 +970,45 @@ def completed_course(mode, progress=None):
     return {step["id"] for step in lessons(mode)} <= set(progress.get("completed", []))
 
 
+def answers(step):
+    """正解として受け付ける入力例（最初が代表例）。"""
+    return [step["command"], *step.get("accept", [])]
+
+
 def matches(line, step):
     try:
-        return shlex.split(line) == shlex.split(step["command"])
+        typed = shlex.split(line)
+        return any(typed == shlex.split(answer) for answer in answers(step))
     except ValueError:
         return False
 
 
-def prepare_step(terminal, step):
+def expected_code(step):
+    return step.get("expected_code", 100 if step["command"] == "apt update" else 0)
+
+
+def accepted(line, result, step, terminal):
+    """課題を達成したか。goal がある課題は、書き方ではなく結果の状態で判定する。"""
+    if result.code != expected_code(step):
+        return False
+    if step.get("goal") is None:
+        return matches(line, step)
+    return goal_met(step, terminal)
+
+
+def goal_met(step, terminal):
+    try:
+        return bool(step["goal"](terminal))
+    except (TrainingError, OSError, KeyError, TypeError, IndexError):
+        return False
+
+
+def prepare_step(terminal, step, fresh=False):
+    """課題の初期状態を用意する。
+
+    editor に continue がある課題は、前の課題から続けて開いている vim の画面（学習者が書いた文）を
+    引き継ぐ。reset（fresh=True）では必ず用意し直す。
+    """
     for key in ("remote", "ssh_known", "ssh_pending", "last_status"):
         if key in step:
             terminal.progress[key] = step[key]
@@ -515,7 +1026,7 @@ def prepare_step(terminal, step):
     if "cwd" in step:
         target = terminal.path("/home/learner/" + step["cwd"].lstrip("/"))
         terminal.ensure_directory(target)
-        terminal.set_cwd(str(target.relative_to(terminal.active_root)))
+        terminal.set_cwd(target.relative_to(terminal.active_root).as_posix())
     for name in step.get("remove", []):
         target = terminal.path(name)
         if target == terminal.active_root or target in terminal.path(".").parents or target == terminal.path("."):
@@ -524,8 +1035,13 @@ def prepare_step(terminal, step):
             shutil.rmtree(target)
         elif target.exists():
             target.unlink()
+        terminal.forget_mode(target)
     for name in step.get("dirs", []):
         terminal.ensure_directory(terminal.path(name))
+    # 環境変数とプロセスは課題ごとに用意し直す（前の課題で止めたプロセスなどを持ち越さない）。
+    terminal.progress["env"] = {**DEFAULT_ENV, **step.get("env", {})}
+    terminal.progress["shell_vars"] = {}
+    terminal.progress["processes"] = [dict(p) for p in DEFAULT_PROCESSES + step.get("processes", [])]
     if "packages" in step:
         terminal.progress["packages"] = list(step["packages"])
     if "apt_updated" in step:
@@ -533,7 +1049,22 @@ def prepare_step(terminal, step):
     for name, content in step.get("files", {}).items():
         terminal.restore_file(name, content)
     for name, mode in step.get("modes", {}).items():
-        terminal.path(name).chmod(mode)
+        terminal.set_mode(terminal.path(name), mode)
+    # 前の課題で学習者が作ったファイルを使う課題。なければ代わりの内容を用意する。
+    for name, content in step.get("initial_files", {}).items():
+        if not terminal.path(name).is_file():
+            terminal.restore_file(name, content)
+    preset = step.get("editor")
+    current = terminal.progress.get("editor")
+    if preset is None:
+        terminal.progress["editor"] = None
+    elif (fresh or not preset.get("continue") or not current or current["name"] != preset["file"]
+          or current["mode"] != preset.get("mode", "normal") or ("goal" in step and goal_met(step, terminal))):
+        # 続きの画面でも、この課題の目的がもう済んでいるなら（復習のやり直しなど）最初から用意する。
+        state = {k: v for k, v in preset.items() if k not in ("file", "lines", "continue")}
+        if state.get("mode") == "insert":
+            state.setdefault("insert_at", len(preset.get("lines", [])))
+        terminal.open_editor(preset["file"], lines=preset.get("lines"), **state)
 
 
 def play(mode, start=None):
@@ -553,41 +1084,49 @@ def play(mode, start=None):
         prepare_step(terminal, step)
         remember(mode, progress)
         ui.clear()
-        print(ui.box([f"{MODE_NAMES[mode]}  {index + 1}/{len(course)}  {step['title']}", "",
+        print(ui.box([f"{MODE_NAMES[mode]}  {index + 1}/{len(course)}  {step['title']}",
+                      *([f"ユニット: {step['unit']}"] if step.get("unit") else []), "",
                       *step["explanation"].splitlines(), "", "やってみよう: " + step["task"]], color="green"))
         if mode == "intro":
             print("\n  入力するコマンド: " + ui.c(step["command"], "bcyan"))
         print("\n  訓練用の模擬ターミナルです。実際の sudo・apt・シェルは実行しません。")
         print("  hint: 入力例 / lesson: 説明を再表示 / reset: この課題を復元 / menu: 保存して戻る")
+        if terminal.progress.get("editor"):
+            print("\n" + vim_sim.render(terminal.progress["editor"]))
         while True:
             try:
-                line = input(f"\n 練習 learner@{terminal.hostname} {terminal.display_cwd} $ ").strip()
+                raw = input("\n " + terminal.prompt_text())
             except (EOFError, KeyboardInterrupt):
                 remember(mode, progress)
                 return
-            if line in ("menu", "quit") or (line == "exit" and not terminal.progress["remote"]):
+            line = raw.strip()
+            in_editor = bool(terminal.progress.get("editor"))
+            if line == "menu" or (not in_editor and (line == "quit" or (line == "exit" and not terminal.progress["remote"]))):
                 remember(mode, progress)
                 return
-            if line in ("hint", "answer", "help"):
+            if line == "hint" or (not in_editor and line in ("answer", "help")):
                 print(f"  入力例: {step['command']}\n  ヒントや解答を何度見ても減点はありません。")
                 continue
-            if line in ("lesson", "mission"):
+            if line == "lesson" or (not in_editor and line == "mission"):
                 print(step["explanation"] + "\nやってみよう: " + step["task"])
                 continue
             if line == "reset":
-                prepare_step(terminal, step)
+                prepare_step(terminal, step, fresh=True)
                 print("課題のファイルと開始場所を復元しました。もう一度試せます。")
                 continue
-            result = terminal.execute(line)
+            # vim の入力モードでは先頭の空白も文字として残す。
+            result = terminal.execute(raw.rstrip("\r") if in_editor else line)
             if result.output:
                 print(result.output)
             remember(mode, progress)
-            expected_code = step.get("expected_code", 100 if step["command"] == "apt update" else 0)
-            if not matches(line, step) or result.code != expected_code:
-                if result.code == 0:
+            if not accepted(line, result, step, terminal):
+                if result.code == 0 and not in_editor:
                     print("  実行できました。今回の課題も試しましょう。hint で入力例を見られます。")
                 continue
             print(ui.c("\n  ✓ できました！ " + step["success"], "bgreen"))
+            others = [answer for answer in answers(step) if not matches(line, {"command": answer})]
+            if others:
+                print("  ほかの書き方でも正解です: " + " / ".join(others))
             completed = progress.setdefault("completed", [])
             if step["id"] not in completed:
                 completed.append(step["id"])
@@ -596,6 +1135,12 @@ def play(mode, start=None):
             if index == len(course):
                 progress["reviewing"] = False
             remember(mode, progress)
+            d = save.load()
+            reward = save.record_activity(d, mode + ":" + step["id"])
+            save.store(d)
+            if reward["earned"]:
+                print(ui.c(f"  +{reward['earned']} XP！", "byellow"))
+            print("  " + save.activity_line(d))
             try:
                 choice = input("\n  Enter: 次の練習へ / menu: 保存して戻る > ").strip().lower()
             except (EOFError, KeyboardInterrupt):
@@ -604,7 +1149,7 @@ def play(mode, start=None):
                 return
             break
     print(ui.box([f"{MODE_NAMES[mode]}を最後まで学習しました！", "何度でもレッスン選択から復習できます。",
-                  "はじめてモードの次は基礎練習、基礎練習の次は実践へ進めます。", "メインメニューの [7] モード選択で切り替えましょう。"], color="green"))
+                  "はじめて → 基礎練習 → 応用練習 → 実践 の順に進めます。", "総合復習の「課題まつり」で、手本なしの力試しもできます。", "メインメニューの [7] モード選択で切り替えましょう。"], color="green"))
     try:
         input("Enter でメニューへ > ")
     except (EOFError, KeyboardInterrupt):
@@ -617,7 +1162,13 @@ def lesson_select(mode):
         progress = progress_for(mode)
         course = lessons(mode)
         print(f"\n  {MODE_NAMES[mode]} — レッスン選択（復習に減点はありません）\n")
+        unit = None
         for index, step in enumerate(course, 1):
+            if step.get("unit") and step["unit"] != unit:
+                unit = step["unit"]
+                members = [s["id"] for s in course if s.get("unit") == unit]
+                done = len(set(members) & set(progress.get("completed", [])))
+                print(ui.c(f"\n  ■ {unit}  {done}/{len(members)}", "bold", "bcyan"))
             mark = "✓" if step["id"] in progress.get("completed", []) else "・"
             print(f"  [{index}] {mark} {step['title']}")
         try:

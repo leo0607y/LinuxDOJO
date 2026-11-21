@@ -2,6 +2,7 @@
 import json
 import os
 import time
+from datetime import date, timedelta
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -53,13 +54,14 @@ def learning_defaults(mode="intro"):
         "mode": mode,
         "intro": {"completed": [], "cwd": ".", "packages": [], "apt_updated": False},
         "basic": {"completed": [], "cwd": ".", "packages": [], "apt_updated": False},
+        "advanced": {"completed": [], "cwd": ".", "packages": [], "apt_updated": False},
         "practice": {"mission": None},
     }
 
 
 def load():
     try:
-        d = json.loads(SAVE.read_text())
+        d = json.loads(SAVE.read_text(encoding="utf-8"))
         base = empty()
         # 既存の実践プレイヤーは同じモードから再開。初めての人は導入から。
         legacy_mode = "practice" if d.get("cleared") or d.get("player", {}).get("sessions", 0) else "intro"
@@ -67,9 +69,9 @@ def load():
         learning = d.setdefault("learning", {})
         for key, value in defaults.items():
             learning.setdefault(key, value)
-        if learning["mode"] not in ("intro", "basic", "practice"):
+        if learning["mode"] not in ("intro", "basic", "advanced", "practice"):
             learning["mode"] = legacy_mode
-        for mode in ("intro", "basic", "practice"):
+        for mode in ("intro", "basic", "advanced", "practice"):
             for key, value in defaults[mode].items():
                 learning[mode].setdefault(key, value)
         for k, v in base.items():
@@ -83,7 +85,7 @@ def load():
 
 def store(d):
     tmp = SAVE.with_suffix(".tmp")
-    tmp.write_text(json.dumps(d, ensure_ascii=False, indent=2))
+    tmp.write_text(json.dumps(d, ensure_ascii=False, indent=2), encoding="utf-8")
     os.replace(tmp, SAVE)
 
 
@@ -119,9 +121,11 @@ def record_clear(mission, hint_level, answer_viewed, seconds):
             d["titles"].append(t)
             new_titles.append(t)
     after_rank = rank_of(len(d["cleared"]))
+    activity = record_activity(d, "practice:" + mission.id)
     store(d)
     return {"score": sc, "first": first, "titles": new_titles,
-            "rankup": after_rank if after_rank != before_rank else None}
+            "rankup": after_rank if after_rank != before_rank else None,
+            "activity": activity}
 
 
 def rank_of(n_cleared):
@@ -142,3 +146,40 @@ def next_rank(n_cleared):
 def total_score(d=None):
     d = d or load()
     return sum(v.get("score", 0) for v in d["cleared"].values())
+
+
+def activity_summary(d, today=None):
+    """端末のローカル日付で日々の学習を集計する。"""
+    today = today or date.today()
+    activity = d.get("activity", {})
+    days = activity.get("days", {})
+    cursor = today if today.isoformat() in days else today - timedelta(days=1)
+    streak = 0
+    while cursor.isoformat() in days:
+        streak += 1
+        cursor -= timedelta(days=1)
+    count = len(days.get(today.isoformat(), []))
+    return {"xp": activity.get("xp", 0), "today": count, "goal": 3,
+            "streak": streak}
+
+
+def record_activity(d, lesson_id, today=None):
+    """同じ課題への報酬は1日1回。復習も別の日なら学習として数える。"""
+    today = today or date.today()
+    activity = d.setdefault("activity", {})
+    activity.setdefault("xp", 0)
+    activity.setdefault("days", {})
+    completed = activity["days"].setdefault(today.isoformat(), [])
+    earned = 0
+    if lesson_id not in completed:
+        completed.append(lesson_id)
+        earned = 10
+        activity["xp"] += earned
+    return dict(activity_summary(d, today), earned=earned)
+
+
+def activity_line(d):
+    summary = activity_summary(d)
+    goal = "今日の目標達成！" if summary["today"] >= summary["goal"] else "今日は3課題に挑戦しよう"
+    return (f"学習XP {summary['xp']}  |  連続 {summary['streak']} 日  |  "
+            f"今日 {summary['today']}/{summary['goal']} 課題  {goal}")

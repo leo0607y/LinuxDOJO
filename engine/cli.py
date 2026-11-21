@@ -183,6 +183,9 @@ def celebrate(m):
     lines += ["", c("✅ 模範解答の一例", "bold", "bcyan")]
     lines += ["  " + c(x, "bcyan") for x in m.render(m.answer, d).strip().split("\n")]
     print(box(lines, title="★ CLEAR ★", color="green", title_color="byellow"))
+    if res["activity"]["earned"]:
+        print(c(f"\n  +{res['activity']['earned']} XP！", "bold", "byellow"))
+    print("  " + save.activity_line(save.load()))
     if res["titles"] and not already:
         for t in res["titles"]:
             print(c(f"\n  🎊 称号を獲得しました: {t}", "bold", "bmagenta"))

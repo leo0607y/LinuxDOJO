@@ -27,8 +27,14 @@ case "${LANG:-}${LC_ALL:-}" in
   *) export LANG=C.UTF-8 ;;
 esac
 
+# WSL で Windows 側のフォルダ (/mnt/c など) から起動すると Linux の権限が正しく働かない。
+# 練習用の作業場所だけ WSL 側に置く（進捗の save_data.json は Windows 版と共通）。
+if [ -z "${LQ_WORKSPACE:-}" ] && [[ "$PWD" == /mnt/* ]] && grep -qi microsoft /proc/version 2>/dev/null; then
+  export LQ_WORKSPACE="${XDG_DATA_HOME:-$HOME/.local/share}/linuxdojo/workspace"
+fi
+
 chmod +x bin/mock/* bin/sim/* 2>/dev/null
-mkdir -p workspace
+mkdir -p "${LQ_WORKSPACE:-workspace}"
 
 check_env() {
   echo "🔎 動作環境チェック"

@@ -1,0 +1,617 @@
+"""課題まつり：プロセス・ディスク・メモリ・環境変数・ソフト管理の運用課題。"""
+
+PACK_TITLE = "プロセス・容量・環境・ソフト管理"
+
+
+def _row(p):
+    """ps aux の1行と同じ書式（grep で抜き出した結果の期待値に使う）。"""
+    return f"{p['user']:<10} {p['pid']:>5} {p['cpu']:>4.1f} {p['mem']:>4.1f} {p['cmd']}"
+
+
+def _rows(*items):
+    return "".join(_row(p) + "\n" for p in items)
+
+
+_DF_ROOT = "/dev/sda1        20G   17G  2.1G  90% /\n"
+_FREE_MEM = "Mem:           3.8Gi       1.2Gi       1.1Gi        12Mi       1.5Gi       2.4Gi\n"
+_BASE_PATH = "/usr/local/bin:/usr/bin:/bin"
+
+# ---- プロセス
+_NGINX_MASTER = {"pid": 1200, "user": "root", "cmd": "nginx: master process /usr/sbin/nginx", "cpu": 0.1, "mem": 0.4}
+_NGINX_WORKER = {"pid": 1201, "user": "www-data", "cmd": "nginx: worker process", "cpu": 1.2, "mem": 0.8}
+_SLEEP = {"pid": 3100, "user": "learner", "cmd": "sleep 600", "cpu": 0.0, "mem": 0.0}
+_NOTEBOOK = {"pid": 3200, "user": "learner", "cmd": "python3 notebook.py", "cpu": 2.0, "mem": 3.1}
+_Q_MAIL = {"pid": 4010, "user": "learner", "cmd": "php worker.php --queue=mail", "cpu": 1.5, "mem": 2.0}
+_Q_REPORT = {"pid": 4020, "user": "learner", "cmd": "php worker.php --queue=report", "cpu": 98.7, "mem": 6.4,
+             "ignores_term": True}
+_FPM_LEGACY = {"pid": 5200, "user": "www-data", "cmd": "php-fpm: pool legacy", "cpu": 4.0, "mem": 45.2}
+_FPM_MAIN = {"pid": 5100, "user": "www-data", "cmd": "php-fpm: pool main", "cpu": 3.0, "mem": 5.0}
+_TAILS = [{"pid": pid, "user": "learner", "cmd": "tail -f app.log", "cpu": 0.0, "mem": 0.1} for pid in (3301, 3302, 3303)]
+_ROOT_TAIL = {"pid": 3400, "user": "root", "cmd": "tail -f /var/log/syslog", "cpu": 0.0, "mem": 0.1}
+_BACKUPS = [{"pid": pid, "user": "learner", "cmd": "bash backup.sh", "cpu": 30.0, "mem": 1.5} for pid in (3501, 3502, 3503)]
+_REPORT_GEN = {"pid": 6100, "user": "learner", "cmd": "python3 report_gen.py --month=11", "cpu": 99.2, "mem": 38.5,
+               "ignores_term": True}
+_POSTGRES = {"pid": 900, "user": "postgres", "cmd": "postgres -D /var/lib/postgresql/data", "cpu": 2.0, "mem": 8.0}
+_INDEXER = {"pid": 6200, "user": "learner", "cmd": "python3 indexer.py", "cpu": 5.0, "mem": 4.0}
+_DEPLOY = {"pid": 4101, "user": "learner", "cmd": "bash deploy.sh", "cpu": 0.5, "mem": 0.3}
+_DEPLOY_RSYNC = {"pid": 4102, "user": "learner", "cmd": "rsync -a release/ deploy@203.0.113.20:/srv/app",
+                 "cpu": 0.0, "mem": 0.5, "ignores_term": True}
+_ALICE_VIM = {"pid": 4300, "user": "alice", "cmd": "vim deploy-notes.txt", "cpu": 0.0, "mem": 0.4}
+_HTTP_DEBUG = {"pid": 7100, "user": "learner", "cmd": "python3 -m http.server 8000", "cpu": 0.3, "mem": 1.0}
+_APP = {"pid": 7000, "user": "learner", "cmd": "python3 app.py --port=8080", "cpu": 6.0, "mem": 9.0}
+
+# ---- ファイル
+_BIG = "キャッシュのかけら\n" * 4000
+_SMALL = "メモ\n" * 20
+_OLD = "古いログ\n" * 900
+
+SCENARIOS = [
+    # ===================== ★1 =====================
+    {
+        "id": "fes-system-01",
+        "level": 1,
+        "title": "nginx のプロセスを報告する",
+        "brief": "「Web サーバーの nginx は動いていますか？」と聞かれました。動いているプロセスの一覧から、nginx に関係する行だけを "
+                 "nginx-report.txt に保存してください。ほかのプロセスの行は入れません。",
+        "processes": [_NGINX_MASTER, _NGINX_WORKER, _NOTEBOOK],
+        "solution": ["ps aux | grep nginx > nginx-report.txt", "cat nginx-report.txt"],
+        "alt_solutions": [["ps -ef | grep nginx > nginx-report.txt"], ["ps aux", "ps aux | grep -i nginx > nginx-report.txt"]],
+        "traps": [["ps aux > nginx-report.txt"], ["pgrep nginx > nginx-report.txt"], ["ps | grep nginx > nginx-report.txt"]],
+        "expected_files": {"nginx-report.txt": _rows(_NGINX_MASTER, _NGINX_WORKER)},
+        "hints": ["すべてのユーザーのプロセスを一覧にし、その結果から必要な行だけを取り出します。",
+                  "ps aux で全体を表示し、| grep で nginx を含む行に絞り、> でファイルに保存します。",
+                  "ps aux | grep nginx > nginx-report.txt"],
+        "explanation": "障害の問い合わせには「見た」ではなく、見た結果をファイルで渡すのが確実です。ps だけでは自分の端末のプロセスしか見えないので、"
+                       "サーバー全体を調べるときは ps aux を使います。",
+        "practice": ["3-7", "2-1"],
+    },
+    {
+        "id": "fes-system-02",
+        "level": 1,
+        "title": "ディスク使用率の行を報告する",
+        "brief": "監視から「ディスクが残り少ない」と通知が来ました。ディスクの使用状況のうち、ルート（/）の行だけを disk.txt に保存して、"
+                 "チームに報告できるようにしてください。見出しや他の行は入れません。",
+        "solution": ["df -h", "df -h | grep sda1 > disk.txt"],
+        "alt_solutions": [["df | grep /dev/sda1 > disk.txt"], ["df -h | grep 90% > disk.txt"]],
+        "traps": [["df -h > disk.txt"], ["df -h | grep tmpfs > disk.txt"]],
+        "expected_files": {"disk.txt": _DF_ROOT},
+        "hints": ["ディスク全体の空き容量を表示するコマンドがあります。-h を付けると G や M で読みやすくなります。",
+                  "df -h の結果を見て、/ に対応する行（/dev/sda1）を grep で取り出します。",
+                  "df -h | grep sda1 > disk.txt"],
+        "explanation": "df は「ディスク全体でどれだけ空いているか」を見る道具です。Use% が 90% を超えると、ログが書けずにアプリが止まることがあります。"
+                       "必要な行だけを渡すと、報告を受けた人がすぐ状況をつかめます。",
+        "practice": ["3-7", "3-8"],
+    },
+    {
+        "id": "fes-system-03",
+        "level": 1,
+        "title": "メモリの状況を報告する",
+        "brief": "「アプリが重いのはメモリ不足では？」と相談されました。メモリ（Mem）の使用状況の行だけを mem.txt に保存してください。"
+                 "スワップ（Swap）の行は入れません。",
+        "solution": ["free -h", "free -h | grep Mem > mem.txt"],
+        "alt_solutions": [["free | grep Mem: > mem.txt"], ["free -h | grep -i mem > mem.txt"]],
+        "traps": [["free -h > mem.txt"], ["free -h | grep Swap > mem.txt"], ["df -h | grep Mem > mem.txt"]],
+        "expected_files": {"mem.txt": _FREE_MEM},
+        "hints": ["メモリの量を表示するコマンドがあります。-h で読みやすい単位になります。",
+                  "free -h の結果から、Mem で始まる行を grep で取り出して保存します。",
+                  "free -h | grep Mem > mem.txt"],
+        "explanation": "free の available 列は「今すぐアプリが使える量」の目安です。free 列が小さくても buff/cache は必要に応じて空けられるので、"
+                       "available を見て判断します。",
+        "practice": ["3-7"],
+    },
+    {
+        "id": "fes-system-04",
+        "level": 1,
+        "title": "環境変数でステージング環境を指定する",
+        "brief": "これから起動するアプリに「ステージング環境で動く」ことを伝えるため、環境変数 APP_ENV に staging を設定してください。"
+                 "子のプログラムにも引き継がれる形にし、設定できたかを自分で確認します。",
+        "solution": ["export APP_ENV=staging", "env | grep APP_ENV"],
+        "alt_solutions": [["APP_ENV=staging", "export APP_ENV", "printenv APP_ENV"], ["export APP_ENV=staging", "echo $APP_ENV"]],
+        "traps": [["APP_ENV=staging", "echo $APP_ENV"], ["export APP_ENV=production", "env | grep APP_ENV"],
+                  ["export APP_ENV=staging"]],
+        "expected_env": {"APP_ENV": "staging"},
+        "checks_commands": [["env | grep APP_ENV", "printenv APP_ENV", "echo $APP_ENV", "env", "printenv"]],
+        "hints": ["ただ代入しただけの変数は、そのシェルの中でしか使えません。引き継ぐには一手間必要です。",
+                  "export を使うと環境変数になります。確認には env | grep や printenv が使えます。",
+                  "export APP_ENV=staging を実行し、env | grep APP_ENV で確かめます。"],
+        "explanation": "アプリは設定を環境変数から読むことがよくあります。export を忘れると、シェルでは echo で見えるのにアプリには届かない、"
+                       "という分かりにくい失敗になります。",
+        "practice": ["3-4"],
+    },
+    {
+        "id": "fes-system-05",
+        "level": 1,
+        "title": "HOME と PATH を記録する",
+        "brief": "環境の調査票を作ります。今のホームフォルダの場所を home.txt に、コマンドを探す場所の一覧（PATH）を path.txt に、"
+                 "それぞれ値だけを1行で保存してください。",
+        "solution": ["echo $HOME > home.txt", "echo $PATH > path.txt"],
+        "alt_solutions": [["printenv HOME > home.txt", "printenv PATH > path.txt"], ["echo \"$PATH\" > path.txt", "echo \"$HOME\" > home.txt"]],
+        "traps": [["echo '$HOME' > home.txt", "echo '$PATH' > path.txt"], ["echo HOME > home.txt", "echo PATH > path.txt"],
+                  ["pwd > home.txt", "env | grep PATH > path.txt"]],
+        "expected_files": {"home.txt": "/home/learner\n", "path.txt": _BASE_PATH + "\n"},
+        "hints": ["変数の中身は、名前の前に $ を付けると取り出せます。",
+                  "echo $HOME の結果を > でファイルに保存します。シングルクォートで囲むと $ がそのままの文字になってしまいます。",
+                  "echo $HOME > home.txt と echo $PATH > path.txt"],
+        "explanation": "「コマンドが見つからない」トラブルの多くは PATH が原因です。値をそのまま記録しておくと、正常な環境と比べて原因を探せます。",
+        "practice": ["3-4", "2-1"],
+    },
+    {
+        "id": "fes-system-06",
+        "level": 1,
+        "title": "置き忘れた sleep を止める",
+        "brief": "テストで使った sleep のプロセスが残っています。それだけを、まずは普通の（行儀のよい）方法で止めてください。"
+                 "同じく自分が動かしている notebook.py は作業中なので止めません。",
+        "processes": [_SLEEP, _NOTEBOOK],
+        "solution": ["ps aux", "kill 3100", "ps aux"],
+        "alt_solutions": [["pgrep sleep", "kill -15 3100"], ["ps", "kill -s TERM 3100", "ps"]],
+        "traps": [["kill 3100 3200"], ["kill 3200"]],
+        "process_gone": ["sleep 600"],
+        "process_kept": ["notebook.py", "cron"],
+        "hints": ["プロセスを止めるには番号（PID）が必要です。まず一覧で探します。",
+                  "ps aux か pgrep sleep で PID を調べ、kill PID で止めます。-9 は最後の手段です。",
+                  "kill 3100 のあと、ps aux で消えたことを確かめます。"],
+        "explanation": "kill は何も付けないと TERM（終了してください）を送ります。プログラムは後片付けをしてから終われるので、最初は TERM を使います。",
+        "practice": ["3-5", "3-6"],
+    },
+    {
+        "id": "fes-system-07",
+        "level": 1,
+        "title": "tree を入れて使えるか確かめる",
+        "brief": "フォルダ構成を図で見たいので tree コマンドを使えるようにしてください。入れたあと、どこに入ったかを確認するところまでが作業です。",
+        "solution": ["sudo apt update", "sudo apt install tree", "which tree"],
+        "alt_solutions": [["apt search tree", "sudo apt update", "sudo apt install -y tree", "which tree"]],
+        "traps": [["sudo apt install tree", "which tree"], ["sudo apt update", "apt install tree"],
+                  ["sudo apt update", "sudo apt install tree"]],
+        "packages": ["tree"],
+        "checks_commands": ["which tree"],
+        "hints": ["ソフトを入れる前に、取得できるソフトの一覧を最新にする手順があります。",
+                  "sudo apt update で一覧を更新し、sudo apt install でソフトを入れます。最後に which で場所を確かめます。",
+                  "sudo apt update → sudo apt install tree → which tree"],
+        "explanation": "update は「カタログの更新」、install は「本体の追加」で別の作業です。入れたあとに which で見つかるか確かめると、"
+                       "PATH の問題などにすぐ気づけます。",
+        "practice": ["3-4", "1-1"],
+    },
+    {
+        "id": "fes-system-08",
+        "level": 1,
+        "title": "いちばん大きいフォルダはどれ？",
+        "brief": "ホームに cache・logs・docs の3つのフォルダがあります。それぞれの合計サイズを調べ、いちばん大きいフォルダの名前だけを "
+                 "big.txt に1行で書いてください。調べずに当て推量で書くのはなしです。",
+        "files": {"cache/a.bin": _BIG, "cache/b.bin": _BIG, "logs/app.log": _SMALL * 5, "docs/readme.txt": _SMALL},
+        "solution": ["du -sh cache logs docs", "echo cache > big.txt"],
+        "alt_solutions": [["du -sh *", "echo cache > big.txt"], ["du -s cache", "du -s logs", "du -s docs", "echo cache > big.txt"]],
+        "traps": [["echo cache > big.txt"], ["du -sh *", "echo logs > big.txt"], ["df -h", "echo cache > big.txt"]],
+        "expected_files": {"big.txt": "cache\n"},
+        "checks_commands": [["du -sh cache logs docs", "du -sh *", "du -s *", "du -h *", "du -sh ./*", "du -s cache logs docs",
+                             "du -sh cache", "du -s cache", "du -h cache", "du -sh .", "du -h ."]],
+        "hints": ["df はディスク全体の量、フォルダごとの大きさを見るのは別のコマンドです。",
+                  "du -sh フォルダ名 で、フォルダの合計サイズが読みやすい単位で表示されます。複数まとめて指定できます。",
+                  "du -sh cache logs docs で比べ、いちばん大きい名前を echo で big.txt に書きます。"],
+        "explanation": "ディスクが逼迫したとき、df で「足りない」と分かったら、du で「どこが使っているか」を絞り込みます。"
+                       "当て推量で消すと、大事なデータを消して容量も空かない、という最悪の結果になりがちです。",
+        "practice": ["3-8", "3-7"],
+    },
+    {
+        "id": "fes-system-09",
+        "level": 1,
+        "title": "jq のバージョンを調べて記録する",
+        "brief": "導入前の確認として、jq というソフトの情報を apt で調べ、バージョンの行だけを jq-version.txt に保存してください。"
+                 "まだインストールはしません。",
+        "solution": ["apt show jq", "apt show jq | grep Version > jq-version.txt"],
+        "alt_solutions": [["apt search jq", "apt show jq | grep -i version > jq-version.txt"], ["apt show jq | head -2 | tail -1 > jq-version.txt"]],
+        "traps": [["apt show jq > jq-version.txt"], ["apt show curl | grep Version > jq-version.txt"]],
+        "expected_files": {"jq-version.txt": "Version: 1.7-training\n"},
+        "hints": ["apt には、ソフトを入れずに詳しい情報だけを表示するサブコマンドがあります。",
+                  "apt show jq で情報が出ます。その中から Version の行を grep で取り出します。",
+                  "apt show jq | grep Version > jq-version.txt"],
+        "explanation": "入れる前にバージョンや説明を確かめると、必要な機能があるか、手順書と同じ版かを判断できます。"
+                       "show や search は管理者権限なしで使えます。",
+        "practice": ["2-1", "6-5"],
+    },
+    # ===================== ★2 =====================
+    {
+        "id": "fes-system-10",
+        "level": 2,
+        "title": "固まったキューワーカーだけを止める",
+        "brief": "同じ worker.php が2つ動いています。メール送信用（queue=mail）は正常ですが、レポート用（queue=report）が CPU を使い切って固まっています。"
+                 "レポート用だけを止めてください。まずは普通の方法で止め、止まらなかったときだけ強制終了を使います。",
+        "processes": [_Q_MAIL, _Q_REPORT],
+        "solution": ["ps aux | grep worker", "kill 4020", "ps aux | grep report", "kill -9 4020", "ps aux | grep worker"],
+        "alt_solutions": [["pgrep report", "kill -TERM 4020", "pgrep report", "kill -KILL 4020"],
+                          ["ps -ef | grep queue", "kill -15 4020", "ps aux | grep 4020", "kill -s KILL 4020"]],
+        "traps": [["kill 4020"], ["kill -9 4010 4020"], ["pgrep worker", "kill -9 4010"]],
+        "process_gone": ["queue=report"],
+        "process_kept": ["queue=mail", "cron"],
+        "hints": ["名前が同じプロセスは、コマンドの後ろの引数まで見て区別します。",
+                  "ps aux | grep worker で2つの PID を見比べ、report のほうに kill します。止まったかを必ず確かめます。",
+                  "kill 4020 → ps aux | grep report でまだ残っていたら kill -9 4020。4010 は止めません。"],
+        "explanation": "pkill worker のように名前だけで止めると、正常なメール送信まで巻き込みます。PID で狙い撃ちし、TERM が無視されたときだけ -9 を使うのが安全です。",
+        "practice": ["3-5"],
+    },
+    {
+        "id": "fes-system-11",
+        "level": 2,
+        "title": "他ユーザーのプロセスを正当な理由で止める",
+        "brief": "チケット: 「旧サイト用の php-fpm の legacy プールがメモリを大量に使っているので停止してください（責任者承認済み）」。"
+                 "このプロセスは www-data ユーザーのものです。legacy プールだけを止め、同じ www-data の main プールや nginx は止めません。",
+        "processes": [_NGINX_WORKER, _FPM_MAIN, _FPM_LEGACY],
+        "solution": ["ps aux | grep php-fpm", "kill 5200", "sudo kill 5200", "ps aux | grep php-fpm"],
+        "alt_solutions": [["pgrep legacy", "sudo kill -15 5200", "pgrep php-fpm"], ["ps aux", "sudo kill -TERM 5200", "ps aux"]],
+        "expected_codes": {"kill 5200": 1},
+        "traps": [["kill 5200"], ["sudo kill 5100 5200"], ["sudo kill -9 5200 1201"]],
+        "process_gone": ["pool legacy"],
+        "process_kept": ["pool main", "nginx: worker", "cron"],
+        "hints": ["ほかのユーザーのプロセスは、普通の kill では止められません。権限が必要です。",
+                  "ps aux で USER 列と PID を確認し、承認済みの1つだけに sudo kill を使います。",
+                  "sudo kill 5200 を実行し、ps aux | grep php-fpm で main（5100）が残っていることを確かめます。"],
+        "explanation": "Operation not permitted は「あなたのものではない」という安全装置です。sudo で突破できますが、使うのは承認や明確な理由があるときだけ、"
+                       "対象も1つに絞ります。",
+        "practice": ["3-5", "7-1"],
+    },
+    {
+        "id": "fes-system-12",
+        "level": 2,
+        "title": "置き去りの tail -f を全部片付ける",
+        "brief": "ログを見るために開いた tail -f app.log が、自分のプロセスとして3つも残っています。それらをすべて止めてください。"
+                 "root が動かしている syslog の tail はシステム側のものなので、触りません。",
+        "processes": [*_TAILS, _ROOT_TAIL],
+        "solution": ["pgrep tail", "ps aux | grep tail", "kill 3301 3302 3303", "ps aux | grep tail"],
+        "alt_solutions": [["pgrep tail", "kill 3301 3302 3303 3400", "ps aux | grep app.log"],
+                          ["ps aux | grep tail", "kill 3301", "kill 3302", "kill 3303"]],
+        "expected_codes": {"kill 3301 3302 3303 3400": 1, "ps aux | grep app.log": 1},
+        "traps": [["kill 3301"], ["sudo kill 3301 3302 3303 3400"], ["sudo kill -9 3400"]],
+        "process_gone": ["tail -f app.log"],
+        "process_kept": ["tail -f /var/log/syslog", "cron"],
+        "hints": ["同じ名前のプロセスが複数あるときは、まず全部の PID と持ち主（USER）を確認します。",
+                  "pgrep tail や ps aux | grep tail で探します。kill には PID を複数並べられます。",
+                  "kill 3301 3302 3303。root の 3400 には sudo を使ってまで手を出しません。"],
+        "explanation": "sudo なしの kill は、うっかり他人やシステムのプロセスを指定しても拒否されるので安全です。"
+                       "自分のプロセスの後片付けに sudo は要りません。",
+        "practice": ["3-6", "3-5"],
+    },
+    {
+        "id": "fes-system-13",
+        "level": 2,
+        "title": "多重起動を数えてから止める",
+        "brief": "定期実行の backup.sh が重なって何個も動いています。まず、いくつ動いていたかの数字だけを count.txt に保存してください。"
+                 "そのあと、backup.sh をすべて止めます（次回の定期実行でやり直すので問題ありません）。",
+        "processes": list(_BACKUPS),
+        "solution": ["pgrep backup.sh | wc -l > count.txt", "pgrep backup.sh", "kill 3501 3502 3503", "ps aux | grep backup.sh"],
+        "alt_solutions": [["ps aux | grep backup.sh | wc -l > count.txt", "kill 3501 3502 3503"],
+                          ["ps aux | grep backup", "echo 3 > count.txt", "kill 3501", "kill 3502", "kill 3503"]],
+        "expected_codes": {"ps aux | grep backup.sh": 1},
+        "traps": [["kill 3501 3502 3503", "pgrep backup.sh | wc -l > count.txt"], ["pgrep backup.sh | wc -l > count.txt", "kill 3501"],
+                  ["ps aux | wc -l > count.txt", "kill 3501 3502 3503"]],
+        "expected_files": {"count.txt": "3\n"},
+        "process_gone": ["backup.sh"],
+        "process_kept": ["cron"],
+        "hints": ["順番が大切です。止めてしまうと、何個あったかは数えられません。",
+                  "pgrep で見つかった PID の行数を wc -l で数え、> で保存します。",
+                  "pgrep backup.sh | wc -l > count.txt のあと、kill 3501 3502 3503。"],
+        "explanation": "「何個重なっていたか」は、cron の間隔が短すぎるなど原因を探る大事な手がかりです。証拠を残してから対処する順番を身につけましょう。",
+        "practice": ["3-5", "6-7"],
+    },
+    {
+        "id": "fes-system-14",
+        "level": 2,
+        "title": "去年のキャッシュだけを消して容量を空ける",
+        "brief": "tmp フォルダが大きくなっています。2024 年に作られたキャッシュ（ファイル名に 2024 が入る .tmp）だけを削除してください。"
+                 "今月（2025-11）のキャッシュと、使用中の印である app.lock は残します。消す前にフォルダの大きさを確認してください。",
+        "files": {"tmp/cache-2024-10-01.tmp": _BIG, "tmp/cache-2024-12-24.tmp": _BIG, "tmp/cache-2024-12-31.tmp": _BIG,
+                  "tmp/cache-2025-11-20.tmp": "今月のキャッシュ\n", "tmp/app.lock": "pid=7000\n"},
+        "solution": ["du -sh tmp", "ls tmp", "rm tmp/cache-2024-*.tmp", "du -sh tmp"],
+        "alt_solutions": [["du -sh tmp", "cd tmp", "rm cache-2024-*", "cd .."],
+                          ["du -h tmp", "rm tmp/cache-2024-10-01.tmp tmp/cache-2024-12-24.tmp tmp/cache-2024-12-31.tmp"]],
+        "traps": [["du -sh tmp", "rm tmp/*.tmp"], ["du -sh tmp", "rm tmp/cache-*"], ["rm tmp/cache-2024-*.tmp"]],
+        "absent": ["tmp/cache-2024-10-01.tmp", "tmp/cache-2024-12-24.tmp", "tmp/cache-2024-12-31.tmp"],
+        "expected_files": {"tmp/cache-2025-11-20.tmp": "今月のキャッシュ\n", "tmp/app.lock": "pid=7000\n"},
+        "checks_commands": [["du -sh tmp", "du -h tmp", "du -s tmp", "du tmp", "du -sh tmp/", "du -sh *", "du -sh ."]],
+        "hints": ["消す前に大きさを確かめ、ワイルドカードが何に一致するかを ls で確認すると安全です。",
+                  "du -sh tmp で大きさを見て、2024 を含む名前だけに一致するパターンで rm します。",
+                  "du -sh tmp → rm tmp/cache-2024-*.tmp"],
+        "explanation": "*.tmp のような広いパターンは、今使っているファイルまで消してしまいます。日付など「消してよい理由」がパターンに入っているかを確かめてから実行します。",
+        "practice": ["2-6", "3-8"],
+    },
+    {
+        "id": "fes-system-15",
+        "level": 2,
+        "title": "ローテート済みの圧縮ログを2か所で片付ける",
+        "brief": "logs と logs/nginx の2つのフォルダに、ローテート（世代分け）されて .gz で圧縮された古いログがたまっています。"
+                 "両方のフォルダの .gz だけを削除してください。いま書き込み中の .log と、直近の世代 .log.1 は残します。",
+        "files": {"logs/app.log": "今のログ\n", "logs/app.log.1": "昨日のログ\n", "logs/app.log.2.gz": _OLD, "logs/app.log.3.gz": _OLD,
+                  "logs/nginx/access.log": "アクセス\n", "logs/nginx/access.log.1": "昨日のアクセス\n",
+                  "logs/nginx/access.log.2.gz": _OLD, "logs/nginx/access.log.3.gz": _OLD},
+        "solution": ["du -sh logs", "ls logs logs/nginx", "rm logs/*.gz logs/nginx/*.gz", "du -sh logs"],
+        "alt_solutions": [["rm logs/*.gz", "cd logs/nginx", "rm *.gz", "cd"],
+                          ["find logs -name *.gz", "rm logs/app.log.2.gz logs/app.log.3.gz", "rm logs/nginx/access.log.2.gz logs/nginx/access.log.3.gz"]],
+        "traps": [["rm logs/*.gz"], ["rm logs/app.log* logs/nginx/access.log*"], ["rm logs/*.log logs/*.gz logs/nginx/*.gz"]],
+        "absent": ["logs/app.log.2.gz", "logs/app.log.3.gz", "logs/nginx/access.log.2.gz", "logs/nginx/access.log.3.gz"],
+        "expected_files": {"logs/app.log": "今のログ\n", "logs/app.log.1": "昨日のログ\n",
+                           "logs/nginx/access.log": "アクセス\n", "logs/nginx/access.log.1": "昨日のアクセス\n"},
+        "hints": ["ワイルドカードは1つのフォルダの中だけに効きます。サブフォルダは別に指定が必要です。",
+                  "logs/*.gz と logs/nginx/*.gz の2つのパターンを rm に並べられます。find -name で先に一覧を見ても構いません。",
+                  "rm logs/*.gz logs/nginx/*.gz"],
+        "explanation": "書き込み中のログ（.log）を消すと、アプリはファイルを掴んだままなので容量が空かないうえに、ログも失われます。"
+                       "片付けてよいのは、ローテート済みで圧縮された古い世代です。",
+        "practice": ["2-6", "1-6"],
+    },
+    {
+        "id": "fes-system-16",
+        "level": 2,
+        "title": "自作ツールのフォルダを PATH に足す",
+        "brief": "自作のスクリプトを /home/learner/bin に置いて、どこからでも名前だけで呼べるようにしたいです。PATH の今の中身は残したまま、"
+                 "末尾に /home/learner/bin を追加してください。変更後の PATH の値を path-after.txt に保存して記録します。",
+        "files": {"bin/hello.sh": "#!/bin/bash\necho hello\n"},
+        "solution": ["echo $PATH", "export PATH=$PATH:/home/learner/bin", "echo $PATH > path-after.txt"],
+        "alt_solutions": [["export PATH=$PATH:$HOME/bin", "printenv PATH > path-after.txt"],
+                          ["PATH=\"$PATH:$HOME/bin\"", "env | grep PATH", "echo \"$PATH\" > path-after.txt"]],
+        "traps": [["export PATH=/home/learner/bin", "echo $PATH > path-after.txt"],
+                  ["export PATH=$HOME/bin:$PATH", "echo $PATH > path-after.txt"],
+                  ["export PATH='$PATH:/home/learner/bin'", "echo $PATH > path-after.txt"]],
+        "expected_env": {"PATH": _BASE_PATH + ":/home/learner/bin"},
+        "expected_files": {"path-after.txt": _BASE_PATH + ":/home/learner/bin\n"},
+        "hints": ["PATH を新しい値だけで上書きすると、ls などの基本コマンドまで見つからなくなります。",
+                  "今の値は $PATH で取り出せます。それに : で区切って新しい場所をつなげます。",
+                  "export PATH=$PATH:/home/learner/bin のあと、echo $PATH > path-after.txt"],
+        "explanation": "PATH は : 区切りで「コマンドを探す場所」を並べたものです。上書きしてしまうのは現場でもよくある事故で、"
+                       "必ず $PATH を含めて付け足します。",
+        "practice": ["3-4"],
+    },
+    {
+        "id": "fes-system-17",
+        "level": 2,
+        "title": "接続先を環境変数で渡し、設定メモに書く",
+        "brief": "データベースの接続先として、環境変数 DB_HOST に 192.0.2.10、DB_PORT に 5432 を設定してください（アプリに引き継がれる形で）。"
+                 "さらに、変数の値を使って「ホスト:ポート」の形の1行を db-target.txt に書きます。値は手で打たず、変数から取り出してください。",
+        "solution": ["export DB_HOST=192.0.2.10", "export DB_PORT=5432", "echo $DB_HOST:$DB_PORT > db-target.txt"],
+        "alt_solutions": [["DB_HOST=192.0.2.10", "DB_PORT=5432", "export DB_HOST DB_PORT", "echo \"$DB_HOST:$DB_PORT\" > db-target.txt"],
+                          ["export DB_HOST=192.0.2.10 DB_PORT=5432", "env | grep DB_", "echo ${DB_HOST}:${DB_PORT} > db-target.txt"]],
+        "traps": [["DB_HOST=192.0.2.10", "DB_PORT=5432", "echo $DB_HOST:$DB_PORT > db-target.txt"],
+                  ["export DB_HOST=192.0.2.10", "export DB_PORT=5432", "echo '$DB_HOST:$DB_PORT' > db-target.txt"],
+                  ["export DB_HOST=192.0.2.10", "echo $DB_HOST:$DB_PORT > db-target.txt"]],
+        "expected_env": {"DB_HOST": "192.0.2.10", "DB_PORT": "5432"},
+        "expected_files": {"db-target.txt": "192.0.2.10:5432\n"},
+        "hints": ["代入だけでは環境変数になりません。2つとも引き継がれる形にします。",
+                  "export で2つの変数を設定し、echo $DB_HOST:$DB_PORT の結果を > で保存します。",
+                  "export DB_HOST=192.0.2.10 → export DB_PORT=5432 → echo $DB_HOST:$DB_PORT > db-target.txt"],
+        "explanation": "同じ値を何か所にも手で書くと、打ち間違いや変更漏れが起きます。値を変数に1度だけ置き、そこから取り出すのが運用の基本です。",
+        "practice": ["3-4", "5-4"],
+    },
+    {
+        "id": "fes-system-18",
+        "level": 2,
+        "title": "調査用の変数を消して元に戻す",
+        "brief": "障害調査のために設定した環境変数 DEBUG_MODE と TMP_TOKEN が残っています。2つとも完全に取り除いてください（空にするのではなく、変数そのものを消します）。"
+                 "本番用の APP_ENV はそのまま残し、最後に環境変数の状態を確認します。",
+        "env": {"DEBUG_MODE": "1", "TMP_TOKEN": "dummy-training-token", "APP_ENV": "production"},
+        "solution": ["env | grep -v PATH", "unset DEBUG_MODE TMP_TOKEN", "env"],
+        "alt_solutions": [["unset DEBUG_MODE", "unset TMP_TOKEN", "printenv APP_ENV"], ["printenv", "unset TMP_TOKEN DEBUG_MODE", "env | grep APP_ENV"]],
+        "traps": [["export DEBUG_MODE=", "export TMP_TOKEN=", "env"], ["unset DEBUG_MODE TMP_TOKEN APP_ENV", "env"],
+                  ["unset DEBUG_MODE", "env"]],
+        "expected_env": {"DEBUG_MODE": None, "TMP_TOKEN": None, "APP_ENV": "production"},
+        "checks_commands": [["env", "printenv", "env | grep APP_ENV", "printenv APP_ENV", "export"]],
+        "hints": ["空の値を入れても、変数そのものは残ります。変数を消すための専用コマンドがあります。",
+                  "unset 変数名 で消せます。複数並べることもできます。確認は env や printenv で。",
+                  "unset DEBUG_MODE TMP_TOKEN のあと env で APP_ENV だけ残っていることを確かめます。"],
+        "explanation": "デバッグ用の設定が残ったままだと、本番で余計なログが出たり、一時的な値が漏れる原因になります。"
+                       "調査が終わったら、作ったものを自分で片付けるところまでが作業です。",
+        "practice": ["3-4"],
+    },
+    {
+        "id": "fes-system-19",
+        "level": 2,
+        "title": "curl と jq をまとめて入れて記録する",
+        "brief": "API の調査に curl と jq の2つが必要です。両方を入れて、それぞれの場所（コマンドのフルパス）を tools.txt に、curl・jq の順で1行ずつ保存してください。"
+                 "確認の質問で止まらないよう、入れるときは自動で「はい」と答える形にします。",
+        "solution": ["sudo apt update", "sudo apt install -y curl jq", "which curl jq > tools.txt"],
+        "alt_solutions": [["sudo apt update", "sudo apt install -y curl", "sudo apt install -y jq", "which curl > tools.txt", "which jq >> tools.txt"],
+                          ["apt show curl", "apt show jq", "sudo apt update", "sudo apt install curl jq -y", "which curl jq > tools.txt"]],
+        "traps": [["sudo apt install -y curl jq", "which curl jq > tools.txt"],
+                  ["sudo apt update", "sudo apt install -y curl", "which curl jq > tools.txt"],
+                  ["sudo apt update", "sudo apt install -y curl jq", "which jq curl > tools.txt"]],
+        "packages": ["curl", "jq"],
+        "expected_files": {"tools.txt": "/usr/bin/curl\n/usr/bin/jq\n"},
+        "hints": ["apt install には複数のソフトを並べられます。-y を付けると確認なしで進みます。",
+                  "sudo apt update のあと sudo apt install -y curl jq。which にも複数の名前を並べられます。",
+                  "sudo apt update → sudo apt install -y curl jq → which curl jq > tools.txt"],
+        "explanation": "手順書やスクリプトでは -y で確認を飛ばし、まとめて入れるのが普通です。入れた直後に which で確かめて記録しておくと、"
+                       "「入れたはずなのに動かない」ときの切り分けが早くなります。",
+        "practice": ["4-3", "6-5"],
+    },
+    # ===================== ★3 =====================
+    {
+        "id": "fes-system-20",
+        "level": 3,
+        "title": "【総合】夜間当番：暴走したレポート生成",
+        "brief": "深夜にサーバーが重いと連絡がありました。incident フォルダを作り、次の順で対応してください。"
+                 "(1) 止める前の証拠として、report_gen のプロセスの行を incident/ps-before.txt に保存。"
+                 "(2) メモリの Mem 行を incident/mem.txt に保存。"
+                 "(3) report_gen を止める（普通の方法で止まらなければ強制終了）。"
+                 "postgres のデータベースと、自分の indexer.py は止めてはいけません。",
+        "processes": [_POSTGRES, _INDEXER, _REPORT_GEN],
+        "solution": ["mkdir incident", "ps aux", "ps aux | grep report_gen > incident/ps-before.txt", "free -h | grep Mem > incident/mem.txt",
+                     "kill 6100", "pgrep report_gen", "kill -9 6100", "ps aux | grep report_gen"],
+        "alt_solutions": [["mkdir -p incident", "cd incident", "ps -ef | grep report_gen > ps-before.txt", "free | grep Mem > mem.txt",
+                           "kill -TERM 6100", "ps aux | grep python3", "kill -KILL 6100", "cd .."],
+                          ["mkdir incident", "free -h | grep Mem: > incident/mem.txt", "ps aux | grep month > incident/ps-before.txt",
+                           "kill -15 6100", "kill -s KILL 6100"]],
+        "expected_codes": {"ps aux | grep report_gen": 1},
+        "traps": [["mkdir incident", "kill -9 6100", "ps aux | grep report_gen > incident/ps-before.txt", "free -h | grep Mem > incident/mem.txt"],
+                  ["mkdir incident", "ps aux | grep report_gen > incident/ps-before.txt", "free -h | grep Mem > incident/mem.txt", "kill 6100"],
+                  ["mkdir incident", "ps aux | grep python3 > incident/ps-before.txt", "free -h | grep Mem > incident/mem.txt", "kill -9 6100 6200"],
+                  ["mkdir incident", "ps aux | grep report_gen > incident/ps-before.txt", "free -h | grep Mem > incident/mem.txt",
+                   "sudo kill -9 6100 900"]],
+        "expected_files": {"incident/ps-before.txt": _rows(_REPORT_GEN), "incident/mem.txt": _FREE_MEM},
+        "process_gone": ["report_gen.py"],
+        "process_kept": ["postgres", "indexer.py", "cron"],
+        "hints": ["証拠は止める前にしか取れません。保存先のフォルダも先に作ります。",
+                  "ps aux | grep と free -h | grep で必要な行だけを incident/ に保存し、kill → 確認 → 必要なら kill -9 の順に進めます。",
+                  "mkdir incident → ps aux | grep report_gen > incident/ps-before.txt → free -h | grep Mem > incident/mem.txt → kill 6100 → pgrep report_gen → kill -9 6100"],
+        "explanation": "夜間対応では「直すこと」と同じくらい「翌朝に原因を調べられるよう記録を残すこと」が求められます。"
+                       "%CPU と %MEM が記録に残っていれば、なぜ止めたのかを誰でも確認できます。",
+        "practice": ["3-5", "3-7", "2-1"],
+    },
+    {
+        "id": "fes-system-21",
+        "level": 3,
+        "title": "【総合】ディスク 90% からの復旧",
+        "brief": "ディスク使用率が 90% になりました。次の作業をして report フォルダに記録を残してください。"
+                 "(1) ルート（/）のディスク行を report/disk.txt に保存。"
+                 "(2) backup・logs・tmp のうち大きいフォルダを調べる。"
+                 "(3) backup では最新の db-2025-11-20.sql.gz だけを残し、2024 年のバックアップを削除。"
+                 "(4) tmp の .tmp ファイルを全部削除（tmp/README は残す）。logs/current.log は消しません。"
+                 "(5) 片付け後の backup フォルダの中身の一覧を report/backup-after.txt に保存。",
+        "files": {"backup/db-2024-09-30.sql.gz": _BIG, "backup/db-2024-10-31.sql.gz": _BIG, "backup/db-2024-12-31.sql.gz": _BIG,
+                  "backup/db-2025-11-20.sql.gz": "最新のバックアップ\n", "tmp/upload-1.tmp": _OLD, "tmp/upload-2.tmp": _OLD,
+                  "tmp/README": "このフォルダは一時ファイル用です\n", "logs/current.log": "今のログ\n"},
+        "solution": ["mkdir report", "df -h | grep sda1 > report/disk.txt", "du -sh backup logs tmp", "ls backup",
+                     "rm backup/db-2024-*.sql.gz", "rm tmp/*.tmp", "ls backup > report/backup-after.txt", "cat report/backup-after.txt"],
+        "alt_solutions": [["mkdir -p report", "df | grep /dev/sda1 > report/disk.txt", "du -sh *", "cd backup", "rm db-2024-*",
+                           "ls > ../report/backup-after.txt", "cd ..", "rm tmp/upload-*.tmp"],
+                          ["mkdir report", "du -s backup", "du -s logs", "du -s tmp", "df -h | grep 90% > report/disk.txt",
+                           "rm backup/db-2024-09-30.sql.gz backup/db-2024-10-31.sql.gz backup/db-2024-12-31.sql.gz",
+                           "rm tmp/upload-1.tmp tmp/upload-2.tmp", "ls backup > report/backup-after.txt"]],
+        "traps": [["mkdir report", "df -h | grep sda1 > report/disk.txt", "du -sh *", "rm backup/*.sql.gz", "rm tmp/*.tmp",
+                   "ls backup > report/backup-after.txt"],
+                  ["mkdir report", "df -h | grep sda1 > report/disk.txt", "du -sh *", "rm backup/db-2024-*.sql.gz", "rm tmp/*",
+                   "ls backup > report/backup-after.txt"],
+                  ["mkdir report", "df -h | grep sda1 > report/disk.txt", "du -sh *", "ls backup > report/backup-after.txt",
+                   "rm backup/db-2024-*.sql.gz", "rm tmp/*.tmp"],
+                  ["mkdir report", "df -h > report/disk.txt", "du -sh *", "rm backup/db-2024-*.sql.gz", "rm tmp/*.tmp",
+                   "ls backup > report/backup-after.txt"]],
+        "absent": ["backup/db-2024-09-30.sql.gz", "backup/db-2024-10-31.sql.gz", "backup/db-2024-12-31.sql.gz",
+                   "tmp/upload-1.tmp", "tmp/upload-2.tmp"],
+        "expected_files": {"report/disk.txt": _DF_ROOT, "report/backup-after.txt": "db-2025-11-20.sql.gz\n",
+                           "backup/db-2025-11-20.sql.gz": "最新のバックアップ\n", "tmp/README": "このフォルダは一時ファイル用です\n",
+                           "logs/current.log": "今のログ\n"},
+        "checks_commands": [["du -sh backup logs tmp", "du -sh *", "du -s *", "du -h *", "du -s backup", "du -sh backup",
+                             "du -h backup", "du -s backup logs tmp", "du -sh ./*"]],
+        "hints": ["全体（df）→ 場所（du）→ 消してよいものの見極め（ls）→ 削除 → 記録、の順に進めます。",
+                  "df -h | grep と du -sh で調べ、rm には 2024 や .tmp のように「消してよい理由」が入ったパターンを使います。",
+                  "mkdir report → df -h | grep sda1 > report/disk.txt → du -sh backup logs tmp → rm backup/db-2024-*.sql.gz → rm tmp/*.tmp → ls backup > report/backup-after.txt"],
+        "explanation": "容量対応で一番怖いのは、焦って最新のバックアップや使用中のファイルまで消すことです。"
+                       "最新の世代が残っていることを一覧で記録しておけば、作業が安全だったことを後から証明できます。",
+        "practice": ["3-8", "2-6", "6-8"],
+    },
+    {
+        "id": "fes-system-22",
+        "level": 3,
+        "title": "【総合】新しいサーバーの作業環境づくり",
+        "brief": "新しく用意されたサーバーで作業環境を整えます。setup フォルダを作り、次を行ってください。"
+                 "(1) vim と tree を、確認で止まらない形でまとめて入れる。"
+                 "(2) 環境変数 EDITOR を vim、APP_ENV を production にする（どちらもアプリに引き継がれる形）。"
+                 "(3) PATH の末尾に /home/learner/bin を追加（今の中身は残す）。"
+                 "(4) vim のバージョン情報を setup/vim-version.txt、vim と tree の場所を setup/tools.txt（vim・tree の順）、"
+                 "APP_ENV の行（APP_ENV=... の形）を setup/env.txt に保存。",
+        "solution": ["mkdir setup", "sudo apt update", "sudo apt install -y vim tree", "export EDITOR=vim", "export APP_ENV=production",
+                     "export PATH=$PATH:$HOME/bin", "vim --version > setup/vim-version.txt", "which vim tree > setup/tools.txt",
+                     "env | grep APP_ENV > setup/env.txt"],
+        "alt_solutions": [["sudo apt update", "sudo apt install -y vim", "sudo apt install -y tree", "mkdir -p setup", "cd setup",
+                           "EDITOR=vim", "APP_ENV=production", "export EDITOR APP_ENV", "PATH=$PATH:/home/learner/bin",
+                           "vim --version > vim-version.txt", "which vim > tools.txt", "which tree >> tools.txt",
+                           "printenv | grep APP_ENV > env.txt", "cd .."],
+                          ["mkdir setup", "export EDITOR=vim APP_ENV=production", "sudo apt update", "sudo apt install vim tree -y",
+                           "export PATH=\"$PATH:/home/learner/bin\"", "env | grep APP_ENV > setup/env.txt",
+                           "which vim tree > setup/tools.txt", "vim --version > setup/vim-version.txt"]],
+        "traps": [["mkdir setup", "sudo apt install -y vim tree", "export EDITOR=vim", "export APP_ENV=production",
+                   "export PATH=$PATH:$HOME/bin", "vim --version > setup/vim-version.txt", "which vim tree > setup/tools.txt",
+                   "env | grep APP_ENV > setup/env.txt"],
+                  ["mkdir setup", "sudo apt update", "sudo apt install -y vim tree", "EDITOR=vim", "export APP_ENV=production",
+                   "export PATH=$PATH:$HOME/bin", "vim --version > setup/vim-version.txt", "which vim tree > setup/tools.txt",
+                   "env | grep APP_ENV > setup/env.txt"],
+                  ["mkdir setup", "sudo apt update", "sudo apt install -y vim tree", "export EDITOR=vim", "export APP_ENV=production",
+                   "export PATH=$HOME/bin", "vim --version > setup/vim-version.txt", "which vim tree > setup/tools.txt",
+                   "env | grep APP_ENV > setup/env.txt"],
+                  ["mkdir setup", "sudo apt update", "sudo apt install -y vim tree", "export EDITOR=vim", "export APP_ENV=production",
+                   "export PATH=$PATH:$HOME/bin", "vim --version > setup/vim-version.txt", "which vim tree > setup/tools.txt",
+                   "echo $APP_ENV > setup/env.txt"]],
+        "packages": ["vim", "tree"],
+        "expected_env": {"EDITOR": "vim", "APP_ENV": "production", "PATH": _BASE_PATH + ":/home/learner/bin"},
+        "expected_files": {"setup/vim-version.txt": "VIM - Vi IMproved 9.1（訓練用シミュレーター）\n",
+                           "setup/tools.txt": "/usr/bin/vim\n/usr/bin/tree\n", "setup/env.txt": "APP_ENV=production\n"},
+        "hints": ["ソフトの追加・環境変数・記録の3つに分けて考えると整理しやすくなります。",
+                  "apt は update してから install -y。変数は export。記録は vim --version、which、env | grep の結果を > で保存します。",
+                  "sudo apt update → sudo apt install -y vim tree → export EDITOR=vim → export APP_ENV=production → export PATH=$PATH:$HOME/bin → 3つの記録を > で保存"],
+        "explanation": "新しいサーバーの初期設定は、後から来た人が同じ状態を再現できることが大切です。何を入れ、何を設定したかを"
+                       "コマンドの出力そのままで記録しておくと、手順書の正しさも確かめられます。",
+        "practice": ["3-4", "6-6", "2-1"],
+    },
+    {
+        "id": "fes-system-23",
+        "level": 3,
+        "title": "【総合】中断したデプロイの後始末",
+        "brief": "途中で止まったデプロイの後始末をします。自分が動かした deploy 関連のプロセス（deploy.sh と、deploy ユーザーへの rsync）が残っています。"
+                 "(1) 止める前に、それらの PID を1行ずつ stopped.txt に保存。"
+                 "(2) どちらも止める（普通の方法で止まらないものだけ強制終了）。"
+                 "同僚 alice が開いている deploy-notes.txt の編集や、nginx・sshd などのシステムのプロセスは止めてはいけません。",
+        "processes": [_NGINX_WORKER, _DEPLOY, _DEPLOY_RSYNC, _ALICE_VIM],
+        "solution": ["ps aux | grep deploy", "pgrep deploy.sh", "pgrep rsync", "pgrep deploy.sh > stopped.txt", "pgrep rsync >> stopped.txt",
+                     "kill 4101 4102", "pgrep rsync", "kill -9 4102", "ps aux | grep deploy"],
+        "alt_solutions": [["ps aux", "echo 4101 > stopped.txt", "echo 4102 >> stopped.txt", "kill 4101", "kill 4102", "ps aux | grep rsync",
+                           "kill -KILL 4102"],
+                          ["ps aux | grep learner", "pgrep bash", "ps aux | grep release", "echo 4101 > stopped.txt", "pgrep release >> stopped.txt",
+                           "kill -TERM 4101 4102", "kill -s KILL 4102", "pgrep release"]],
+        "expected_codes": {"pgrep release": 1, "ps aux | grep deploy": 0},
+        "traps": [["pgrep deploy > stopped.txt", "kill -9 4101 4102"],
+                  ["pgrep deploy.sh > stopped.txt", "pgrep rsync >> stopped.txt", "kill 4101 4102"],
+                  ["pgrep deploy.sh > stopped.txt", "pgrep rsync >> stopped.txt", "sudo kill -9 4101 4102 4300"],
+                  ["kill 4101", "kill -9 4102", "pgrep deploy.sh > stopped.txt", "pgrep rsync >> stopped.txt"]],
+        "expected_files": {"stopped.txt": "4101\n4102\n"},
+        "process_gone": ["deploy.sh", "rsync -a release/"],
+        "process_kept": ["deploy-notes.txt", "nginx: worker", "sshd", "cron"],
+        "hints": ["名前に deploy が入っていても、自分のものとは限りません。USER 列も必ず見ます。",
+                  "pgrep で PID を調べて stopped.txt に保存してから kill。rsync は TERM を無視するので、確認して残っていれば -9 を使います。",
+                  "pgrep deploy.sh > stopped.txt → pgrep rsync >> stopped.txt → kill 4101 4102 → pgrep rsync → kill -9 4102"],
+        "explanation": "「deploy」で一括停止すると、同僚の作業（alice の vim）まで巻き込みます。ほかのユーザーのプロセスに sudo kill を使うのは、"
+                       "持ち主や責任者の了解があるときだけです。",
+        "practice": ["3-5", "4-7", "2-1"],
+    },
+    {
+        "id": "fes-system-24",
+        "level": 3,
+        "title": "【総合】障害調査の後片付けと引き継ぎ",
+        "brief": "障害調査が終わったので、調査用に用意したものを片付けて引き継ぎます。"
+                 "(1) 調査用に立ち上げた python3 -m http.server（ポート 8000）を止める。本番の app.py は止めない。"
+                 "(2) 環境変数 DEBUG_MODE を消す（APP_ENV は残す）。"
+                 "(3) debug フォルダの .dump ファイルを削除し、debug/README.txt は残す。"
+                 "(4) 今後の調査用に jq を入れる。"
+                 "(5) 実施した内容を handover.txt に3行以上で書く。最後にディスクの空き容量を確認します。",
+        "processes": [_APP, _HTTP_DEBUG],
+        "env": {"DEBUG_MODE": "1", "APP_ENV": "production"},
+        "files": {"debug/core-0101.dump": _BIG, "debug/heap-0102.dump": _BIG, "debug/README.txt": "調査手順のメモ\n"},
+        "solution": ["ps aux | grep python3", "kill 7100", "unset DEBUG_MODE", "rm debug/*.dump", "sudo apt update", "sudo apt install -y jq",
+                     "which jq", "echo 'http.server(7100) を停止しました' > handover.txt", "echo 'DEBUG_MODE を unset しました' >> handover.txt",
+                     "echo 'debug の dump を削除し、jq を追加しました' >> handover.txt", "df -h"],
+        "alt_solutions": [["pgrep http.server", "kill -15 7100", "pgrep python3", "env | grep DEBUG", "unset DEBUG_MODE", "ls debug",
+                           "rm debug/core-0101.dump debug/heap-0102.dump", "sudo apt update", "sudo apt install jq",
+                           "echo 1. 調査用の Web サーバーを止めた >> handover.txt", "echo 2. 調査用の変数を消した >> handover.txt",
+                           "echo 3. dump を消して jq を入れた >> handover.txt", "df"],
+                          ["df -h", "sudo apt update", "sudo apt install -y jq", "cd debug", "rm *.dump", "cd ..", "unset DEBUG_MODE",
+                           "pgrep 8000", "kill 7100", "echo 停止: http.server > handover.txt", "echo 削除: DEBUG_MODE と dump >> handover.txt",
+                           "echo 追加: jq >> handover.txt", "df -h | grep sda1"]],
+        "traps": [["kill 7000 7100", "unset DEBUG_MODE", "rm debug/*.dump", "sudo apt update", "sudo apt install -y jq",
+                   "echo a > handover.txt", "echo b >> handover.txt", "echo c >> handover.txt", "df -h"],
+                  ["kill 7100", "DEBUG_MODE=", "rm debug/*.dump", "sudo apt update", "sudo apt install -y jq",
+                   "echo a > handover.txt", "echo b >> handover.txt", "echo c >> handover.txt", "df -h"],
+                  ["kill 7100", "unset DEBUG_MODE", "rm debug/*", "sudo apt update", "sudo apt install -y jq",
+                   "echo a > handover.txt", "echo b >> handover.txt", "echo c >> handover.txt", "df -h"],
+                  ["kill 7100", "unset DEBUG_MODE", "rm debug/*.dump", "sudo apt install -y jq",
+                   "echo a > handover.txt", "echo b >> handover.txt", "echo c >> handover.txt", "df -h"],
+                  ["kill 7100", "unset DEBUG_MODE", "rm debug/*.dump", "sudo apt update", "sudo apt install -y jq",
+                   "echo a > handover.txt", "echo b > handover.txt", "echo c > handover.txt", "df -h"]],
+        "process_gone": ["http.server"],
+        "process_kept": ["app.py", "cron"],
+        "expected_env": {"DEBUG_MODE": None, "APP_ENV": "production"},
+        "absent": ["debug/core-0101.dump", "debug/heap-0102.dump"],
+        "expected_files": {"debug/README.txt": "調査手順のメモ\n"},
+        "packages": ["jq"],
+        "min_lines": {"handover.txt": 3},
+        "checks_commands": [["df -h", "df", "df -h | grep sda1", "df -h | grep /dev/sda1"]],
+        "hints": ["5つの作業は互いに独立しています。1つずつ片付けて、そのたびに確認しましょう。",
+                  "プロセスは ps aux で PID を確認して kill、変数は unset、ファイルは *.dump で rm、ソフトは update → install。メモは > と >> で書きます。",
+                  "kill 7100 → unset DEBUG_MODE → rm debug/*.dump → sudo apt update → sudo apt install -y jq → echo ... > handover.txt（2行目以降は >>）→ df -h"],
+        "explanation": "調査用に開いたポートや変数、巨大な dump を残すと、セキュリティの穴や次の容量逼迫の原因になります。"
+                       "片付けた内容を書き残せば、次の担当者が同じことを二度調べずに済みます。",
+        "practice": ["3-5", "3-4", "3-8", "2-1"],
+    },
+]

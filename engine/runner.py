@@ -42,6 +42,11 @@ STAGES = {
 }
 
 
+def practice_supported() -> bool:
+    """実践モードは本物の bash と Linux コマンドを使う。Windows では WSL 上で起動する。"""
+    return os.name != "nt"
+
+
 def stage_dir(stage: int) -> Path:
     name = "stage_EX" if stage == EXTRA else f"stage_{stage:02d}"
     return WORKSPACE / name
@@ -527,6 +532,7 @@ def shell_env(mission: Mission, token: str):
         "PATH": path,
         "LQ_HOME": str(ROOT),
         "LQ_STATE": str(STATE),
+        "LQ_WORKSPACE": str(WORKSPACE),
         "LQ_WORK": str(stage_dir(mission.stage)),
         "LQ_MISSION": mission.id,
         "LQ_SESSION": token,

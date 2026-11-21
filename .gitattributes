@@ -1,0 +1,7 @@
+# Windows で取得しても、Linux/WSL で動くスクリプトは LF のままにする。
+*.sh    text eol=lf
+*.bash  text eol=lf
+*.py    text eol=lf
+bin/**  text eol=lf
+# Windows のコマンドプロンプト用ランチャーは CRLF。
+*.bat   text eol=crlf

@@ -40,20 +40,20 @@ def docker_mode_label():
 # ------------------------------------------------------------------ header / title
 def header():
     d = save.load()
-    mode = d["learning"]["mode"]
+    mode = guided.selected_mode()
     if mode != "practice":
         course = guided.lessons(mode)
         progress = d["learning"][mode]
         completed = set(progress["completed"]) & {step["id"] for step in course}
         step = guided.current_step(mode, progress)
-        return box([f"学習モード: {guided.MODE_NAMES[mode]}",
+        return box([save.activity_line(d), "", f"学習モード: {guided.MODE_NAMES[mode]}",
                     f"進み具合 {ui.progress_bar(len(completed) / len(course), 20)} {len(completed)}/{len(course)} レッスン",
                     f"続き: {step['title']}", "ヒント・解答は何度見ても減点なし。自分のペースで進めましょう。"], color="green")
     ms = all_missions()
     n = len([m for m in ms if m.id in d["cleared"]])
     rank = save.rank_of(n)
     nxt = save.next_rank(n)
-    lines = [
+    lines = [save.activity_line(d), "",
         f"{c('ランク', 'gray')} {c(rank[1], 'bold', 'byellow')} {c(rank[2], 'bold', 'bwhite')}"
         + (c(f"   次の {nxt[1]} {nxt[2]} まであと {nxt[0] - n} 問", "gray") if nxt else c("   全ミッション制覇！", "bmagenta")),
         f"{c('進捗  ', 'gray')} {ui.progress_bar(n / len(ms), 20)} {c(f'{n}/{len(ms)} 問', 'bold')}  "
@@ -72,7 +72,8 @@ def title_screen():
     talk = ["", "  Linux が初めてでも大丈夫。文字の入力から始めよう。",
             "  はじめて → 基礎練習 → 実践の3モード。",
             "  モードごとに保存して、次回は続きから学べます。",
-            "", f"  実践では本物の bash で {len(all_missions())} 問に挑戦！", ""]
+            "", f"  実践では本物の bash で {len(all_missions())} 問に挑戦！"
+            + ("" if runner.practice_supported() else "（Windows では WSL で利用）"), ""]
     for i in range(max(len(peng), len(talk))):
         left = peng[i] if i < len(peng) else ""
         right = talk[i] if i < len(talk) else ""
@@ -428,19 +429,40 @@ def mode_select():
         print(box(["どこから学ぶか、自分で選べます。いつでも変更できます。",
                    "[1] はじめてモード（おすすめ）: 文字を入力して Enter を押すところから。",
                    "    コマンドの意味を1つずつ説明し、一緒に練習します。",
-                   "[2] 基礎練習モード: ファイル操作・検索・権限・ソフト追加を反復。",
+                   "[2] 基礎練習モード: ファイル操作・検索・権限・ソフト追加・vim を反復。",
                    "    入力例は hint でいつでも表示できます。減点はありません。",
-                   "[3] 実践モード: 本物の bash で59問のトラブル解決に挑戦。",
+                   "[3] 応用練習モード: ワイルドカード・パイプ・集計・環境変数・プロセス・vim 編集。",
+                   "    コマンドを組み合わせて、目的の結果を自分で作ります。",
+                   "[4] 実践モード: 本物の bash で59問のトラブル解決に挑戦。",
                    "    はじめて・基礎練習の sudo / apt は安全な模擬操作です。",
                    "    実践モードではコマンドが実際に動きます。",
                    "モードごとに続きの位置を保存します。既存の実践クリア実績も残ります。"], title="学習モードを選ぶ", color="green"))
-        value = ask("  [1 / 2 / 3] 選択 / b: 戻る > ").lower()
+        value = ask("  [1 / 2 / 3 / 4] 選択 / b: 戻る > ").lower()
         if value in ("b", "q", ""):
             return
-        if value in ("1", "2", "3"):
-            d["learning"]["mode"] = {"1": "intro", "2": "basic", "3": "practice"}[value]
+        if value == "4" and not runner.practice_supported():
+            windows_practice_notice()
+            continue
+        if value in ("1", "2", "3", "4"):
+            d["learning"]["mode"] = {"1": "intro", "2": "basic", "3": "advanced", "4": "practice"}[value]
             save.store(d)
             return
+
+
+def windows_practice_notice():
+    ui.clear()
+    print(box(["実践モードは本物の Linux（bash）でコマンドを動かすため、WSL が必要です。",
+               "はじめて・基礎練習モードは、このまま Windows で学べます。",
+               "",
+               "WSL を使う手順（1回だけ）:",
+               "  1. PowerShell を「管理者として実行」で開く",
+               "  2. wsl --install と入力して Enter、終わったら PC を再起動",
+               "  3. Ubuntu の初期設定（ユーザー名とパスワード）を済ませる",
+               "  4. Ubuntu で sudo apt install python3 を実行する",
+               "  5. もう一度 start.bat をダブルクリック（自動で WSL 版が起動します）",
+               "",
+               "進み具合は Windows 版と WSL 版で共通です。"], title="実践モードを使うには", color="yellow"))
+    pause("Enter で戻る")
 
 
 def command_dictionary():
@@ -461,6 +483,7 @@ def command_dictionary():
                "apt update: ソフトの一覧更新 / apt install tree: tree というソフトを追加",
                "install はここでは apt のサブコマンド（具体的な操作の指定）です。",
                "update と upgrade（導入済みソフトの更新）は別操作です。",
+               "vim: ターミナルで使うテキストエディタ。i で入力モード、Esc で戻る、:wq で保存して終了、:q! で保存せず終了。",
                "模擬モードは説明した一部の書式を練習する環境。本物の bash の全機能は使えません。"], title="はじめての用語・コマンド辞典", color="cyan"))
     pause()
 
@@ -470,13 +493,17 @@ def learning_dashboard(mode):
     print(header())
     print("\n  モードごとの進み具合\n")
     d = save.load()
-    for key in ("intro", "basic"):
+    for key in guided.GUIDED_MODES:
         course = guided.lessons(key)
         done = len(set(d["learning"][key]["completed"]) & {s["id"] for s in course})
         print(f"  {guided.MODE_NAMES[key]}: {done}/{len(course)} レッスン")
     done = len([m for m in all_missions() if m.id in d["cleared"]])
     print(f"  実践モード: {done}/{len(all_missions())} 問")
-    print("\n  [7] モード選択で切り替えられます。レッスンの復習は [2] から。")
+    from engine import readiness
+    print()
+    for line in readiness.mastery_lines(d):
+        print("  " + line)
+    print("\n  [7] モード選択で切り替えられます。レッスンの復習は [2]、課題まつりは [8] から。")
     pause()
 
 
@@ -496,8 +523,8 @@ def main_menu():
         items = [("1", "▶ ", cont), ("2", "🗺 ", "ステージ選択"), ("3", "📊", "進捗ダッシュボード"),
                  ("4", "📖", "小ネタ図鑑（Extra 閲覧モード）"), ("5", "❓", "遊び方・操作コマンド一覧"),
                  ("6", "⚙ ", "設定（Docker モード / セーブ初期化）"),
-                 ("7", "🌱", "モード選択（はじめて / 基礎練習 / 実践）"),
-                 ("8", "🔎", "総合復習・学習ロードマップ"), ("q", "🚪", "終了")]
+                 ("7", "🌱", "モード選択（はじめて / 基礎 / 応用 / 実践）"),
+                 ("8", "🎪", "課題まつり（総合復習）・自由自在マップ"), ("q", "🚪", "終了")]
         if mode != "practice":
             beginner_labels = {"2": "レッスン選択・復習", "4": "用語・コマンド辞典", "6": "設定（進捗の初期化）"}
             items = [(key, icon, beginner_labels.get(key, label))
@@ -551,7 +578,20 @@ def main_menu():
             return
 
 
+def setup_windows_console():
+    """Windows のコンソールで日本語と色を表示できるようにする。"""
+    if os.name != "nt":
+        return
+    os.system("")  # 仮想端末シーケンス（ANSI カラー）を有効にする
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
+
 def main():
+    setup_windows_console()
     if not sys.stdin.isatty():
         print("LinuxQuest は対話型のゲームです。ターミナルから ./start.sh で起動してください。")
         return 1
@@ -570,7 +610,7 @@ def main():
         except Exception:
             import traceback
             log = runner.WORKSPACE / "error.log"
-            with open(log, "a") as f:
+            with open(log, "a", encoding="utf-8") as f:
                 f.write(time.strftime("[%Y-%m-%d %H:%M:%S]\n") + traceback.format_exc() + "\n")
             print(c(f"\n  ⚠ 予期せぬエラーが発生しました（詳細: {log}）。メニューに戻ります。", "bred"))
             pause("Enter で続ける")

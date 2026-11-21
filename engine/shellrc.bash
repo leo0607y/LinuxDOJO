@@ -56,7 +56,8 @@ PROMPT_COMMAND=__lq_prompt
 
 __lq_ps1_path() {
   case "$PWD" in
-    "$LQ_HOME"/workspace|"$LQ_HOME"/workspace/*) printf '%s' "${PWD#$LQ_HOME/}" ;;
+    "${LQ_WORKSPACE:-$LQ_HOME/workspace}"|"${LQ_WORKSPACE:-$LQ_HOME/workspace}"/*)
+      printf 'workspace%s' "${PWD#"${LQ_WORKSPACE:-$LQ_HOME/workspace}"}" ;;
     *) printf '\001\e[1;31m\002(サンドボックス外) %s' "$PWD" ;;
   esac
 }

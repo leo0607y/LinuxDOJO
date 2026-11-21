@@ -116,3 +116,7 @@ for scenario in SCENARIOS:
     scenario.setdefault("require_disconnected", False)
     scenario.setdefault("checks_commands", [])
     scenario.setdefault("absent", [])
+    scenario.setdefault("expected_env", {})
+    scenario.setdefault("process_gone", [])
+    scenario.setdefault("process_kept", [])
+    scenario.setdefault("min_lines", {})

@@ -3,12 +3,9 @@
 本物の bash や sudo / apt は実行しない。パスワード・外部通信も不要。
 実践59問の登録とは独立しており、各モード内の位置で再開できる。
 """
-
-
-def lesson(key, title, explanation, task, command, success, **extra):
-    return dict(id=key, title=title, explanation=explanation, task=task,
-                command=command, success=success, **extra)
-
+from curriculum.advanced_lessons import ADVANCED
+from curriculum.lesson_kit import (LS_VIEW, absent, all_of, content, cwd_is, editor, editor_closed,
+                                   executable, has_package, is_dir, is_file, lesson)
 
 INTRO = [
     lesson("intro-01", "文字でコンピューターにお願いする",
@@ -514,10 +511,155 @@ BASIC.extend([
            "Connection refused は、その宛先・ポートで接続を受け付けるサービスがない場合などの表示です。\n"
            "今回はSSHが動いていない9999番をあえて指定して、表示を読みます。認証エラーとは区別しましょう。\n"
            "本物では接続先名と指定ポート、サーバーのSSHサービスやファイアウォール設定を管理者と確認します。\n"
-           "ここまでで調べ方とSSHの基本を練習しました。実践モードではファイル操作・検索・監視なども段階的に学べます。",
+           "ここまでで調べ方とSSHの基本を練習しました。次は、サーバーでファイルを書き換えるときに使う vim を学びます。",
            "9999番へ接続を試し、接続拒否の表示を読みましょう。", "ssh -p 9999 learner@training-server",
            "認証の問題と接続先・ポートの問題を分けて考えられました。忘れたら説明や手本を見直して大丈夫です。",
            ssh_known=True, expected_code=255),
+])
+
+# ---- vim: インストールから、書く・保存する・やめる・直すまで
+_TODO = ["買い物", "不要な行", "掃除"]
+_APP_LOG = ["INFO 起動しました", "INFO 設定を読み込みました", "ERROR 接続できません", "INFO 再試行します"]
+_ESC_NOTE = ("本物の vim では Esc キーを押します。この練習では esc と入力して Enter でも同じ扱いです"
+             "（Windows のコンソールでは Esc キーが入力を消してしまうため）。")
+_DRAFT = "元の下書き\n"
+
+BASIC.extend([
+    lesson("basic-49", "ターミナルでファイルを書く道具",
+           "サーバーの設定ファイルを直すときは、ターミナルの中で動く「テキストエディタ」を使います。\n"
+           "代表的なものが vim（ヴィム）です。ただし、最初から入っていない環境もあります。\n"
+           "まず vim memo.txt と入力して、何が表示されるか読んでみましょう。エラーも次の行動の手がかりです。",
+           "vim で memo.txt を開こうとしてみましょう。", "vim memo.txt",
+           "Command 'vim' not found と表示されました。入っていないので、自分でインストールします。",
+           expected_code=127, packages=[], apt_updated=False, accept=["vi memo.txt"]),
+    lesson("basic-50", "インストールの前に一覧を更新する",
+           "エラーには sudo apt install vim と、入れ方まで書かれていました。\n"
+           "インストールの前に、取得できるソフトの一覧を最新にしておきます。sudo を付ける操作でしたね。",
+           "ソフトの情報一覧を更新しましょう。", "sudo apt update",
+           "一覧を更新できました。次は vim がどんなソフトか確かめます。",
+           packages=[], apt_updated=False, goal=lambda t: t.progress["apt_updated"]),
+    lesson("basic-51", "入れるソフトを確かめる",
+           "知らない名前のソフトをいきなり入れず、説明を読んでから入れる習慣をつけましょう。\n"
+           "apt show は詳しい説明、apt search は名前で探す操作です。どちらを使っても構いません。",
+           "vim の説明を表示しましょう。", "apt show vim",
+           "テキストエディタだと確認できました。",
+           packages=[], apt_updated=True, accept=["apt search vim"]),
+    lesson("basic-52", "vim をインストールする",
+           "確認できたので vim を追加します。本物の Ubuntu では -y を付けると確認の質問に自動で yes と答えます。\n"
+           "付けても付けなくても構いません。中身を読んでから同意する習慣があるなら、付けないほうが安全です。",
+           "vim をインストールしましょう。", "sudo apt install vim",
+           "vim が使えるようになりました（模擬）。",
+           packages=[], apt_updated=True, goal=has_package("vim"), accept=["sudo apt install -y vim"]),
+    lesson("basic-53", "入ったかどうか確かめる",
+           "インストールしたら、本当に使えるか確かめます。確かめ方は1つではありません。\n"
+           "vim --version はバージョンを表示し、which vim はコマンドの置き場所を表示します。",
+           "vim が使えることを確認しましょう。", "vim --version",
+           "使える状態になっていました。インストールの後は確認、が基本です。",
+           packages=["vim"], accept=["which vim", "vi --version"]),
+    lesson("basic-54", "vim でファイルを開く",
+           "vim の後ろにファイル名を書くと開きます。まだないファイル名なら、新しいファイルとして開きます。\n"
+           "開いた直後は「ノーマルモード」です。キーを押すと文字ではなく、移動や削除などの命令になります。\n"
+           "画面の下に [NORMAL] や -- INSERT -- と今のモードが出るので、いつも確かめましょう。",
+           "vim で memo.txt を開きましょう。", "vim memo.txt",
+           "開けました。行の左の > は今いる行（カーソル）の印です。",
+           packages=["vim"], remove=["memo.txt"], accept=["vi memo.txt"],
+           goal=editor(lambda e: e["key"] == "memo.txt")),
+    lesson("basic-55", "文字を書けるモードにする",
+           "文字を書くには「入力モード」に切り替えます。i（insert の i）を入力します。\n"
+           "a や o でも入力モードになります（a はカーソルの後ろ、o は下に新しい行を作って入力）。\n"
+           "この練習では 1回の Enter までを1つの操作として扱います。",
+           "入力モードに切り替えましょう。", "i",
+           "画面の下が -- INSERT -- になりました。ここからは打った文字がそのまま書かれます。",
+           packages=["vim"], accept=["a", "o"],
+           editor={"file": "memo.txt", "lines": [], "continue": True}, goal=editor(lambda e: e["mode"] == "insert")),
+    lesson("basic-56", "好きな文を書く",
+           "入力モードでは、打った文字がファイルに書かれます。この練習では Enter で1行ずつ書きます。\n"
+           "書く内容は自由です。例: 毎日少しずつLinuxを学ぶ\n"
+           "（hint・lesson・reset・menu は練習の操作として扱うので、それ以外の文にしましょう）",
+           "memo.txt に好きな文を1行書きましょう。", "毎日少しずつLinuxを学ぶ",
+           "書けました！ [+] は「まだ保存していない変更がある」という印です。",
+           packages=["vim"], editor={"file": "memo.txt", "lines": [], "mode": "insert", "continue": True},
+           goal=editor(lambda e: any(x.strip() for x in e["lines"]))),
+    lesson("basic-57", "命令を出すモードへ戻る",
+           "保存や終了は、ノーマルモードに戻ってから命令します。\n" + _ESC_NOTE + "\n"
+           "vim で困ったら、まず Esc でノーマルモードへ戻る、と覚えておきましょう。",
+           "ノーマルモードに戻りましょう。", "esc",
+           "[NORMAL] に戻りました。ここから保存や終了の命令を出せます。",
+           packages=["vim"], editor={"file": "memo.txt", "lines": ["毎日少しずつLinuxを学ぶ"],
+                                     "mode": "insert", "modified": True, "continue": True},
+           goal=editor(lambda e: e["mode"] == "normal")),
+    lesson("basic-58", "保存して終了する",
+           ": （コロン）で始まる入力は、保存や終了などの命令です。\n"
+           ":w は保存（write）、:q は終了（quit）。2つを合わせた :wq で保存して終了します。\n"
+           ":x や ZZ（大文字のZを2回）でも、保存して終了できます。",
+           "保存して vim を終了しましょう。", ":wq",
+           "保存してターミナルに戻りました。vim の「やめ方」は最初の大きな関門です。もう突破しました！",
+           packages=["vim"], accept=[":x", "ZZ"],
+           editor={"file": "memo.txt", "lines": ["毎日少しずつLinuxを学ぶ"], "modified": True, "continue": True},
+           goal=all_of(editor_closed, is_file("memo.txt"), lambda t: t.path("memo.txt").read_text(encoding="utf-8").strip() != "")),
+    lesson("basic-59", "保存した内容を確かめる",
+           "vim を閉じた後は、いつものコマンドで内容を確かめられます。中身を表示するコマンドを思い出しましょう。",
+           "memo.txt の中身を表示しましょう。", "cat memo.txt",
+           "自分で書いた文が保存されていました。",
+           initial_files={"memo.txt": "毎日少しずつLinuxを学ぶ\n"}),
+    lesson("basic-60", "保存しないでやめようとすると",
+           "間違えて書き換えてしまい、保存せずにやめたい場面もあります。\n"
+           "変更があるのに :q で終了しようとすると、vim は止めてくれます。表示されるメッセージを読んでみましょう。",
+           ":q で終了を試して、表示を読みましょう。", ":q",
+           "E37 は「保存していない変更がある」という警告です。vim が変更を守ってくれました。",
+           packages=["vim"], files={"draft.txt": _DRAFT}, expected_code=1,
+           editor={"file": "draft.txt", "lines": ["元の下書き", "間違えて書いた行"], "modified": True}),
+    lesson("basic-61", "変更を捨てて終了する",
+           "メッセージにあった ! は「分かったうえで強制する」という意味です。\n"
+           ":q! と入力すると、変更を保存せずに終了します。ファイルは開く前の内容のままです。",
+           "変更を保存せずに終了しましょう。", ":q!",
+           "保存せずに終了できました。draft.txt は元の内容のままです。",
+           packages=["vim"], files={"draft.txt": _DRAFT},
+           editor={"file": "draft.txt", "lines": ["元の下書き", "間違えて書いた行"], "modified": True},
+           goal=all_of(editor_closed, content("draft.txt", _DRAFT))),
+    lesson("basic-62", "1行まるごと消す",
+           "ノーマルモードで dd と入力すると、カーソルのある行を削除します。\n"
+           "カーソル（>）は2行目の「不要な行」にあります。j で下、k で上へ動かすこともできます。",
+           "「不要な行」を削除しましょう。", "dd",
+           "1行消えました。削除した行は覚えられていて、p で貼り付けることもできます。",
+           packages=["vim"], files={"todo.txt": "\n".join(_TODO) + "\n"},
+           editor={"file": "todo.txt", "lines": list(_TODO), "cursor": 1},
+           goal=editor(lambda e: e["lines"] == ["買い物", "掃除"])),
+    lesson("basic-63", "間違えたら取り消す",
+           "u（undo の u）は、直前の変更を取り消します。消しすぎたときも慌てなくて大丈夫です。\n"
+           "今の画面は「不要な行」を消した直後です。取り消して元に戻してみましょう。",
+           "直前の削除を取り消しましょう。", "u",
+           "元に戻りました。vim では「Esc → u」で、たいていの失敗から戻れます。",
+           packages=["vim"], files={"todo.txt": "\n".join(_TODO) + "\n"},
+           editor={"file": "todo.txt", "lines": ["買い物", "掃除"], "cursor": 1, "modified": True,
+                   "undo": list(_TODO)},
+           goal=editor(lambda e: e["lines"] == _TODO)),
+    lesson("basic-64", "文字を探して移動する",
+           "長いファイルでは、目で探すより検索が速いです。ノーマルモードで / の後ろに探す文字を書きます。\n"
+           "見つかった行へカーソルが移動します。ログからエラーを探すときによく使います。",
+           "app.log の中で ERROR を探しましょう。", "/ERROR",
+           "ERROR の行へ移動しました。",
+           packages=["vim"], files={"app.log": "\n".join(_APP_LOG) + "\n"},
+           editor={"file": "app.log", "lines": list(_APP_LOG)},
+           goal=editor(lambda e: "ERROR" in e["lines"][e["cursor"]])),
+    lesson("basic-65", "上書き保存だけする",
+           "長い作業の途中では、終了せずにこまめに保存します。:w は保存だけして、vim は開いたままです。\n"
+           "今は2行目に「今日の目標」を書いた後の状態です。",
+           "vim を開いたまま保存しましょう。", ":w",
+           "保存できました。[+] の印が消えたら、保存済みです。",
+           packages=["vim"], files={"plan.txt": "勉強の計画\n"},
+           editor={"file": "plan.txt", "lines": ["勉強の計画", "今日の目標: vim を使う"], "modified": True},
+           goal=all_of(editor(lambda e: not e["modified"]),
+                       content("plan.txt", "勉強の計画\n今日の目標: vim を使う\n"))),
+    lesson("basic-66", "保存済みならそのまま閉じる",
+           "保存した後なら :q だけで終了できます。:wq でも構いません。\n"
+           "ここまでで vim の「開く・書く・戻る・保存・やめる・直す・探す」をひと通り練習しました。\n"
+           "実際のサーバーでは、設定ファイルを直す前にコピーを取っておくとさらに安心です。",
+           "vim を終了しましょう。", ":q",
+           "vim の基本を練習できました！ 毎日少しずつ使うと、手が覚えてきます。",
+           packages=["vim"], accept=[":wq", ":x", "ZZ", ":q!"], files={"plan.txt": "勉強の計画\n今日の目標: vim を使う\n"},
+           editor={"file": "plan.txt", "lines": ["勉強の計画", "今日の目標: vim を使う"]},
+           goal=all_of(editor_closed, content("plan.txt", "勉強の計画\n今日の目標: vim を使う\n"))),
 ])
 
 # 追加課題も一覧から単独で選び、同じ初期条件で復習できる。
@@ -531,4 +673,29 @@ for step in INTRO + BASIC[:24]:
     step.setdefault("remote", False)
     step.setdefault("ssh_pending", False)
 
-LESSONS = {"intro": INTRO, "basic": BASIC}
+# ---- 正解は1つではない。同じ目的に届く書き方も受け付ける。
+INTRO[1].update(accept=["echo 'hello Linux'"])
+INTRO[5].update(accept=["ls -la", "ls -al", "ls -a ."])
+INTRO[7].update(goal=is_dir("practice"), accept=["mkdir -p practice"])
+INTRO[8].update(accept=LS_VIEW)
+INTRO[9].update(goal=cwd_is("practice"), accept=["cd ./practice", "cd /home/learner/practice"])
+INTRO[11].update(goal=is_file("note.txt"))
+INTRO[12].update(accept=LS_VIEW)
+INTRO[13].update(goal=cwd_is("."), accept=["cd /home/learner", "cd"])
+INTRO[21].update(packages=[], goal=has_package("tree"), accept=["sudo apt install -y tree"])
+BASIC[1].update(goal=is_dir("notes"), accept=["mkdir -p notes"])
+BASIC[2].update(goal=cwd_is("notes"), accept=["cd ./notes", "cd /home/learner/notes"])
+BASIC[3].update(goal=is_file("memo.txt"))
+BASIC[4].update(goal=content("memo.txt", _MEMO), accept=["echo Linuxの練習 > memo.txt", "echo 'Linuxの練習' > memo.txt"])
+BASIC[6].update(goal=content("memo.txt", _MEMO_TWO_LINES), accept=["echo 毎日少しずつ >> memo.txt"])
+BASIC[8].update(goal=content("memo.bak", _MEMO_TWO_LINES))
+BASIC[9].update(accept=LS_VIEW)
+BASIC[10].update(goal=all_of(content("archive.txt", _MEMO_TWO_LINES), absent("memo.bak")))
+BASIC[14].update(goal=cwd_is("."), accept=["cd /home/learner", "cd"])
+BASIC[15].update(goal=executable("script.sh"), accept=["chmod +x script.sh", "chmod 755 script.sh"])
+BASIC[17].update(goal=all_of(absent("notes/archive.txt"), is_file("notes/memo.txt")),
+                 accept=["rm ./notes/archive.txt"])
+BASIC[21].update(packages=[], goal=has_package("tree"), accept=["sudo apt install -y tree"])
+BASIC[23].update(goal=lambda t: "tree" not in t.progress["packages"], accept=["sudo apt remove -y tree"])
+
+LESSONS = {"intro": INTRO, "basic": BASIC, "advanced": ADVANCED}

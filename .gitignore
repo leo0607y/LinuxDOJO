@@ -6,6 +6,8 @@
 !/LICENSE.*
 !/start.sh
 !/install-start.sh
+!/start.bat
+!/.gitattributes
 !/engine/
 !/curriculum/
 !/tests/
@@ -16,6 +18,9 @@
 !/engine/*.bash
 /curriculum/*
 !/curriculum/*.py
+!/curriculum/festival/
+/curriculum/festival/*
+!/curriculum/festival/*.py
 /tests/*
 !/tests/*.py
 /bin/*
