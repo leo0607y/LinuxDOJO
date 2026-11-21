@@ -13,7 +13,9 @@ SOURCE = ROOT / "labs" / "vm"
 MODULE_PATTERN = re.compile(r"^[a-z][a-z0-9_-]{0,40}$")
 PACKAGES = ("python3", "curl", "ca-certificates", "acl", "attr", "sysstat", "strace", "util-linux",
             "coreutils", "findutils", "lvm2", "parted", "e2fsprogs", "nftables", "dnsmasq",
-            "nginx", "openssl", "sqlite3", "dnsutils", "tcpdump", "iproute2", "rsync", "jq")
+            "nginx", "openssl", "sqlite3", "dnsutils", "tcpdump", "iproute2", "rsync", "jq",
+            "openssh-client", "openssh-server", "git", "vim", "nano", "tmux", "ripgrep",
+            "fzf", "fd-find", "bat", "tree", "ncdu", "gcc", "make", "libc6-dev", "python3-venv")
 
 
 def lab_catalog(source=None):
@@ -72,11 +74,14 @@ def export_bundle(output, source=None):
         raise ValueError("No VM modules are available")
     generated = {role + "-cloud-init.yaml": render_cloud_init(role, source) for role in ("app", "client")}
     readme = (source / "README.md").read_text(encoding="utf-8")
+    software_guide = source / "SOFTWARE.md"
     output.mkdir(parents=True)
     try:
         for filename, content in generated.items():
             (output / filename).write_text(content, encoding="utf-8")
         (output / "README.md").write_text(readme, encoding="utf-8")
+        if software_guide.is_file() and not software_guide.is_symlink():
+            shutil.copyfile(software_guide, output / "SOFTWARE.md")
         guest = output / "guest"
         (guest / "modules").mkdir(parents=True)
         dispatcher = source / "guest" / "dojo-vm-lab"

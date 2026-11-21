@@ -99,3 +99,17 @@ Thumbs.db
 !/tools/
 /tools/*
 !/tools/*.py
+
+# Disposable-VM course sources are teaching material, not generated VM images.
+!/labs/
+/labs/*
+!/labs/vm/
+/labs/vm/*
+!/labs/vm/*.md
+!/labs/vm/cloud-init.yaml.in
+!/labs/vm/guest/
+/labs/vm/guest/*
+!/labs/vm/guest/dojo-vm-lab
+!/labs/vm/guest/modules/
+/labs/vm/guest/modules/*
+!/labs/vm/guest/modules/*.sh

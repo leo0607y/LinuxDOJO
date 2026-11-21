@@ -528,7 +528,8 @@ def main_menu():
                  ("4", "📖", "小ネタ図鑑（Extra 閲覧モード）"), ("5", "❓", "遊び方・操作コマンド一覧"),
                  ("6", "⚙ ", "設定（Docker モード / セーブ初期化）"),
                  ("7", "🌱", "モード選択（はじめて / 基礎 / 応用 / 達人 / 実践）"),
-                 ("8", "🎪", "課題まつり（総合復習）・自由自在マップ"), ("q", "🚪", "終了")]
+                 ("8", "🎪", "課題まつり（総合復習）・自由自在マップ"),
+                 ("9", "🔧", "Linux常用コース（目的検索・本物のツール実習）"), ("q", "🚪", "終了")]
         if mode != "practice":
             beginner_labels = {"2": "レッスン選択・復習", "4": "用語・コマンド辞典", "6": "設定（進捗の初期化）"}
             items = [(key, icon, beginner_labels.get(key, label))
@@ -571,6 +572,9 @@ def main_menu():
         elif k == "8":
             from engine import readiness
             readiness.run()
+        elif k == "9":
+            from engine import toolbox
+            toolbox.menu()
         elif k in ("q", "quit", "exit"):
             ui.clear()
             d = save.load()

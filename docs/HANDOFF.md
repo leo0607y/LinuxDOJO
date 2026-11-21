@@ -10,13 +10,39 @@
 3. 課題ファイルを書くときの仕様は `docs/STAGE_BRIEF.md`（共通指示）。新Stageの配線は下の「配線の仕組み」。
 4. 統合が済んだら: `tests/test_progress.py` の総問数・ステージ別内訳・ランク境界を更新 → `python3 -m unittest discover -s tests` → README更新 → コミット。
    - 注意: 課題が増えたら `test_progress.py` の件数を実態に合わせる。現在の期待値は501問。
-5. `python3 tools/audit_coverage.py --list` で未カバーのコマンドを確認し、残りがあれば次のStageで埋める。
+5. 常用コースは `docs/LINUX_DAILY_USE.md` と `docs/coverage.md` を読み、`python3 -m engine.toolbox audit` で参照を検査する。`python3 tools/audit_coverage.py --list` は名前の出現確認だけなので、未登場の数合わせでStageを増やさない。
 6. この文書の表を更新してコミットする。
 
 ### サブエージェントの使い方（今回のやり方）
 - 1Stage = 1エージェント。担当ファイル以外は編集させない（配線は親が先に済ませる）。
 - 指示は `docs/STAGE_BRIEF.md` ＋ 担当Stageの「必須キーワード一覧」。キーワードが課題内に名前で出ているか、最後に grep で検証する。
 - エージェントの自己報告は鵜呑みにせず、親が全体テストを再実行する。他エージェントが書き途中のファイルがあると一時的に import エラーになる（待って再実行）。
+
+## 常用コースの追加（2026-11-21）
+
+利用者の「Linuxを普段使いし、主要ソフトを導入後も扱える教材」という依頼で追加。Stageの問数を増やすより、既存501問を目的別につなぎ、実機での経験を補う方式。
+
+- 入口: ゲームの **[9] Linux常用コース**、または `python3 -m engine.toolbox list`。
+- `curriculum/toolbox_catalog.py`: 27コア目標＋5拡張分野、主要159コマンド。日本語の目的検索、正確な課題ID・実習ID・手引きアンカー。
+- `curriculum/toolbox_labs.py` / `toolbox_python.py` / `toolbox_containers.py`: 本物のツールを動かす20実習。`start ID`、`doctor [ID]`、`check --directory PATH`、`cleanup --directory PATH`。必要ツールなしでは開始・合格にせず、未完了setupの再開も拒否する。
+- 実習シェル: `task` / `check` / `answer` / `cleanup` / `exit`。進捗は専用フォルダの `.dojo/state.json`。既存501問のスコア・称号・セーブとは別枠。
+- `docs/LINUX_DAILY_USE.md`: 最短経路、導入・操作・設定・検証・障害切り分け・更新・撤去、手本なし総合確認。
+- `docs/coverage.md`: 実ツール・模擬・記録・VM・手動を区別した対応表と修了基準。資格試験・全機器・全クラウドの網羅を意味しない。
+- VM教材は `.gitignore` の許可対象から漏れていたため今回追跡する。既存6本＋ `packages` / `software` / `ssh` = 9モジュール。`SOFTWARE.md` もexportに含める。
+- 実VM試験でstorageの `df -i --output=iavail` がGNU dfで両立しない不具合を発見し、`df --output=iavail` に修正。SSHの内部接続には `-n` を追加し、呼出し元の標準入力を消費しない。また、再起動時に `/run/sshd` がまだ存在せず専用sshdが失敗する問題を発見し、unitのExecStartPreでディレクトリを作成するよう修正。新規setupから実SSH操作と再起動を再検証した。
+
+検証（最終結果は下の記録と `docs/coverage.md` を参照）:
+
+- 既存ミッション: **501/501 PASS、137.7秒**（Dockerは従来のmockモードを含む）。
+- 全unittest: **299件、失敗0、skip1、54.0秒**。ホストのDockerデーモンがないため統合1件は明示skip。未導入のtmux/sqlite/gcc/make/fzfはUbuntu公式debを `/tmp` へ展開して実ツールで検証し、ホストOSへインストールしていない。
+- 実pip: オフラインwheelを本物のvenvへ導入→利用→更新→版固定、アンインストール→再導入まで検証。OSのPythonは変更なし。
+- 専用Ubuntu 24.04 KVM VMを実際に作成（公式cloud imageのSHA256照合）、実aptの導入・設定保持更新・remove/purge、systemd service/timer・障害・ログ・再起動・撤去、実SSHの認証・scp/rsync・権限障害を確認。
+- 同VMでpermissions/performance、network app側、boot/storage/webstackの故障拒否→修復、後者3本はVM再起動後のcheckまでPASS。
+- 2台の実Ubuntu KVM VMでclient→appのDNS/HTTP正常、DNS故障時のcheck拒否とIP直指定HTTP成功、DNS修復後の双方PASSまで検証。
+- 同VMの実Dockerでイメージ構築・設定エラー・非root HTTP・コンテナ再作成・volume保持・専用資源削除までPASS。ホストのDocker skipを模擬成功で置き換えていない。
+- 同VMの通常ubuntuユーザーでも18実習＋pipの23テストを実行し、skipなしPASS（21.1秒）。全実ツール20実習を実行確認済み。検証用VM2台は終了後に停止した。
+
+従来のStageの静的検査や、各拡張分野がすべて実機化されたわけではない。常用コースの全項目を手本なしで再現・説明するのが学習者の到達確認であり、教材テストの成功だけで習得済みにはしない。
 
 ## 目的
 Linuxを学ぶうえで「使うもの・使わなくても必要なもの」を網羅した実践課題を用意する。
@@ -30,8 +56,9 @@ Linuxを学ぶうえで「使うもの・使わなくても必要なもの」を
 | ui.clear のスクロールバック消去 | ✅ 実装済（`e833997`） | **実端末での目視は未確認** |
 | Stage 19〜34（337問） | ✅ 統合テスト済み | 全501問 PASS（130.8秒）。Stage 30も28問すべてPASS |
 | 統合テスト・READMEの問数更新・コミット | ✅ 完了 | 全501問 PASS、unittest 246件 OK、compileall・diff --check OK。README・進捗テストは501問 |
-| 試験範囲との対応表 `docs/coverage.md` | ⏳ 未着手 | LPIC/LinuC/RHCSA 範囲 ↔ 課題ID |
-| 「必要ツール」宣言の仕組み | ⏳ 未着手 | 下の「既知の課題」参照 |
+| 資格試験の公式範囲との全項目対応表 | ⏳ 未着手 | LPIC/LinuC/RHCSA 範囲 ↔ 課題ID |
+| 「必要ツール」宣言の仕組み | ✅ 常用20実習に実装 | 既存501問への一律適用は未実施 |
+| 常用コース・対応表・実機検証 | ✅ 追加 | 上の「常用コースの追加」を参照 |
 
 ## Stage 一覧（ID・内容・状態）
 状態の凡例: ✅統合テスト済 / 📝作成済(未統合テスト) / 🔄作成中 / ⏳未着手。2026-11-21に全501問の初期状態・誤答拒否・想定解・メタデータを実行検証済み。記録診断や静的検査の限界は下表に残す。
@@ -97,7 +124,7 @@ Linuxを学ぶうえで「使うもの・使わなくても必要なもの」を
 
 ## 次の一手（この順）
 1. Stage 24ほか静的検査の課題を、ツールがある環境での実行検証へ段階的に強化する
-2. 「必要ツール」宣言と未導入時の案内・UI（検索・絞り込み）を実装
+2. 常用コースで実装した必要ツール・未導入案内・目的検索を、必要に応じて既存501問へ拡張
 3. 未登場100コマンドの必要性を評価する（別名・内部用コマンドを数合わせで追加しない）
-4. 試験範囲対応表 `docs/coverage.md` を公式範囲に照らして作る
+4. 常用対応表 `docs/coverage.md` とは別に、資格試験の公式範囲との対応表を必要時に作る
 5. 上の「追加で必要そうなもの」を優先度付けして着手

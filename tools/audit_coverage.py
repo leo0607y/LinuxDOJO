@@ -3,7 +3,8 @@
 
 使い方: python3 tools/audit_coverage.py [--list]
 カバー判定は「教材・エンジンのソースにコマンド名が単語として現れるか」。名前が出ることと
-身につくことは別なので、これは下限の目安。実際の網羅は docs/HANDOFF.md の表で管理する。
+身につくことは別なので、これは下限の目安。実際の到達目標・判定方式は docs/coverage.md で管理し、
+python3 -m engine.toolbox audit で課題・実習への参照を確認する。
 """
 import glob
 import re

@@ -1,0 +1,74 @@
+#!/bin/bash
+# Guest-only dispatcher. Provision through exported cloud-init; never copy a marker to a host.
+set -euo pipefail
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+MODULE_DIR=/usr/local/lib/linuxdojo-vm-lab/modules
+MARKER=/etc/linuxdojo-vm-lab
+LAB_ROOT=/var/lib/linuxdojo-vm-lab
+export LAB_ROOT
+
+fail() { printf '%s\n' "LinuxDOJO VM: $*" >&2; exit 2; }
+usage() { printf '%s\n' 'Usage: dojo-vm-lab list | <module> setup|break|check|reset'; }
+trusted() {
+    local path=$1 mode
+    [[ ! -L "$path" && -e "$path" ]] || fail "通常のファイルまたはディレクトリが必要です: $path"
+    [[ $(stat -c %u "$path") == 0 ]] || fail "root 所有が必要です: $path"
+    mode=$(stat -c %a "$path")
+    (( (8#$mode & 8#022) == 0 )) || fail "他の利用者が書き換えられるパスは使えません: $path"
+}
+
+if [[ $# == 1 && $1 == list ]]; then
+    [[ -d "$MODULE_DIR" ]] || fail 'VM用モジュールがインストールされていません。'
+    for module in "$MODULE_DIR"/*.sh; do
+        [[ -f "$module" && ! -L "$module" ]] || continue
+        printf '%s\n' "$(basename "$module" .sh): $(sed -n 's/^# title: //p' "$module" | head -n 1)"
+    done
+    exit 0
+fi
+if [[ $# != 2 ]]; then usage >&2; exit 2; fi
+LAB_ID=$1
+[[ $LAB_ID =~ ^[a-z][a-z0-9_-]{0,40}$ ]] || fail '課題IDが不正です。'
+case "$2" in setup|break|check|reset) action=$2 ;; *) usage >&2; exit 2 ;; esac
+[[ $EUID == 0 ]] || fail '専用VM内で sudo dojo-vm-lab を使ってください。'
+trusted "$MARKER"
+[[ -f "$MARKER" ]] || fail 'VMの識別マーカーが通常ファイルではありません。'
+format= role= expected_hostname=
+while IFS='=' read -r key value; do
+    case "$key" in
+        format) format=$value ;;
+        role) role=$value ;;
+        hostname) expected_hostname=$value ;;
+        '') ;;
+        *) fail 'VM識別マーカーの形式が不正です。' ;;
+    esac
+done < "$MARKER"
+[[ $format == linuxdojo-vm-v1 ]] || fail '専用VMの識別マーカーがありません。'
+case "$role" in app|client) ;; *) fail 'VMの役割が不正です。' ;; esac
+[[ $expected_hostname == "linuxdojo-$role" && $(hostname -s) == "$expected_hostname" ]] || fail '専用VMのホスト名と識別マーカーが一致しません。'
+virtualization=$(systemd-detect-virt --vm 2>/dev/null) || fail 'VMの仮想化環境を確認できません。実機やコンテナでは実行しません。'
+case "$virtualization" in kvm|qemu|oracle|vmware|microsoft|parallels|apple) ;; *) fail "未対応の仮想化環境です: $virtualization" ;; esac
+trusted /usr/local/lib/linuxdojo-vm-lab
+trusted "$MODULE_DIR"
+module="$MODULE_DIR/$LAB_ID.sh"
+trusted "$module"
+[[ -f "$module" ]] || fail '課題モジュールがありません。'
+[[ ! -L "$LAB_ROOT" ]] || fail '実習データの保存先にリンクは使えません。'
+[[ -d "$LAB_ROOT" ]] || install -d -m 0700 "$LAB_ROOT"
+trusted "$LAB_ROOT"
+[[ ! -L "$LAB_ROOT/state" ]] || fail 'state にリンクは使えません。'
+[[ -d "$LAB_ROOT/state" ]] || install -d -m 0700 "$LAB_ROOT/state"
+trusted "$LAB_ROOT/state"
+LAB_STATE="$LAB_ROOT/state/$LAB_ID"
+[[ ! -L "$LAB_STATE" ]] || fail '課題の保存先にリンクは使えません。'
+[[ -d "$LAB_STATE" ]] || install -d -m 0700 "$LAB_STATE"
+trusted "$LAB_STATE"
+LAB_VM_ROLE=$role
+export LAB_ID LAB_STATE LAB_VM_ROLE
+cd "$LAB_STATE"
+# Modules define only functions/constants; all writes occur inside an action.
+source "$module"
+for name in lab_setup lab_break lab_check lab_reset; do
+    declare -F "$name" >/dev/null || fail "課題モジュールに $name がありません。"
+done
+"lab_$action"
