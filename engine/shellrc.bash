@@ -5,7 +5,7 @@
 # ============================================================
 
 # Ubuntu の標準設定（command-not-found など）を読み込む
-if [ -f /etc/bash.bashrc ]; then . /etc/bash.bashrc; fi
+if [ -f /etc/bash.bashrc ]; then . /etc/bash.bashrc >/dev/null 2>&1; fi
 # タブ補完（bash-completion があれば）
 if ! shopt -oq posix && [ -f /usr/share/bash-completion/bash_completion ]; then
   . /usr/share/bash-completion/bash_completion 2>/dev/null
@@ -37,8 +37,9 @@ answer()        { __lq answer; }
 check()         { __lq check; __lq_after $?; }
 submit()        { __lq submit "$*"; __lq_after $?; }
 reset_mission() { __lq reset && builtin cd "$LQ_WORK"; }
-skip()          { echo next > "$LQ_STATE/intent"; builtin exit 0; }
+skip()          { echo "  [i] この問題を飛ばして次へ進みます。" ; echo next > "$LQ_STATE/intent"; builtin exit 0; }
 menu()          { echo menu > "$LQ_STATE/intent"; builtin exit 0; }
+quit()          { menu; }
 lqhelp()        { __lq help; }
 
 # ---------------- 状態の記録（判定エンジン用） ----------------

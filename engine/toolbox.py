@@ -230,7 +230,11 @@ def validate_catalog():
 
 
 def show_topics(query=""):
-    for topic in search(query):
+    show_topics_list(search(query))
+
+
+def show_topics_list(found):
+    for topic in found:
         print(f"{topic['id']}: {topic['title']} [{topic['category']}/{topic['level']}]")
         print("  コマンド: " + " ".join(topic["commands"]))
         print("  既存課題: " + (", ".join(topic["missions"]) or "なし"))
@@ -246,16 +250,25 @@ def menu():
         print(ui.box([ui.c("Linux常用コース", "bold", "bwhite"), "",
                       "目的から課題を探し、本物の道具で練習します。",
                       "既存の実践モードとは別に、専用フォルダへ保存します。"], color="green"))
-        for key, label in (("1", "目的・コマンドから探す"), ("2", "実機実習を選ぶ"),
-                           ("3", "必要ツールを確認"), ("4", "学習ガイドを読む"), ("b", "戻る")):
+        for key, label in (("1", "目的・コマンドから探す（例: ログ、ディスク、ssh）"),
+                           ("2", "実機実習を選んで始める"),
+                           ("3", "実習に必要なツールが入っているか確認"),
+                           ("4", "学習ガイドを読む（q で閉じる）"), ("b", "戻る（メインメニューへ）")):
             print("   " + ui.c(f"[{key}]", "bold", "bcyan") + "  " + label)
+        print(ui.take_flash(), end="")
         try:
             choice = input("\n  メニュー番号 > ").strip().lower()
             if choice in ("b", "q", ""):
                 return
             if choice == "1":
-                show_topics(input("目的・コマンド・分野（空欄で全件） > "))
-                mid = input("取り組む既存課題ID（空欄で戻る） > ").strip()
+                found = search(input("\n  目的・コマンド・分野（空欄で全件） > "))
+                if not found:
+                    print(ui.c(f"\n  {ui.WARN} 該当する分野がありません。別の言葉（例: ログ、ディスク、ssh）で探し直せます。"
+                               "空欄で Enter を押すと全件を表示します。", "yellow"))
+                else:
+                    show_topics_list(found)
+                    print(ui.c("\n  実機実習は、メニューの [2] で「実機実習」に出た名前を入力すると始められます。", "gray"))
+                mid = input("\n  取り組む既存課題ID（例 7-4。空欄で戻る） > ").strip() if found else ""
                 if mid:
                     from engine import runner
                     from engine.main import play
@@ -263,28 +276,37 @@ def menu():
                     if mission:
                         play(mission)
                     else:
-                        print("該当する課題IDがありません。")
+                        print(ui.c(f"\n  {ui.WARN} 課題ID「{mid}」はありません。上の「既存課題」に並ぶ ID（例 7-4）を入力します。", "yellow"))
             elif choice in ("2", "3"):
+                print()
                 for key, lab in labs().items():
                     availability = "未導入: " + ",".join(missing_tools(lab)) if missing_tools(lab) else "実行可能"
                     status_color = "yellow" if missing_tools(lab) else "bgreen"
                     print("   " + ui.c(f"[{key}]", "bold", "bcyan") + f" {lab['title']} " + ui.c(f"({availability})", status_color))
-                key = input("実習ID（空欄で戻る） > ").strip()
+                what = "始める" if choice == "2" else "確認する"
+                key = input(f"\n  {what}実習の名前（[ ] の中の文字。空欄で戻る） > ").strip()
                 if key:
-                    if choice == "3":
-                        print(dependency_message(_lab(key)))
+                    if key not in labs():
+                        print(ui.c(f"\n  {ui.WARN} 「{key}」という実習はありません。一覧の [ ] の中の文字をそのまま入力します。", "yellow"))
+                    elif choice == "3":
+                        print("\n  " + dependency_message(_lab(key)).replace("\n", "\n  "))
                     else:
                         start(key)
+                        print(ui.c(f"\n  {ui.INFO} 実習から戻りました。作業フォルダは残っています。同じ名前でもう一度始めると続きから再開できます。", "gray"))
             elif choice == "4":
                 import pydoc
                 pydoc.pager((ROOT / "docs" / "LINUX_DAILY_USE.md").read_text(encoding="utf-8"))
+            else:
+                ui.invalid_choice(choice, "1〜4 か b")
+                continue
         except (EOFError, KeyboardInterrupt):
             print()
             return
         except (OSError, ValueError, subprocess.SubprocessError) as error:
-            print(ui.c(str(error), "bred"))
+            print(ui.c(f"\n  {ui.NG} {error}", "bred"))
+            print(ui.c("  Enter で常用コースへ戻り、別の選択肢を試せます。", "gray"))
         try:
-            input(ui.c("\n  Enter で常用コースへ戻る > ", "gray"))
+            input(ui.c("\n  Enter で常用コースのメニューへ戻る > ", "gray"))
         except (EOFError, KeyboardInterrupt):
             return
 

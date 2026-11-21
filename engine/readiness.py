@@ -354,8 +354,9 @@ def _choose_in_group(title, items):
         for index, scenario in enumerate(items, 1):
             stars = "*" * scenario.get("level", 1)
             print(f"  [{index:>2}] {ui.pad(stars, 4)} {ui.pad(scenario['title'], 44)} {_status(completed, scenario['id'])}")
+        print(ui.take_flash(), end="")
         try:
-            choice = input("\n  課題番号 / Enter: 次の未達成 / b: 戻る > ").strip().lower()
+            choice = input("\n  課題番号 / Enter: 次の未達成 / b: 戻る（パック一覧へ） > ").strip().lower()
         except (EOFError, KeyboardInterrupt):
             return
         if choice in ("b", "q", "menu"):
@@ -368,6 +369,8 @@ def _choose_in_group(title, items):
             play(target)
         elif choice.isdigit() and 1 <= int(choice) <= len(items):
             play(items[int(choice) - 1])
+        else:
+            ui.invalid_choice(choice, f"1〜{len(items)} の番号、Enter、b")
 
 
 def run():
@@ -386,8 +389,9 @@ def run():
             done = sum(1 for s in items if s["id"] in completed)
             mine = sum(1 for s in items if s["id"] in completed and not completed[s["id"]]["assisted"])
             print(f"  [{index}] {ui.pad(title, 36)} {ui.progress_bar(done / len(items), 10)} {done}/{len(items)}（自力 {mine}）")
+        print(ui.take_flash(), end="")
         try:
-            choice = input("\n  パック番号 / Enter: 前回の課題 / b: メニューへ > ").strip().lower()
+            choice = input("\n  パック番号 / Enter: 前回の課題 / b: メインメニューへ戻る > ").strip().lower()
         except (EOFError, KeyboardInterrupt):
             return
         if choice in ("b", "q", "menu"):
@@ -398,3 +402,5 @@ def run():
             play(target)
         elif choice.isdigit() and 1 <= int(choice) <= len(groups):
             _choose_in_group(*groups[int(choice) - 1])
+        else:
+            ui.invalid_choice(choice, f"1〜{len(groups)} の番号、Enter、b")

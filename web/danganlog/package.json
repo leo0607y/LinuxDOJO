@@ -1,0 +1,20 @@
+{
+  "name": "danganlog",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "DANGAN LOG / Linux道場: ブラウザーだけで動く静的サイト",
+  "engines": { "node": ">=20.9.0" },
+  "scripts": {
+    "prepare-assets": "node scripts/prepare-assets.mjs",
+    "dev": "npm run prepare-assets && next dev",
+    "build": "npm run prepare-assets && next build",
+    "test": "node --test tests/core.test.mjs tests/worker-e2e.mjs"
+  },
+  "dependencies": {
+    "next": "15.5.29",
+    "pyodide": "0.27.7",
+    "react": "19.1.10",
+    "react-dom": "19.1.10"
+  }
+}

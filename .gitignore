@@ -113,3 +113,26 @@ Thumbs.db
 !/labs/vm/guest/modules/
 /labs/vm/guest/modules/*
 !/labs/vm/guest/modules/*.sh
+
+# Next.js static site (web/danganlog): sources only; generated assets and dependencies are ignored.
+!/web/
+/web/*
+!/web/danganlog/
+/web/danganlog/*
+!/web/danganlog/README.md
+!/web/danganlog/package.json
+!/web/danganlog/package-lock.json
+!/web/danganlog/next.config.mjs
+!/web/danganlog/.node-version
+!/web/danganlog/app/
+!/web/danganlog/components/
+!/web/danganlog/lib/
+!/web/danganlog/scripts/
+!/web/danganlog/tests/
+!/web/danganlog/public/
+/web/danganlog/public/*
+!/web/danganlog/public/worker.js
+!/web/danganlog/public/_headers
+node_modules/
+.next/
+out/

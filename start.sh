@@ -17,7 +17,7 @@ for cand in python3 python; do
   fi
 done
 if [ -z "$PY" ]; then
-  echo "❌ Python 3.8 以上が見つかりません。'sudo apt install python3' でインストールしてください。" >&2
+  echo "[NG] Python 3.8 以上が見つかりません。'sudo apt install python3' でインストールしてください。" >&2
   exit 1
 fi
 
@@ -37,21 +37,23 @@ chmod +x bin/mock/* bin/sim/* 2>/dev/null
 mkdir -p "${LQ_WORKSPACE:-workspace}"
 
 check_env() {
-  echo "🔎 動作環境チェック"
+  echo "動作環境チェック（足りない道具があっても、一部の問題以外は遊べます）"
   for c in bash "$PY" grep sed awk find tar gzip curl ss ping dig rsync zip unzip lsof ssh watch jq vim; do
-    if command -v "$c" >/dev/null 2>&1; then printf "  ✔ %s\n" "$c"; else printf "  ✖ %s （一部の問題で必要です: sudo apt install で導入してください）\n" "$c"; fi
+    if command -v "$c" >/dev/null 2>&1; then printf "  [OK] %s\n" "$c"; else printf "  [NG] %s （一部の問題で必要です。Ubuntu/Debian なら sudo apt install で導入。パッケージ名は異なる場合があります）\n" "$c"; fi
   done
   if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-    echo "  🐳 Docker: 本物の Docker デーモンが使えます"
+    echo "  [OK] Docker: 本物の Docker デーモンが使えます"
   else
-    echo "  🐳 Docker: 使えないため Stage 5・7 はシミュレーションモードで動作します"
+    echo "  [i] Docker: 使えないため Stage 5・7 はシミュレーションモードで動作します（そのまま遊べます）"
   fi
+  echo "確認が終わりました。ゲームは ./start.sh で起動します。"
 }
 
 case "${1:-}" in
   --test)  shift; exec "$PY" tests/test_all_missions.py "$@" ;;
   --check) check_env; exit 0 ;;
   -h|--help) sed -n '2,8p' "$0"; exit 0 ;;
+  -*) echo "[NG] 不明なオプションです: $1" >&2; echo "使えるもの: --check / --test / --help（引数なしでゲーム起動）" >&2; exit 2 ;;
 esac
 
 exec "$PY" engine/main.py

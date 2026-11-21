@@ -1274,7 +1274,8 @@ def play(mode, start=None):
                     print(ui.c(f"  +{reward['earned']} XP！", "byellow"))
                 print("  " + save.activity_line(d))
                 try:
-                    choice = input("\n  Enter: 次の練習へ / menu: 保存して戻る > ").strip().lower()
+                    nxt = "次の練習へ" if index < len(course) else "学習の締めくくりへ"
+                    choice = input(f"\n  Enter: {nxt} / menu: 保存してメニューへ > ").strip().lower()
                 except (EOFError, KeyboardInterrupt):
                     return
                 if choice in ("menu", "q", "exit"):
@@ -1283,7 +1284,7 @@ def play(mode, start=None):
     print(ui.box([f"{MODE_NAMES[mode]}を最後まで学習しました！", "何度でもレッスン選択から復習できます。",
                   "はじめて → 基礎練習 → 応用練習 → 達人 → 実践 の順に進めます。", "総合復習の「課題まつり」で、手本なしの力試しもできます。", "メインメニューの [7] モード選択で切り替えましょう。"], color="green"))
     try:
-        input("Enter でメニューへ > ")
+        input("Enter でメインメニューへ戻る > ")
     except (EOFError, KeyboardInterrupt):
         pass
 
@@ -1303,8 +1304,9 @@ def lesson_select(mode):
                 print(ui.c(f"\n  ■ {unit}  {done}/{len(members)}", "bold", "bcyan"))
             mark = ui.DONE if step["id"] in progress.get("completed", []) else ui.TODO
             print(f"  [{index}] {mark} {step['title']}")
+        print(ui.take_flash(), end="")
         try:
-            value = input("\n  番号 / Enter: 続きから / b: 戻る > ").strip()
+            value = input("\n  番号 / Enter: 続きから / b: 戻る（メインメニューへ） > ").strip()
         except (EOFError, KeyboardInterrupt):
             return
         if value in ("b", "q"):
@@ -1313,3 +1315,5 @@ def lesson_select(mode):
             play(mode)
         elif value.isdigit() and 1 <= int(value) <= len(course):
             play(mode, int(value) - 1)
+        else:
+            ui.invalid_choice(value, f"1〜{len(course)} の番号、Enter、b")

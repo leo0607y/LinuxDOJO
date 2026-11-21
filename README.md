@@ -276,6 +276,10 @@ sudo apt install curl iputils-ping dnsutils rsync zip unzip lsof openssh-client 
 - Stage 4 の SSH 設定は作業ディレクトリ内の `.ssh/` を使い、本物の `~/.ssh` は変更しません。
 - 予期しないエラーは `workspace/error.log` に記録され、メニューに戻ります。
 
+## ブラウザ版 (web/danganlog)
+
+Next.js の静的書き出しで、学習処理はブラウザ内の Pyodide が実行します。サーバー側の実行や従量課金のサービスは使いません。ビルド、ローカル確認、Cloudflare Pages への配置手順は [web/danganlog/README.md](web/danganlog/README.md) を参照してください。`next build` と、実際の Pyodide 上での worker の通し実行は確認済みです。実ブラウザでの表示確認と Cloudflare Pages への実デプロイは未実施です。
+
 ## 開発とテスト
 
 全ユニットテスト:

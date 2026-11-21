@@ -168,6 +168,31 @@ def table(headers, rows, colors=None):
     return "\n".join(out)
 
 
+_FLASH = []
+
+
+def flash(message):
+    """次に描画するメニューの入力欄の上へ出す一行メッセージを予約する。"""
+    _FLASH.append(str(message))
+
+
+def take_flash():
+    """予約済みのメッセージを返して消す（なければ空文字）。"""
+    text = "\n".join(_FLASH)
+    del _FLASH[:]
+    return c("  " + text.replace("\n", "\n  "), "yellow") + "\n" if text else ""
+
+
+def term_rows():
+    return shutil.get_terminal_size((100, 30)).lines
+
+
+def invalid_choice(value, choices):
+    """メニューで選べない入力をしたときのメッセージを予約する。"""
+    shown = value if width(value) <= 20 else clip(value, 20)
+    flash(f"{WARN} 「{shown}」は選べません。{choices} のいずれかを入力して Enter を押します。")
+
+
 def clear():
     """画面とスクロールバックの両方を消す。前の画面まで遡ってスクロールできないようにする。"""
     if sys.stdout.isatty():

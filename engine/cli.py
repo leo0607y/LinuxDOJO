@@ -67,6 +67,14 @@ def stage_label(m):
     return f"{s[0]}「{s[1]}」 第{idx}問 / 全{total}問"
 
 
+def _shown_path(path):
+    """教材フォルダ内なら相対表示。LQ_WORKSPACE が外にある場合は絶対パスのまま表示する。"""
+    try:
+        return str(path.relative_to(ROOT))
+    except ValueError:
+        return str(path)
+
+
 def cmd_mission(brief=False):
     m = _mission()
     d = _data()
@@ -75,7 +83,7 @@ def cmd_mission(brief=False):
     lines += ["", c(f"{ui.HEAD} 達成条件", "bold", "byellow")]
     for o in m.objectives:
         lines.append("  " + c("▶ ", "byellow") + fmt(m.render(o, d)))
-    lines += ["", c(f"{ui.HEAD} 作業ディレクトリ: ", "bold") + c(str(runner.stage_dir(m.stage).relative_to(ROOT)) + "/", "bcyan")]
+    lines += ["", c(f"{ui.HEAD} 作業ディレクトリ: ", "bold") + c(_shown_path(runner.stage_dir(m.stage)) + "/", "bcyan")]
     if m.docker:
         from engine import docker_backend
         mode = docker_backend.detect_mode()

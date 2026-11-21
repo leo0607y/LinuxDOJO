@@ -188,8 +188,9 @@ def ending():
 def stage_select():
     while True:
         ui.clear()
-        print(header())
         d = save.load()
+        if ui.term_rows() >= len(runner.STAGES) + 16:
+            print(header())
         sel_w = max(20, min(44, ui.term_width() - 40))
         print(c("\n  ステージ選択\n", "bold", "bwhite"))
         for s, (name, desc) in runner.STAGES.items():
@@ -199,7 +200,8 @@ def stage_select():
             pct = int(100 * done / len(ms)) if ms else 0
             print(f"   {ui.pad(c(f'[{key}]', 'bold', 'bcyan'), 4)} {ui.pad(name, 8)} {ui.pad(ui.clip(desc, sel_w), sel_w)} "
                   f"{ui.progress_bar(done / len(ms), 8)} {pct:>3}%  {c(f'{done}/{len(ms)}', 'gray')}")
-        print(c("\n   [b] 戻る", "gray"))
+        print(c("\n   [b] 戻る（メインメニューへ）", "gray"))
+        print(ui.take_flash(), end="")
         k = ask("\n  ステージ番号 > ").lower()
         if k in ("b", "q", ""):
             return
@@ -207,6 +209,8 @@ def stage_select():
         if s in runner.STAGES:
             if mission_select(s) == "menu":
                 return "menu"
+        else:
+            ui.invalid_choice(k, "一覧の番号（x は Extra）か b")
 
 
 def mission_select(stage):
@@ -224,7 +228,8 @@ def mission_select(stage):
             score = c(f"{cl['score']:>3}pt", "byellow") if cl else c("  ---", "gray")
             dk = " [Docker]" if m.docker else ""
             print(f"   {ui.pad(c(f'[{i}]', 'bold', 'bcyan'), 4)} {mark} {ui.pad(c(m.id, 'gray'), 6)} {ui.pad(ui.clip(m.title, ttl_w), ttl_w)} {score}{dk}")
-        print(c("\n   [b] 戻る   （Enter のみで、この中の最初の未クリア問題から開始）", "gray"))
+        print(c("\n   [b] 戻る（ステージ選択へ）   Enter のみ: この中の最初の未クリア問題から開始", "gray"))
+        print(ui.take_flash(), end="")
         k = ask("\n  問題番号 > ").lower()
         if k in ("b", "q"):
             return
@@ -236,6 +241,8 @@ def mission_select(stage):
         if k.isdigit() and 1 <= int(k) <= len(ms):
             if play(ms[int(k) - 1]) == "menu":
                 return "menu"
+        else:
+            ui.invalid_choice(k, f"1〜{len(ms)} の番号か b")
 
 
 def fmt_time(sec):
@@ -290,7 +297,8 @@ def tips_catalog():
         print(c("\n  小ネタ図鑑 ― 現場で一目置かれる Linux 時短テクニック 10選\n", "bold", "bwhite"))
         for i, t in enumerate(TIPS, 1):
             print(f"   {c(f'[{i:>2}]', 'bold', 'bcyan')} {t['title']}")
-        print(c("\n   [p] 実践モード（ミニ課題5問）に挑戦   [b] 戻る", "gray"))
+        print(c("\n   [p] 実践モード（ミニ課題5問）に挑戦   [b] 戻る（メインメニューへ）", "gray"))
+        print(ui.take_flash(), end="")
         k = ask("\n  番号 > ").lower()
         if k in ("b", "q", ""):
             return
@@ -300,6 +308,8 @@ def tips_catalog():
             continue
         if k.isdigit() and 1 <= int(k) <= len(TIPS):
             show_tip(int(k) - 1, TIPS)
+        else:
+            ui.invalid_choice(k, f"1〜{len(TIPS)} の番号か p・b")
 
 
 def show_tip(i, tips):
@@ -311,7 +321,7 @@ def show_tip(i, tips):
         lines += ["  " + c(x, "bcyan") for x in t["example"].split("\n")]
         print()
         print(box(lines, title=f"小ネタ {i + 1}/{len(tips)}  {t['title']}", color="cyan", title_color="bcyan"))
-        k = ask("\n  [n] 次へ  [p] 前へ  [b] 一覧へ > ").lower()
+        k = ask("\n  [n] 次へ  [p] 前へ  [b] / Enter: 一覧へ戻る > ").lower()
         if k == "n":
             i = (i + 1) % len(tips)
         elif k == "p":
@@ -378,8 +388,10 @@ def settings():
             d = save.empty()
             d["settings"] = save.load()["settings"]
             save.store(d)
-            print("進捗を初期化しました。はじめてモードから学び直せます。")
+            print(f"{ui.OK} 進捗を初期化しました。はじめてモードから学び直せます。")
             pause()
+        elif value == "r":
+            ui.flash("初期化は行いませんでした（消す場合だけ yes と入力します）。")
         return
     from engine import docker_backend
     while True:
@@ -394,26 +406,32 @@ def settings():
         print(f"   {c('[2]', 'bold', 'bcyan')} Docker モード: mock（常にシミュレーション。実環境を汚さない）")
         print(f"   {c('[3]', 'bold', 'bcyan')} Docker モード: real（本物の Docker を使う）")
         print(f"   {c('[r]', 'bold', 'bred')} セーブデータを初期化する")
-        print(c("\n   [b] 戻る", "gray"))
-        k = ask("\n  > ").lower()
+        print(c("\n   [b] 戻る（メインメニューへ）", "gray"))
+        print(ui.take_flash(), end="")
+        k = ask("\n  設定番号 > ").lower()
         if k in ("b", "q", ""):
             return
+        if k not in ("1", "2", "3", "r"):
+            ui.invalid_choice(k, "1・2・3・r・b")
         if k in ("1", "2", "3"):
             d["settings"]["docker_mode"] = {"1": "auto", "2": "mock", "3": "real"}[k]
             save.store(d)
+            ui.flash(f"{ui.OK} Docker モードを {d['settings']['docker_mode']} にしました。")
             docker_backend._MODE = None
             os.environ.pop("LQ_DOCKER_MODE", None)
             if k == "3" and not real_ok:
                 print(c(f"  {ui.WARN} Docker デーモンが使えないため、実際にはシミュレーションモードで動作します。", "yellow"))
-                pause("Enter で続ける")
+                pause("Enter で設定へ戻る")
         if k == "r":
             yn = ask(c("  本当に全ての進捗を消去しますか？ 消去するなら yes と入力 > ", "bred"))
             if yn == "yes":
                 s = save.empty()
                 s["settings"] = d["settings"]
                 save.store(s)
-                print(c("  セーブデータを初期化しました。", "bgreen"))
-                pause("Enter で続ける")
+                print(c(f"  {ui.OK} セーブデータを初期化しました。", "bgreen"))
+                pause("Enter で設定へ戻る")
+            else:
+                ui.flash("初期化は行いませんでした（消す場合だけ yes と入力します）。")
 
 
 def practice_resume():
@@ -443,6 +461,7 @@ def mode_select():
                    "    はじめて・基礎練習の sudo / apt は安全な模擬操作です。",
                    "    実践モードではコマンドが実際に動きます。",
                    "モードごとに続きの位置を保存します。既存の実践クリア実績も残ります。"], title="学習モードを選ぶ", color="green"))
+        print(ui.take_flash(), end="")
         value = ask("  [1 / 2 / 3 / 4 / 5] 選択 / b: 戻る > ").lower()
         if value in ("b", "q", ""):
             return
@@ -453,6 +472,7 @@ def mode_select():
             d["learning"]["mode"] = {"1": "intro", "2": "basic", "3": "advanced", "4": "expert", "5": "practice"}[value]
             save.store(d)
             return
+        ui.invalid_choice(value, "1〜5 か b")
 
 
 def windows_practice_notice():
@@ -518,7 +538,8 @@ def learning_dashboard(mode):
 def main_menu():
     while True:
         ui.clear()
-        print(ui.title_art())
+        if ui.term_rows() >= 34:
+            print(ui.title_art())
         print(header())
         mode = guided.selected_mode()
         nxt = practice_resume() if mode == "practice" else None
@@ -540,6 +561,8 @@ def main_menu():
         print()
         for k, label in items:
             print(f"   {c(f'[{k}]', 'bold', 'bcyan')} {label}")
+        print(c("\n  番号を入力して Enter（Enter のみ = [1]）。終了は q。", "gray"))
+        print(ui.take_flash(), end="")
         k = ask("\n  メニュー番号 > ").lower()
         if k in ("1", ""):
             if mode != "practice":
@@ -586,7 +609,10 @@ def main_menu():
                 print("  学習の続きは保存済みです。次回も [1] 続きから で再開できます。\n")
                 return
             print(f"  現在のランク: {' '.join(save.rank_of(len(d['cleared']))[1:])}   総スコア: {save.total_score(d)} pt\n")
+            print("  進捗は自動で保存済みです。次回は ./start.sh（または start）で再開できます。\n")
             return
+        else:
+            ui.invalid_choice(k, "1〜9 か q")
 
 
 def setup_windows_console():

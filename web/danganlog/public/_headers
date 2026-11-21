@@ -1,0 +1,9 @@
+/pyodide/*
+  Cache-Control: public, max-age=31536000, immutable
+/worker.js
+  Cache-Control: public, max-age=0, must-revalidate
+/python-source.json
+  Cache-Control: public, max-age=0, must-revalidate
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
