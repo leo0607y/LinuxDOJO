@@ -44,7 +44,7 @@ class ShellFeatureTests(unittest.TestCase):
         self.assertFalse((self.term.root / "a.txt").exists())
 
     def test_command_chaining_is_still_rejected(self):
-        for command in ("ls && whoami", "ls ; whoami", "ls || whoami", "cat < access.log", "ls | | wc"):
+        for command in ("ls && whoami", "ls ; whoami", "ls || whoami", "ls | | wc"):
             with self.subTest(command=command):
                 self.assertNotEqual(self.term.execute(command).code, 0)
 

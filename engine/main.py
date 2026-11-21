@@ -70,7 +70,7 @@ def title_screen():
     print(c(f"                                                     v{VERSION}", "gray"))
     peng = ui.PENGUIN.strip("\n").split("\n")
     talk = ["", "  Linux が初めてでも大丈夫。文字の入力から始めよう。",
-            "  はじめて → 基礎練習 → 実践の3モード。",
+            "  はじめて → 基礎 → 応用 → 達人 → 実践の5モード。",
             "  モードごとに保存して、次回は続きから学べます。",
             "", f"  実践では本物の bash で {len(all_missions())} 問に挑戦！"
             + ("" if runner.practice_supported() else "（Windows では WSL で利用）"), ""]
@@ -258,7 +258,7 @@ def dashboard():
     st = d["stats"]
     n = len(d["cleared"])
     print(c("\n  🎖  ランク", "bold", "bwhite"))
-    for th, lv, nm in save.RANKS:
+    for th, lv, nm in save.rank_table():
         cur = save.rank_of(n)[1] == lv
         mark = c("▶", "byellow", "bold") if cur else (c("✔", "bgreen") if n >= th else c("・", "gray"))
         print(f"    {mark} {c(lv, 'bold' if cur else 'gray'):<8} {c(nm, 'byellow' if cur else ('white' if n >= th else 'gray'))}"
@@ -269,6 +269,8 @@ def dashboard():
             print("    " + c(t, "bmagenta"))
     else:
         print(c("    （ステージを全問クリアすると称号が手に入ります）", "gray"))
+    from engine import security_progress
+    print("\n" + "\n".join(security_progress.lines(d)))
     perfect = len([v for v in d["cleared"].values() if v.get("hints", 0) == 0 and not v.get("answer")])
     print(c("\n  📈 プレイ統計", "bold", "bwhite"))
     print(f"    総プレイ時間 {c(fmt_time(d['player'].get('play_seconds', 0)), 'bcyan')}   "
@@ -433,18 +435,20 @@ def mode_select():
                    "    入力例は hint でいつでも表示できます。減点はありません。",
                    "[3] 応用練習モード: ワイルドカード・パイプ・集計・環境変数・プロセス・vim 編集。",
                    "    コマンドを組み合わせて、目的の結果を自分で作ります。",
-                   "[4] 実践モード: 本物の bash で59問のトラブル解決に挑戦。",
+                   "[4] 達人モード: アーカイブ・検索・ネットワーク・ユーザー・Git・スクリプト・テキスト加工・サービス。",
+                   "    答えは書いていません。hint を段階的に使いながら自力で解きます。",
+                   f"[5] 実践モード: 本物の bash で{len(all_missions())}問。Linux 運用からセキュリティ監査・報告へ。",
                    "    はじめて・基礎練習の sudo / apt は安全な模擬操作です。",
                    "    実践モードではコマンドが実際に動きます。",
                    "モードごとに続きの位置を保存します。既存の実践クリア実績も残ります。"], title="学習モードを選ぶ", color="green"))
-        value = ask("  [1 / 2 / 3 / 4] 選択 / b: 戻る > ").lower()
+        value = ask("  [1 / 2 / 3 / 4 / 5] 選択 / b: 戻る > ").lower()
         if value in ("b", "q", ""):
             return
-        if value == "4" and not runner.practice_supported():
+        if value == "5" and not runner.practice_supported():
             windows_practice_notice()
             continue
-        if value in ("1", "2", "3", "4"):
-            d["learning"]["mode"] = {"1": "intro", "2": "basic", "3": "advanced", "4": "practice"}[value]
+        if value in ("1", "2", "3", "4", "5"):
+            d["learning"]["mode"] = {"1": "intro", "2": "basic", "3": "advanced", "4": "expert", "5": "practice"}[value]
             save.store(d)
             return
 
@@ -523,7 +527,7 @@ def main_menu():
         items = [("1", "▶ ", cont), ("2", "🗺 ", "ステージ選択"), ("3", "📊", "進捗ダッシュボード"),
                  ("4", "📖", "小ネタ図鑑（Extra 閲覧モード）"), ("5", "❓", "遊び方・操作コマンド一覧"),
                  ("6", "⚙ ", "設定（Docker モード / セーブ初期化）"),
-                 ("7", "🌱", "モード選択（はじめて / 基礎 / 応用 / 実践）"),
+                 ("7", "🌱", "モード選択（はじめて / 基礎 / 応用 / 達人 / 実践）"),
                  ("8", "🎪", "課題まつり（総合復習）・自由自在マップ"), ("q", "🚪", "終了")]
         if mode != "practice":
             beginner_labels = {"2": "レッスン選択・復習", "4": "用語・コマンド辞典", "6": "設定（進捗の初期化）"}

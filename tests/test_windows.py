@@ -138,7 +138,7 @@ class PracticeUnavailableTests(unittest.TestCase):
         from engine import main
         save.store(save.empty())
         out = io.StringIO()
-        with patch("builtins.input", side_effect=["4", "", "b"]), contextlib.redirect_stdout(out):
+        with patch("builtins.input", side_effect=["5", "", "b"]), contextlib.redirect_stdout(out):
             main.mode_select()
         self.assertIn("wsl --install", out.getvalue())
         self.assertEqual(save.load()["learning"]["mode"], "intro")

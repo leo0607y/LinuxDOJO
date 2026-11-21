@@ -83,3 +83,11 @@ secrets*
 *~
 .DS_Store
 Thumbs.db
+
+# plugin commands and expert units
+!/engine/commands/
+/engine/commands/*
+!/engine/commands/*.py
+!/curriculum/units/
+/curriculum/units/*
+!/curriculum/units/*.py

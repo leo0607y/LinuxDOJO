@@ -1,0 +1,779 @@
+"""課題まつり：実務シナリオ（バックアップ・ログ調査・デプロイ準備・設定の巻き戻し・権限監査・環境構築・後始末）。
+
+現場でそのまま起こる作業を、目的と制約だけで出題する。データはすべて教材用の架空のもの。
+IP アドレスは文書用の範囲（192.0.2.0/24 など）だけを使う。
+"""
+from collections import Counter
+
+PACK_TITLE = "実務シナリオ"
+
+
+def _ex(steps):
+    """3段階目のヒント用に、手順を「入力例: a → b → c」の形にする。"""
+    return "入力例: " + " → ".join(steps)
+
+
+def _lines(text, keep):
+    return "".join(x for x in text.splitlines(keepends=True) if keep(x))
+
+
+# ---- 共通のデータ ---------------------------------------------------------
+APP_CONF = "port=8080\nmode=dev\nworkers=2\n"
+
+# 「LEVEL:メッセージ」形式のアプリログ。DEBUG の行、小文字の error を含む行がある。
+APP_LOG = (
+    "INFO:server started\n"
+    "DEBUG:cache warmup 120 items\n"
+    "ERROR:db timeout\n"
+    "WARN:disk usage 81%\n"
+    "DEBUG:session id=a1\n"
+    "ERROR:payment api 502\n"
+    "INFO:retry finished without error\n"
+    "ERROR:db timeout\n"
+    "INFO:user=alice login\n"
+    "DEBUG:session id=b2\n"
+    "ERROR:queue full\n"
+    "INFO:batch end\n"
+)
+
+# 時刻つきのログ。10 時台に ERROR と INFO があり、「10」を含む別の行（日付・数字）もある。
+TIMED_LOG = (
+    "2026-11-10 09:58:01 ERROR nightly report failed\n"
+    "2026-11-21 09:59:30 ERROR cache miss storm\n"
+    "2026-11-21 10:03:44 ERROR db connection timeout\n"
+    "2026-11-21 10:05:00 INFO retry ok after 10 seconds\n"
+    "2026-11-21 10:30:12 WARN queue length 100\n"
+    "2026-11-21 10:41:09 ERROR payment api returned 502\n"
+    "2026-11-21 11:12:09 ERROR db deadlock detected\n"
+    "2026-11-21 11:40:00 INFO batch end\n"
+)
+
+# カンマ区切りのアクセスログ（IP,ステータス,パス）。
+ACCESS_ROWS = [
+    ("203.0.113.7", 200, "/"), ("203.0.113.7", 200, "/api/items"), ("198.51.100.23", 502, "/api/cart"),
+    ("203.0.113.7", 500, "/api/order"), ("192.0.2.44", 404, "/wp-admin"), ("203.0.113.7", 200, "/login"),
+    ("198.51.100.23", 502, "/api/order"), ("192.0.2.44", 404, "/old"), ("203.0.113.7", 200, "/search"),
+    ("198.51.100.23", 200, "/item/502"), ("203.0.113.50", 502, "/api/items"), ("203.0.113.7", 200, "/"),
+    ("198.51.100.23", 200, "/"), ("192.0.2.44", 200, "/"),
+]
+ACCESS_CSV = "".join(f"{ip},{status},{path}\n" for ip, status, path in ACCESS_ROWS)
+_COUNTS = Counter(ip for ip, _, _ in ACCESS_ROWS).most_common()          # 同数がないのでそのまま使える
+TOP3 = "".join(f"{n:>7} {ip}\n" for ip, n in _COUNTS[:3])
+
+AUTH_LOG = (
+    "Nov 21 09:00:01 web01 sshd[1001]: Accepted password for alice from 192.0.2.10 port 50001 ssh2\n"
+    "Nov 21 09:01:12 web01 sshd[1002]: Failed password for root from 203.0.113.66 port 50122 ssh2\n"
+    "Nov 21 09:01:15 web01 sshd[1003]: Failed password for root from 203.0.113.66 port 50123 ssh2\n"
+    "Nov 21 09:02:40 web01 sshd[1004]: Failed password for bob from 198.51.100.77 port 50300 ssh2\n"
+    "Nov 21 09:03:02 web01 sshd[1005]: Accepted publickey for root from 192.0.2.11 port 50400 ssh2\n"
+    "Nov 21 09:05:30 web01 sshd[1006]: Failed password for root from 203.0.113.66 port 50124 ssh2\n"
+    "Nov 21 09:07:00 web01 sshd[1007]: Accepted password for bob from 192.0.2.12 port 50500 ssh2\n"
+)
+
+WEB_LOG = "INFO web started\nERROR web 502 from upstream\nINFO web request ok\nERROR web timeout\n"
+DB_LOG = "INFO db started\nERROR db deadlock\nWARN db slow query\nERROR db disk full\n"
+
+SCENARIOS = [
+    # ====================== バックアップ ======================
+    {
+        "id": "fes-scenarios-01", "level": 2, "title": "変更の前に退避してから設定を直す",
+        "brief": "app.conf の mode を dev から production に変更してください。変更前の内容は app.conf.bak に残します。"
+                 "ほかの行（port と workers）は元のままにします。",
+        "files": {"app.conf": APP_CONF},
+        "solution": ["cp app.conf app.conf.bak", "grep -v mode= app.conf > app.new", "echo mode=production >> app.new",
+                     "mv app.new app.conf"],
+        "alt_solutions": [["cp app.conf app.conf.bak", "echo port=8080 > app.conf", "echo workers=2 >> app.conf",
+                           "echo mode=production >> app.conf"]],
+        "traps": [["grep -v mode= app.conf > app.new", "echo mode=production >> app.new", "mv app.new app.conf",
+                   "cp app.conf app.conf.bak"],
+                  ["cp app.conf app.conf.bak", "echo mode=production > app.conf"],
+                  ["cp app.conf app.conf.bak", "echo mode=production >> app.conf"]],
+        "expected_files": {"app.conf": "port=8080\nworkers=2\nmode=production\n", "app.conf.bak": APP_CONF},
+        "absent": ["app.new"],
+        "hints": ["元に戻せるよう、直す前に控えを取る。そのあと、元の行を除いた内容に新しい行を足す、という流れで考えます。",
+                  "控えはコピー（cp）。直すときは grep -v で不要な行を除いた内容を別ファイルへ書き出し、echo と >> で新しい行を足し、最後に mv で差し替えます。",
+                  _ex(["cp app.conf app.conf.bak", "grep -v mode= app.conf > app.new", "echo mode=production >> app.new",
+                       "mv app.new app.conf"])],
+        "explanation": "変更後にコピーしても「変更前」は取れません。控え→変更の順が鉄則です。> は上書き、>> は末尾に追加なので、既存の内容を残したいときに > を使うと中身が消えます。行の入れ替えは「除いて足す」で表現できます。",
+        "practice": ["6-6", "2-1"],
+    },
+    {
+        "id": "fes-scenarios-02", "level": 3, "title": "世代バックアップを1つずつずらす",
+        "brief": "データベースのバックアップは3世代（db.bak が最新、db.bak.1 が1つ前、db.bak.2 が2つ前）で管理しています。"
+                 "今日の新しいダンプ db.sql を最新の世代にし、これまでの世代を1つずつ古い側へ送ってください。"
+                 "いちばん古い世代は捨ててかまいません。db.sql は残します。",
+        "files": {"db.sql": "v4\n", "db.bak": "v3\n", "db.bak.1": "v2\n", "db.bak.2": "v1\n"},
+        "solution": ["mv db.bak.1 db.bak.2", "mv db.bak db.bak.1", "cp db.sql db.bak"],
+        "alt_solutions": [["rm db.bak.2", "mv db.bak.1 db.bak.2", "mv db.bak db.bak.1", "cp db.sql db.bak"]],
+        "traps": [["mv db.bak db.bak.1", "mv db.bak.1 db.bak.2", "cp db.sql db.bak"],
+                  ["cp db.sql db.bak", "mv db.bak.1 db.bak.2", "mv db.bak db.bak.1"],
+                  ["mv db.bak db.bak.1", "cp db.sql db.bak"]],
+        "expected_files": {"db.bak": "v4\n", "db.bak.1": "v3\n", "db.bak.2": "v2\n", "db.sql": "v4\n"},
+        "hints": ["上書きで消えないよう、いちばん古い世代の側から順に動かします。",
+                  "名前を変えて移すのは mv、新しいダンプを最新の位置に置くのはコピーです。順番を間違えると1つ前の世代を上書きして失います。",
+                  _ex(["mv db.bak.1 db.bak.2", "mv db.bak db.bak.1", "cp db.sql db.bak"])],
+        "explanation": "ローテーションは「後ろから前へ」が鉄則です。先に db.bak を db.bak.1 へ動かすと、まだ退避していない db.bak.1（v2）を上書きして失います。mv は宛先が既にあると黙って置き換えます。",
+        "practice": ["6-6", "1-5"],
+    },
+    {
+        "id": "fes-scenarios-03", "level": 2, "title": "古い日次バックアップを整理する",
+        "brief": "backups フォルダに 11/17〜11/21 の5日分の日次バックアップがあります。保存は最新の2日分（11/20 と 11/21）だけにして、"
+                 "それより古い3日分を削除してください。",
+        "files": {f"backups/db-2026-11-{d}.sql": f"dump of {d}\n" for d in (17, 18, 19, 20, 21)},
+        "solution": ["ls backups", "rm backups/db-2026-11-17.sql backups/db-2026-11-18.sql backups/db-2026-11-19.sql"],
+        "alt_solutions": [["rm backups/db-2026-11-1*"],
+                          ["cd backups", "rm db-2026-11-17.sql", "rm db-2026-11-18.sql", "rm db-2026-11-19.sql"]],
+        "traps": [["rm backups/db-2026-11-20.sql backups/db-2026-11-21.sql"], ["rm backups/*.sql"],
+                  ["rm backups/db-2026-11-17.sql backups/db-2026-11-18.sql"]],
+        "absent": ["backups/db-2026-11-17.sql", "backups/db-2026-11-18.sql", "backups/db-2026-11-19.sql"],
+        "expected_files": {"backups/db-2026-11-20.sql": "dump of 20\n", "backups/db-2026-11-21.sql": "dump of 21\n"},
+        "hints": ["日付の古い順に3つ。残す側を消さないよう、まず一覧で確かめます。",
+                  "一覧は ls、削除は rm です。名前を並べて書くか、共通部分をワイルドカードにします。",
+                  _ex(["ls backups", "rm backups/db-2026-11-17.sql backups/db-2026-11-18.sql backups/db-2026-11-19.sql"])],
+        "explanation": "削除は取り消せません。ワイルドカードを使うときは「消したいものだけに一致するか」を、先に ls で同じパターンを使って確かめると安全です。",
+        "practice": ["3-8", "2-6"],
+    },
+    {
+        "id": "fes-scenarios-04", "level": 1, "title": "日付つきでバックアップを取る",
+        "brief": "data.csv の今日（2026-11-21）の控えを、backup フォルダの中に data-2026-11-21.csv という名前で作ってください。"
+                 "backup フォルダはまだありません。元の data.csv は残します。",
+        "files": {"data.csv": "id,name\n1,alice\n2,bob\n"},
+        "solution": ["mkdir backup", "cp data.csv backup/data-2026-11-21.csv"],
+        "alt_solutions": [["mkdir backup", "cp data.csv backup", "mv backup/data.csv backup/data-2026-11-21.csv"],
+                          ["mkdir -p backup", "cp data.csv ./backup/data-2026-11-21.csv"]],
+        "traps": [["cp data.csv backup/data-2026-11-21.csv"], ["mkdir backup", "mv data.csv backup/data-2026-11-21.csv"],
+                  ["mkdir backup", "cp data.csv backup/data-2026-11-20.csv"]],
+        "expected_files": {"backup/data-2026-11-21.csv": "id,name\n1,alice\n2,bob\n", "data.csv": "id,name\n1,alice\n2,bob\n"},
+        "hints": ["入れ物（フォルダ）を先に用意してから、中身を複製して置きます。",
+                  "フォルダ作成は mkdir、複製は cp。コピー先の名前に日付を入れれば、置く場所と同時に名前も決まります。",
+                  _ex(["mkdir backup", "cp data.csv backup/data-2026-11-21.csv"])],
+        "explanation": "cp はコピー、mv は移動です。バックアップは元を残すので cp を使います。移動してしまうと「控え」ではなく「持ち去り」になります。",
+        "practice": ["6-6", "2-1"],
+    },
+    {
+        "id": "fes-scenarios-05", "level": 2, "title": "設定ファイルだけをまとめて控える",
+        "brief": "conf フォルダにある拡張子 .conf のファイルすべてを、backup フォルダにコピーしてください（backup はまだありません）。"
+                 "メモ用の notes.txt は控えに入れません。元のファイルはそのまま残します。",
+        "files": {"conf/web.conf": "listen=80\n", "conf/db.conf": "host=db.example.test\n", "conf/cache.conf": "size=64\n",
+                  "conf/notes.txt": "移行前のメモ\n"},
+        "solution": ["mkdir backup", "cp conf/*.conf backup"],
+        "alt_solutions": [["mkdir backup", "cp conf/web.conf conf/db.conf conf/cache.conf backup"],
+                          ["mkdir backup", "cd conf", "cp *.conf ../backup"]],
+        "traps": [["mkdir backup", "cp conf/* backup"], ["mkdir backup", "mv conf/*.conf backup"], ["cp conf/*.conf backup"]],
+        "expected_files": {"backup/web.conf": "listen=80\n", "backup/db.conf": "host=db.example.test\n",
+                           "backup/cache.conf": "size=64\n", "conf/web.conf": "listen=80\n",
+                           "conf/db.conf": "host=db.example.test\n", "conf/cache.conf": "size=64\n"},
+        "absent": ["backup/notes.txt"],
+        "hints": ["コピー先を作る。コピー対象は「名前の終わりが共通」なので、まとめて指定できます。",
+                  "mkdir でフォルダを作り、cp に * を使った指定と宛先フォルダを渡します。複数のファイルを送る cp は、最後が宛先です。",
+                  _ex(["mkdir backup", "cp conf/*.conf backup"])],
+        "explanation": "* は「任意の文字列」に展開されます。conf/* だと notes.txt も含まれてしまうので、.conf まで書いて対象を絞ります。",
+        "practice": ["6-6", "2-1"],
+    },
+    {
+        "id": "fes-scenarios-06", "level": 2, "title": "バックアップから設定を復元する",
+        "brief": "app.conf を書き換えたらサービスが起動しなくなりました。backup フォルダの app.conf.bak の内容に戻してください。"
+                 "backup の中の控えは、次回のためにそのまま残します。",
+        "files": {"app.conf": "port=80\nmode=broken\n", "backup/app.conf.bak": APP_CONF},
+        "solution": ["cp backup/app.conf.bak app.conf"],
+        "alt_solutions": [["cat backup/app.conf.bak", "cp backup/app.conf.bak ./app.conf"],
+                          ["cp backup/app.conf.bak /home/learner/app.conf"]],
+        "traps": [["mv backup/app.conf.bak app.conf"], ["cp app.conf backup/app.conf.bak"], ["rm app.conf"]],
+        "expected_files": {"app.conf": APP_CONF, "backup/app.conf.bak": APP_CONF},
+        "hints": ["戻す元（控え）を壊さずに、現在のファイルへ内容を行き渡らせます。",
+                  "コピー（cp）です。向きは「控え → 現在のファイル」。逆向きに書くと壊れた内容が控えに上書きされます。",
+                  _ex(["cp backup/app.conf.bak app.conf"])],
+        "explanation": "cp の引数は「元 先」の順です。復元で mv を使うと控えがなくなり、もう一度失敗したときに戻れません。",
+        "practice": ["6-6"],
+    },
+    # ====================== ログ調査 ======================
+    {
+        "id": "fes-scenarios-07", "level": 2, "title": "ERROR の行だけを報告用に取り出す",
+        "brief": "app.log から、重大なエラー（レベルが ERROR の行）だけを取り出して errors.txt に保存してください。"
+                 "「error」という単語を文中に含むだけの INFO の行は含めません。",
+        "files": {"app.log": APP_LOG},
+        "solution": ["grep ERROR app.log > errors.txt"],
+        "alt_solutions": [["grep '^ERROR' app.log > errors.txt"], ["cat app.log | grep ERROR > errors.txt"]],
+        "traps": [["grep -i error app.log > errors.txt"], ["grep ERROR app.log"], ["grep -c ERROR app.log > errors.txt"]],
+        "expected_files": {"errors.txt": _lines(APP_LOG, lambda x: x.startswith("ERROR"))},
+        "hints": ["必要な行だけを選んで、画面ではなくファイルへ流します。大文字小文字の違いにも注意。",
+                  "選ぶのは grep、ファイルへ流すのは >。-i（大文字小文字を区別しない）を付けると別の行も混ざります。",
+                  _ex(["grep ERROR app.log > errors.txt"])],
+        "explanation": "grep は大文字小文字を区別します。ログのレベルは大文字で書かれるのが普通なので、区別することで INFO の文中の error を避けられます。> で保存した内容は cat で必ず確かめましょう。",
+        "practice": ["6-6", "3-4"],
+    },
+    {
+        "id": "fes-scenarios-08", "level": 2, "title": "502 エラーの件数だけを数える",
+        "brief": "access.csv は「IP,ステータス,パス」を1行にした記録です。ステータスが 502 のリクエストが何件あったかを数え、"
+                 "数字だけを count.txt に保存してください。パスに 502 を含むだけの行は数えません。",
+        "files": {"access.csv": ACCESS_CSV},
+        "solution": ["grep ,502, access.csv | wc -l > count.txt"],
+        "alt_solutions": [["grep -c ,502, access.csv > count.txt"], ["grep ',502,' access.csv | wc -l > count.txt"]],
+        "traps": [["grep 502 access.csv | wc -l > count.txt"], ["grep -c 502 access.csv > count.txt"],
+                  ["grep ,502, access.csv > count.txt"]],
+        "expected_files": {"count.txt": f"{sum(1 for _, s, _ in ACCESS_ROWS if s == 502)}\n"},
+        "hints": ["「ステータスの欄だけ」に一致させるには、前後の区切りも含めて探します。数え方は2通りあります。",
+                  "grep を使います。行数を数える wc -l にパイプでつなぐか、grep 自身の件数オプション -c を使います。結果は > で保存。",
+                  _ex(["grep ,502, access.csv | wc -l > count.txt"])],
+        "explanation": "単に 502 で探すと、パスやサイズに偶然含まれる行まで一致します。区切り文字ごと指定して欄を絞るのは、集計の基本です。",
+        "practice": ["3-4", "6-6"],
+    },
+    {
+        "id": "fes-scenarios-09", "level": 3, "title": "アクセスの多い IP のトップ3を出す",
+        "brief": "access.csv は「IP,ステータス,パス」を1行にした記録です。リクエストの多かった IP を上位3つ、多い順に"
+                 "「件数 IP」の形で top.txt に保存してください。",
+        "files": {"access.csv": ACCESS_CSV},
+        "solution": ["cut -d, -f1 access.csv | sort | uniq -c | sort -rn | head -n 3 > top.txt"],
+        "alt_solutions": [["cut -d, -f1 access.csv | sort | uniq -c | sort -nr | head -n 3 > top.txt"],
+                          ["cut -d, -f1 access.csv > ips.txt", "sort ips.txt | uniq -c | sort -rn | head -n 3 > top.txt"]],
+        "traps": [["cut -d, -f1 access.csv | uniq -c | sort -rn | head -n 3 > top.txt"],
+                  ["cut -d, -f1 access.csv | sort | uniq -c | sort -n | head -n 3 > top.txt"],
+                  ["cut -d, -f1 access.csv | sort | uniq | head -n 3 > top.txt"]],
+        "expected_files": {"top.txt": TOP3},
+        "hints": ["IP の列だけ取り出す→同じものを並べて数える→多い順→上位だけ、の順につなぎます。",
+                  "cut（区切りは -d、欄は -f）、sort、uniq -c、数の大きい順の sort -rn、先頭を取る head をパイプでつなぎます。uniq は隣り合う同じ行しか数えない点に注意。",
+                  _ex(["cut -d, -f1 access.csv | sort | uniq -c | sort -rn | head -n 3 > top.txt"])],
+        "explanation": "uniq -c は「隣り合った同じ行」を数えるので、先に sort で同じものを隣へ集めます。集計→多い順の並べ替え→上位だけ、はログ分析の定番です。",
+        "practice": ["3-4", "6-6", "1-5"],
+    },
+    {
+        "id": "fes-scenarios-10", "level": 2, "title": "root への不正ログイン失敗を抜き出す",
+        "brief": "auth.log から、ユーザー root への「パスワード認証の失敗」の行だけを root-fail.txt に保存してください。"
+                 "root の成功ログインや、他のユーザーの失敗は含めません。",
+        "files": {"auth.log": AUTH_LOG},
+        "solution": ["grep 'Failed password for root' auth.log > root-fail.txt"],
+        "alt_solutions": [["grep Failed auth.log | grep root > root-fail.txt"], ["grep root auth.log | grep Failed > root-fail.txt"]],
+        "traps": [["grep root auth.log > root-fail.txt"], ["grep Failed auth.log > root-fail.txt"],
+                  ["grep -c 'Failed password for root' auth.log > root-fail.txt"]],
+        "expected_files": {"root-fail.txt": _lines(AUTH_LOG, lambda x: "Failed password for root" in x)},
+        "hints": ["「失敗」かつ「root」の両方を満たす行だけが必要です。",
+                  "1回の grep で長い語句を探す方法と、grep を2つ続けて絞り込む方法があります。空白を含む語句は引用符で囲みます。",
+                  _ex(["grep 'Failed password for root' auth.log > root-fail.txt"])],
+        "explanation": "条件が2つあるときは、より具体的な語句にするか、grep を重ねて絞り込みます。root だけで探すと成功した root ログインも混ざります。",
+        "practice": ["3-4", "6-6"],
+    },
+    {
+        "id": "fes-scenarios-11", "level": 1, "title": "デバッグ行を除いたログを作る",
+        "brief": "app.log から DEBUG の行を取り除いた内容を、共有用の clean.log に保存してください。元の app.log は変更しません。",
+        "files": {"app.log": APP_LOG},
+        "solution": ["grep -v DEBUG app.log > clean.log"],
+        "alt_solutions": [["cat app.log | grep -v DEBUG > clean.log"], ["grep -v DEBUG ./app.log > ./clean.log"]],
+        "traps": [["grep DEBUG app.log > clean.log"], ["grep -v DEBUG app.log > app.log"], ["grep -v ERROR app.log > clean.log"]],
+        "expected_files": {"clean.log": _lines(APP_LOG, lambda x: "DEBUG" not in x), "app.log": APP_LOG},
+        "hints": ["「含まない行」を選びます。入力と出力のファイルを同じにしないこと。",
+                  "grep に「一致しない行」を選ぶ -v を付け、結果は別のファイルへ > で流します。",
+                  _ex(["grep -v DEBUG app.log > clean.log"])],
+        "explanation": "grep -v は反転です。入力と同じファイルへ > で書き込むと、読む前に中身が空になって全部消えるので、必ず別名に出力します。",
+        "practice": ["3-4", "6-6"],
+    },
+    {
+        "id": "fes-scenarios-12", "level": 1, "title": "直近の4行を共有用に切り出す",
+        "brief": "app.log の末尾4行（直近の出来事）を recent.txt に保存してください。",
+        "files": {"app.log": APP_LOG},
+        "solution": ["tail -n 4 app.log > recent.txt"],
+        "alt_solutions": [["cat app.log | tail -n 4 > recent.txt"], ["tail -4 app.log > recent.txt"]],
+        "traps": [["head -n 4 app.log > recent.txt"], ["tail -n 5 app.log > recent.txt"], ["tail -n 4 app.log"]],
+        "expected_files": {"recent.txt": "".join(APP_LOG.splitlines(keepends=True)[-4:])},
+        "hints": ["ファイルの「終わり」から数行を取る道具です。出力は画面でなくファイルへ。",
+                  "先頭を取る head の反対側の道具を使い、行数を指定します。結果は > で保存。",
+                  _ex(["tail -n 4 app.log > recent.txt"])],
+        "explanation": "ログは新しい出来事が末尾に追記されるので、直近を見るには tail です。head は先頭、tail は末尾と覚えましょう。",
+        "practice": ["3-4", "6-6"],
+    },
+    {
+        "id": "fes-scenarios-13", "level": 3, "title": "エラーの種類を重複なしで一覧にする",
+        "brief": "app.log は「レベル:メッセージ」の形式です。ERROR の行について、メッセージ部分だけを取り出し、"
+                 "重複を除いて五十音・アルファベット順に並べたものを error-types.txt に保存してください。",
+        "files": {"app.log": APP_LOG},
+        "solution": ["grep ERROR app.log | cut -d: -f2 | sort -u > error-types.txt"],
+        "alt_solutions": [["grep ERROR app.log | cut -d: -f2 | sort | uniq > error-types.txt"],
+                          ["grep '^ERROR' app.log | cut -d: -f2 | sort -u > error-types.txt"]],
+        "traps": [["grep ERROR app.log | cut -d: -f2 > error-types.txt"], ["cut -d: -f2 app.log | sort -u > error-types.txt"],
+                  ["grep ERROR app.log | cut -d: -f2 | uniq > error-types.txt"]],
+        "expected_files": {"error-types.txt": "db timeout\npayment api 502\nqueue full\n"},
+        "hints": ["ERROR の行だけを選ぶ→メッセージの欄だけにする→並べて重複を除く、の3段階です。",
+                  "grep、区切りを指定する cut、そして重複を除く並べ替え（sort の -u か、sort と uniq の組み合わせ）をパイプでつなぎます。",
+                  _ex(["grep ERROR app.log | cut -d: -f2 | sort -u > error-types.txt"])],
+        "explanation": "uniq だけでは「隣り合った同じ行」しか除けないため、先に sort が必要です。cut の -d は区切り文字、-f は取り出す欄の番号です。",
+        "practice": ["3-4", "6-6", "1-5"],
+    },
+    {
+        "id": "fes-scenarios-14", "level": 2, "title": "2つのサービスのエラーを1つにまとめる",
+        "brief": "web.log と db.log のエラー（ERROR を含む行）を、1つの report.txt にまとめてください。"
+                 "web のエラー、db のエラーの順に並べ、各行は元のログのままにします（ファイル名などを付けません）。",
+        "files": {"web.log": WEB_LOG, "db.log": DB_LOG},
+        "solution": ["grep ERROR web.log > report.txt", "grep ERROR db.log >> report.txt"],
+        "alt_solutions": [["cat web.log db.log | grep ERROR > report.txt"],
+                          ["grep ERROR web.log > report.txt", "grep ERROR db.log >> ./report.txt"]],
+        "traps": [["grep ERROR web.log db.log > report.txt"], ["grep ERROR web.log > report.txt", "grep ERROR db.log > report.txt"],
+                  ["grep ERROR db.log > report.txt", "grep ERROR web.log >> report.txt"]],
+        "expected_files": {"report.txt": "ERROR web 502 from upstream\nERROR web timeout\nERROR db deadlock\nERROR db disk full\n"},
+        "hints": ["2回に分けて追記するか、2つのファイルを先に1つの流れにつなげるか、のどちらかです。",
+                  "grep と、上書きの > ／追記の >> を使い分けます。1つの grep に2ファイルを渡すと、行頭にファイル名が付くので条件に合いません。",
+                  _ex(["grep ERROR web.log > report.txt", "grep ERROR db.log >> report.txt"])],
+        "explanation": "> は毎回上書き、>> は末尾へ追記です。複数ファイルに grep をかけると「ファイル名:」が付くのは便利ですが、そのまま報告に使うと形式が変わります。",
+        "practice": ["6-6", "3-4"],
+    },
+    {
+        "id": "fes-scenarios-15", "level": 3, "title": "10時台に起きたエラーだけを調べる",
+        "brief": "障害は 10 時台に起きたようです。app.log から、2026-11-21 の 10 時台に発生した ERROR の行だけを "
+                 "incident.txt に保存してください。10 時台以外や、数字の 10 をたまたま含むだけの行は含めません。",
+        "files": {"app.log": TIMED_LOG},
+        "solution": ["grep ' 10:' app.log | grep ERROR > incident.txt"],
+        "alt_solutions": [["grep ERROR app.log | grep ' 10:' > incident.txt"],
+                          ["grep '2026-11-21 10:' app.log | grep ERROR > incident.txt"]],
+        "traps": [["grep 10 app.log | grep ERROR > incident.txt"], ["grep ' 10:' app.log > incident.txt"],
+                  ["grep ERROR app.log > incident.txt"]],
+        "expected_files": {"incident.txt": "2026-11-21 10:03:44 ERROR db connection timeout\n"
+                                           "2026-11-21 10:41:09 ERROR payment api returned 502\n"},
+        "hints": ["「時間帯」と「レベル」の2条件。時刻らしさが分かる形で探さないと、無関係な 10 が混ざります。",
+                  "grep を2回つなげます。時間帯は、前に空白、後ろにコロンを付けた「 10:」のような形で探すと、時刻の時の部分に一致します。",
+                  _ex(["grep ' 10:' app.log | grep ERROR > incident.txt"])],
+        "explanation": "短い数字で探すと日付・件数・秒数にも一致します。前後の区切りを含めて「時刻の形」で探すのが、ログ調査での誤検出を防ぐコツです。",
+        "practice": ["3-4", "6-6", "1-5"],
+    },
+    # ====================== デプロイ準備 ======================
+    {
+        "id": "fes-scenarios-16", "level": 2, "title": "新しいリリース用フォルダを用意する",
+        "brief": "releases/v2 というフォルダ（releases もまだありません）を作り、app.py と config.ini をそこへコピーしてください。"
+                 "メモの notes.txt は入れません。元のファイルは残します。",
+        "files": {"app.py": "print('v2')\n", "config.ini": "[main]\nname=demo\n", "notes.txt": "社内メモ\n"},
+        "solution": ["mkdir -p releases/v2", "cp app.py config.ini releases/v2"],
+        "alt_solutions": [["mkdir releases", "mkdir releases/v2", "cp app.py releases/v2", "cp config.ini releases/v2"],
+                          ["mkdir -p releases/v2", "cp app.py releases/v2/app.py", "cp config.ini releases/v2/config.ini"]],
+        "traps": [["mkdir releases/v2", "cp app.py config.ini releases/v2"], ["mkdir -p releases/v2", "cp app.py config.ini notes.txt releases/v2"],
+                  ["mkdir -p releases/v2", "mv app.py config.ini releases/v2"]],
+        "expected_files": {"releases/v2/app.py": "print('v2')\n", "releases/v2/config.ini": "[main]\nname=demo\n",
+                           "app.py": "print('v2')\n", "config.ini": "[main]\nname=demo\n"},
+        "absent": ["releases/v2/notes.txt"],
+        "hints": ["2階層のフォルダを一度に作れる方法があります。そのあと必要なものだけコピーします。",
+                  "mkdir の -p オプションは途中のフォルダも一緒に作ります。cp は複数のファイルを最後の宛先フォルダへ送れます。",
+                  _ex(["mkdir -p releases/v2", "cp app.py config.ini releases/v2"])],
+        "explanation": "-p を付けない mkdir は、親フォルダがないと失敗します。リリース物は「入れるもの」を明示してコピーし、メモなど余計なものを混ぜないのが基本です。",
+        "practice": ["6-6", "2-1"],
+    },
+    {
+        "id": "fes-scenarios-17", "level": 2, "title": "デプロイスクリプトに実行権限を付ける",
+        "brief": "deploy.sh が実行できません。持ち主は読み書き実行、それ以外の人は読み取りと実行だけができる権限にしてください。"
+                 "同じ場所の helper.sh は実行させたくないので、権限を変えません。",
+        "files": {"deploy.sh": "#!/bin/bash\necho deploy\n", "helper.sh": "#!/bin/bash\necho helper\n"},
+        "modes": {"deploy.sh": 0o644, "helper.sh": 0o644},
+        "solution": ["ls -l", "chmod 755 deploy.sh"],
+        "alt_solutions": [["chmod u+x,go+x deploy.sh"], ["chmod a+x deploy.sh"]],
+        "traps": [["chmod 777 deploy.sh"], ["chmod 700 deploy.sh"], ["chmod 755 deploy.sh helper.sh"]],
+        "expected_modes": {"deploy.sh": 0o755, "helper.sh": 0o644},
+        "hints": ["権限は「持ち主・グループ・その他」の3つの組で決まります。必要な組み合わせを数字か記号で表します。",
+                  "chmod を使います。読み=4、書き=2、実行=1 を足した数を3桁並べる方法と、+x のように足す方法があります。対象は deploy.sh だけ。",
+                  _ex(["chmod 755 deploy.sh"])],
+        "explanation": "777 は誰でも書き換えられるため危険です。必要最小限の権限にし、変更後は ls -l で確かめましょう。複数ファイルをまとめて指定すると、変えたくないものまで変わります。",
+        "practice": ["2-8", "6-6"],
+    },
+    {
+        "id": "fes-scenarios-18", "level": 2, "title": "本番用の環境変数を整える",
+        "brief": "本番デプロイの前に環境を整えます。APP_ENV を production、APP_PORT を 8080 にしてください。"
+                 "デバッグ用の DEBUG 変数が設定されたままなので、これは消します（0 などにするのではなく、存在しない状態にします）。",
+        "env": {"DEBUG": "1", "APP_ENV": "staging"},
+        "solution": ["export APP_ENV=production", "export APP_PORT=8080", "unset DEBUG", "env"],
+        "alt_solutions": [["unset DEBUG", "export APP_PORT=8080 APP_ENV=production"], ["export APP_PORT=8080", "export APP_ENV=production", "unset DEBUG", "printenv APP_ENV"]],
+        "traps": [["export APP_ENV=production", "export APP_PORT=8080"], ["export APP_ENV=production", "export APP_PORT=8080", "export DEBUG=0"],
+                  ["export APP_ENV=production", "export APP_PORT=80", "unset DEBUG"]],
+        "expected_env": {"APP_ENV": "production", "APP_PORT": "8080", "DEBUG": None},
+        "hints": ["値を変える・足す・消す、の3つの操作が必要です。",
+                  "設定と更新は export、完全に消すのは unset です。0 を入れても「存在しない」ことにはなりません。",
+                  _ex(["export APP_ENV=production", "export APP_PORT=8080", "unset DEBUG"])],
+        "explanation": "環境変数は「ある・ない」で意味が変わるものがあります。DEBUG=0 でも、変数があるだけで有効と判断するプログラムもあるため、無効にしたいときは unset で消します。",
+        "practice": ["6-5", "6-6"],
+    },
+    {
+        "id": "fes-scenarios-19", "level": 2, "title": "デプロイ用のツールを導入する",
+        "brief": "このサーバーには curl と jq が入っていません。2つとも使える状態にし、jq が使える場所を確認してください。",
+        "solution": ["sudo apt update", "sudo apt install curl jq", "which jq"],
+        "alt_solutions": [["sudo apt update", "sudo apt install -y curl jq", "which jq"],
+                          ["sudo apt update", "sudo apt install curl", "sudo apt install jq", "which jq"]],
+        "traps": [["sudo apt install curl jq", "which jq"], ["sudo apt update", "sudo apt install curl", "which jq"],
+                  ["sudo apt update", "sudo apt install curl jq"]],
+        "packages": ["curl", "jq"],
+        "checks_commands": [["which jq"]],
+        "hints": ["ソフトを入れる前に、取得できるソフトの一覧を最新にする必要があります。",
+                  "管理者権限（sudo）で apt を使います。一覧の更新と、実際に入れる操作は別のサブコマンドです。確認は which。",
+                  _ex(["sudo apt update", "sudo apt install curl jq", "which jq"])],
+        "explanation": "apt update は一覧の更新、apt install が本体の導入です。更新を忘れると一覧が古くて失敗することがあります。入れた後に which で場所を確かめると、使える状態か分かります。",
+        "practice": ["4-8", "6-6"],
+    },
+    {
+        "id": "fes-scenarios-20", "level": 3, "title": "デプロイ前の確認を終えてから合図を書く",
+        "brief": "デプロイの前に、ディスクの空きと、メモリの空きの両方を人が読める単位で確認してください。"
+                 "確認を終えたら、その後で checklist.txt に ready とだけ書いてください。確認の前に書いてはいけません。",
+        "solution": ["df -h", "free -h", "echo ready > checklist.txt"],
+        "alt_solutions": [["free -h", "df -h", "echo 'ready' > checklist.txt"], ["df -h", "free -h", 'echo "ready" > checklist.txt']],
+        "traps": [["echo ready > checklist.txt", "df -h", "free -h"], ["df -h", "echo ready > checklist.txt"],
+                  ["df -h", "free -h"]],
+        "expected_files": {"checklist.txt": "ready\n"},
+        "ordered_commands": [["df -h", "free -h"], ["free -h", "df -h"], ["echo ready > checklist.txt", "echo 'ready' > checklist.txt", 'echo "ready" > checklist.txt']],
+        "checks_commands": [["df -h"], ["free -h"]],
+        "hints": ["ディスクとメモリは別の道具で調べます。合図は最後です。",
+                  "ディスクは df、メモリは free。どちらも人が読みやすい単位にする -h を付けます。合図は echo と > で書きます。",
+                  _ex(["df -h", "free -h", "echo ready > checklist.txt"])],
+        "explanation": "チェックリストは「確認した証拠」を残すためのものです。先に書いてしまうと意味がありません。-h は human-readable（MB や GB で表示）の略です。",
+        "practice": ["3-8", "6-6"],
+    },
+    {
+        "id": "fes-scenarios-21", "level": 2, "title": "テンプレートから設定を作って1行足す",
+        "brief": "app.conf.template を元に本番用の app.conf を作ってください。内容はテンプレートそのままに、末尾に workers=4 を1行足します。"
+                 "テンプレート自体は変更しません。",
+        "files": {"app.conf.template": "port=8080\nmode=production\n"},
+        "solution": ["cp app.conf.template app.conf", "echo workers=4 >> app.conf"],
+        "alt_solutions": [["cat app.conf.template > app.conf", "echo workers=4 >> app.conf"],
+                          ["cp app.conf.template app.conf", "echo 'workers=4' >> app.conf", "cat app.conf"]],
+        "traps": [["cp app.conf.template app.conf", "echo workers=4 > app.conf"], ["echo workers=4 >> app.conf.template", "cp app.conf.template app.conf"],
+                  ["echo workers=4 > app.conf"]],
+        "expected_files": {"app.conf": "port=8080\nmode=production\nworkers=4\n", "app.conf.template": "port=8080\nmode=production\n"},
+        "hints": ["まず元の内容ごと複製し、そのあと足します。",
+                  "複製は cp。末尾への追加は echo と、追記のリダイレクト（>>）です。> だと中身が置き換わります。",
+                  _ex(["cp app.conf.template app.conf", "echo workers=4 >> app.conf"])],
+        "explanation": "テンプレートは「ひな形」なので直接編集しません。複製してから足す、という流れで、元を壊さずに環境ごとの設定を作れます。",
+        "practice": ["6-6", "2-1"],
+    },
+    # ====================== 設定の巻き戻し ======================
+    {
+        "id": "fes-scenarios-22", "level": 2, "title": "壊れた設定を残したまま巻き戻す",
+        "brief": "app.conf の変更でサービスが止まりました。原因調査のため、いまの壊れた app.conf は app.conf.broken として残し、"
+                 "app.conf は app.conf.good の内容に戻してください。",
+        "files": {"app.conf": "port=99999\nmode=broken\n", "app.conf.good": APP_CONF},
+        "solution": ["mv app.conf app.conf.broken", "cp app.conf.good app.conf"],
+        "alt_solutions": [["cp app.conf app.conf.broken", "cp app.conf.good app.conf"],
+                          ["cp app.conf app.conf.broken", "rm app.conf", "cp app.conf.good app.conf"]],
+        "traps": [["cp app.conf.good app.conf", "cp app.conf app.conf.broken"], ["cp app.conf.good app.conf"],
+                  ["mv app.conf.good app.conf"]],
+        "expected_files": {"app.conf": APP_CONF, "app.conf.good": APP_CONF, "app.conf.broken": "port=99999\nmode=broken\n"},
+        "hints": ["戻す前に、いまの壊れた状態を別名で残します。順番が結果を左右します。",
+                  "名前を変えるなら mv、複製なら cp。そのあと、良い版を app.conf の位置に複製します。",
+                  _ex(["mv app.conf app.conf.broken", "cp app.conf.good app.conf"])],
+        "explanation": "先に復元すると壊れた版が上書きで消え、原因調査ができません。「証拠を残してから戻す」が障害対応の基本です。",
+        "practice": ["6-6", "1-5"],
+    },
+    {
+        "id": "fes-scenarios-23", "level": 2, "title": "前のリリースの設定をまとめて戻す",
+        "brief": "新しいリリースでうまく動かなくなったので、前のバージョン（releases/v1）の .conf ファイルをすべて、"
+                 "いまの作業フォルダに戻してください（同名のファイルは置き換えます）。releases/v1 の中身は残します。",
+        "files": {"web.conf": "listen=9090\n", "db.conf": "host=wrong.example.test\n",
+                  "releases/v1/web.conf": "listen=80\n", "releases/v1/db.conf": "host=db.example.test\n",
+                  "releases/v1/README": "v1 release notes\n"},
+        "solution": ["cp releases/v1/*.conf ."],
+        "alt_solutions": [["cp releases/v1/web.conf releases/v1/db.conf ."], ["cp releases/v1/web.conf web.conf", "cp releases/v1/db.conf db.conf"]],
+        "traps": [["mv releases/v1/*.conf ."], ["cp releases/v1/web.conf ."], ["cp releases/v1/* ."]],
+        "expected_files": {"web.conf": "listen=80\n", "db.conf": "host=db.example.test\n",
+                           "releases/v1/web.conf": "listen=80\n", "releases/v1/db.conf": "host=db.example.test\n"},
+        "absent": ["README"],
+        "hints": ["戻したいのは .conf だけ。1つずつでも、まとめてでもできますが、元（v1）は動かしません。",
+                  "cp にワイルドカードを使い、宛先は今いる場所（. で表せます）にします。",
+                  _ex(["cp releases/v1/*.conf ."])],
+        "explanation": ". は「いまのフォルダ」を表します。mv で戻すと v1 側が空になり、次に巻き戻すときの手がかりを失います。README まで混ざらないよう、拡張子を指定します。",
+        "practice": ["6-6", "2-1"],
+    },
+    {
+        "id": "fes-scenarios-24", "level": 3, "title": "混入したデバッグ設定だけを取り除く",
+        "brief": "app.conf に誤って debug=true の行が足されました。この1行だけを取り除き、それ以外の行（順番も含む）は元のままにしてください。"
+                 "作業用に作ったファイルは残さないでください。",
+        "files": {"app.conf": "port=8080\ndebug=true\nmode=production\nworkers=4\n"},
+        "solution": ["grep -v debug=true app.conf > app.new", "mv app.new app.conf"],
+        "alt_solutions": [["grep -v debug=true app.conf > app.new", "cp app.new app.conf", "rm app.new"],
+                          ["grep -v debug app.conf > app.new", "mv app.new app.conf"]],
+        "traps": [["grep -v port=8080 app.conf > app.new", "mv app.new app.conf"], ["grep -v debug=true app.conf > app.new"], ["grep debug=true app.conf > app.new", "mv app.new app.conf"]],
+        "expected_files": {"app.conf": "port=8080\nmode=production\nworkers=4\n"},
+        "absent": ["app.new"],
+        "hints": ["不要な行を除いた内容を、一度別のファイルに作って差し替える、が安全です。",
+                  "除外は grep -v。入力と同じファイルに > で出力すると中身が先に消えるので、別名で書き出してから mv で置き換えます。",
+                  _ex(["grep -v debug=true app.conf > app.new", "mv app.new app.conf"])],
+        "explanation": "同じファイルを読みながら > で書くと、読む前に空になってしまいます。「別名に書く→差し替える」はファイルを安全に書き換える定番の手順です。",
+        "practice": ["6-6", "3-4"],
+    },
+    {
+        "id": "fes-scenarios-25", "level": 3, "title": "壊れたタイムアウト値だけを直す",
+        "brief": "app.conf の timeout=1 が短すぎて障害になっています。timeout の行を timeout=30 にしてください。"
+                 "ほかの設定はそのまま残します（行の順番は問いません）。作業用ファイルは残さないでください。",
+        "files": {"app.conf": "port=8080\ntimeout=1\nmode=production\nworkers=4\n"},
+        "solution": ["grep -v timeout app.conf > app.new", "echo timeout=30 >> app.new", "mv app.new app.conf"],
+        "alt_solutions": [["grep -v timeout= app.conf > app.new", "echo timeout=30 >> app.new", "cp app.new app.conf", "rm app.new"]],
+        "traps": [["echo timeout=30 >> app.conf"], ["grep -v timeout app.conf > app.new", "mv app.new app.conf"],
+                  ["echo timeout=30 > app.conf"]],
+        "expected_files": {"app.conf": "port=8080\nmode=production\nworkers=4\ntimeout=30\n"},
+        "absent": ["app.new"],
+        "hints": ["古い行を取り除き、新しい行を足す、の2つの操作です。",
+                  "grep -v で除いた内容を別名へ、echo と >> で新しい値を足し、mv か cp で本物へ反映します。",
+                  _ex(["grep -v timeout app.conf > app.new", "echo timeout=30 >> app.new", "mv app.new app.conf"])],
+        "explanation": "追記だけでは古い timeout=1 が残り、設定の書き方によっては最初か最後のどちらが有効になるか分からなくなります。同じ設定が2つある状態は避けます。",
+        "practice": ["6-6", "3-4"],
+    },
+    {
+        "id": "fes-scenarios-26", "level": 2, "title": "巻き戻した内容をその場で確認する",
+        "brief": "app.conf を backup/app.conf.bak の内容に戻してください。戻した後に、実際の内容を画面で確認するところまでが作業です。",
+        "files": {"app.conf": "port=1\nmode=broken\n", "backup/app.conf.bak": APP_CONF},
+        "solution": ["cp backup/app.conf.bak app.conf", "cat app.conf"],
+        "alt_solutions": [["cp backup/app.conf.bak app.conf", "cat -n app.conf"]],
+        "traps": [["cat app.conf", "cp backup/app.conf.bak app.conf"], ["cp backup/app.conf.bak app.conf"],
+                  ["cat backup/app.conf.bak", "cp app.conf backup/app.conf.bak"]],
+        "expected_files": {"app.conf": APP_CONF, "backup/app.conf.bak": APP_CONF},
+        "ordered_commands": [["cp backup/app.conf.bak app.conf"], ["cat app.conf", "cat -n app.conf", "cat ./app.conf"]],
+        "hints": ["戻す作業と、確認の作業。確認は戻したあとです。",
+                  "復元はコピー（cp）。内容を画面に出すのは cat です。",
+                  _ex(["cp backup/app.conf.bak app.conf", "cat app.conf"])],
+        "explanation": "戻したつもりでも向きを間違えていることがあります。作業の最後に cat で中身を確かめるのは、慣れていても省かない習慣です。",
+        "practice": ["6-6", "1-5"],
+    },
+    # ====================== 権限の点検 ======================
+    {
+        "id": "fes-scenarios-27", "level": 1, "title": "秘密鍵の権限を正しくする",
+        "brief": "keys/deploy_key（秘密鍵）が誰でも読める状態になっています。持ち主だけが読み書きでき、他の人は何もできない権限にしてください。"
+                 "公開鍵 keys/deploy_key.pub は誰でも読めてよいので、変えません。",
+        "files": {"keys/deploy_key": "DUMMY-NOT-A-REAL-KEY\n", "keys/deploy_key.pub": "ssh-ed25519 DUMMY-PUBLIC-KEY deploy@example.test\n"},
+        "modes": {"keys/deploy_key": 0o644, "keys/deploy_key.pub": 0o644},
+        "solution": ["ls -l keys", "chmod 600 keys/deploy_key"],
+        "alt_solutions": [["chmod go-rwx keys/deploy_key"], ["chmod u=rw,go= keys/deploy_key"]],
+        "traps": [["chmod 600 keys/deploy_key keys/deploy_key.pub"], ["chmod 400 keys/deploy_key"], ["chmod 700 keys/deploy_key"]],
+        "expected_modes": {"keys/deploy_key": 0o600, "keys/deploy_key.pub": 0o644},
+        "hints": ["「持ち主だけ」「読み書きだけ」の組み合わせを考えます。公開鍵は対象外。",
+                  "chmod で、持ち主に読み(4)＋書き(2)を足した数と、グループ・その他の0を並べます。",
+                  _ex(["chmod 600 keys/deploy_key"])],
+        "explanation": "秘密鍵が他人に読めると、ssh は安全でないとして使用を拒否します。実行権が不要なファイルに x を付けないのも、権限の基本です。",
+        "practice": ["2-8", "4-8"],
+    },
+    {
+        "id": "fes-scenarios-28", "level": 2, "title": "誰でも書き換えられるファイルを塞ぐ",
+        "brief": "public フォルダの index.html と app.js が、誰でも書き換えられる権限になっています（666）。"
+                 "持ち主は読み書き、他の人は読み取りだけの権限にしてください。すでに適切な readme.txt には触れません。",
+        "files": {"public/index.html": "<h1>demo</h1>\n", "public/app.js": "console.log('demo')\n", "public/readme.txt": "公開用\n"},
+        "modes": {"public/index.html": 0o666, "public/app.js": 0o666, "public/readme.txt": 0o644},
+        "solution": ["ls -l public", "chmod 644 public/index.html public/app.js"],
+        "alt_solutions": [["chmod go-w public/index.html public/app.js"], ["chmod 644 public/*.html public/*.js"]],
+        "traps": [["chmod 600 public/index.html public/app.js"], ["chmod o-w public/index.html public/app.js"],
+                  ["chmod 644 public/index.html"]],
+        "expected_modes": {"public/index.html": 0o644, "public/app.js": 0o644, "public/readme.txt": 0o644},
+        "hints": ["書き込みを許す相手を、持ち主だけに絞ります。",
+                  "chmod で、数字で 644 を指定するか、グループとその他から書き込みを外す記号の指定をします。2つのファイルとも対象です。",
+                  _ex(["chmod 644 public/index.html public/app.js"])],
+        "explanation": "go-w は「グループとその他から書き込みを外す」、o-w は「その他だけ」です。666 から o-w だけだと 664 になり、グループには書き込みが残ります。",
+        "practice": ["2-8", "6-6"],
+    },
+    {
+        "id": "fes-scenarios-29", "level": 3, "title": "公開前の権限を点検して整える",
+        "brief": "公開前に権限を点検します。まず権限つきの一覧で状態を確認してください。そのうえで、秘密の設定 secrets.env は持ち主だけが読み書き、"
+                 "実行したい run.sh は持ち主が読み書き実行・他の人は読み取りと実行、index.html は持ち主が読み書き・他の人は読み取りだけにします。",
+        "files": {"secrets.env": "API_TOKEN=TRAINING_ONLY_NOT_A_SECRET\n", "run.sh": "#!/bin/bash\necho run\n", "index.html": "<p>ok</p>\n"},
+        "modes": {"secrets.env": 0o666, "run.sh": 0o644, "index.html": 0o664},
+        "solution": ["ls -l", "chmod 600 secrets.env", "chmod 755 run.sh", "chmod 644 index.html"],
+        "alt_solutions": [["ls -l", "chmod u=rw,go= secrets.env", "chmod a+x run.sh", "chmod g-w index.html"]],
+        "traps": [["chmod 600 secrets.env", "chmod 755 run.sh", "chmod 644 index.html"], ["ls -l", "chmod 600 secrets.env", "chmod 755 run.sh"],
+                  ["ls -l", "chmod 644 secrets.env", "chmod 755 run.sh", "chmod 644 index.html"]],
+        "expected_modes": {"secrets.env": 0o600, "run.sh": 0o755, "index.html": 0o644},
+        "checks_commands": [["ls -l"]],
+        "hints": ["一覧で現状を見てから、3つのファイルをそれぞれの用途に合わせて設定します。",
+                  "一覧は ls の -l、変更は chmod。秘密は600、実行するものは755、公開する文書は644が定番です。",
+                  _ex(["ls -l", "chmod 600 secrets.env", "chmod 755 run.sh", "chmod 644 index.html"])],
+        "explanation": "権限の点検は「見る→直す→もう一度見る」。ファイルの用途（秘密・実行・公開）ごとに、必要最小限の権限を割り当てます。",
+        "practice": ["2-8", "4-8", "6-6"],
+    },
+    {
+        "id": "fes-scenarios-30", "level": 2, "title": "共有設定のグループ書き込みを外す",
+        "brief": "shared フォルダの3つの .conf ファイルは、グループにも書き込みが許されています（664）。"
+                 "持ち主は読み書き、グループとその他は読み取りだけにしてください。",
+        "files": {"shared/web.conf": "a=1\n", "shared/db.conf": "b=2\n", "shared/cache.conf": "c=3\n"},
+        "modes": {"shared/web.conf": 0o664, "shared/db.conf": 0o664, "shared/cache.conf": 0o664},
+        "solution": ["chmod 644 shared/web.conf shared/db.conf shared/cache.conf"],
+        "alt_solutions": [["chmod g-w shared/*.conf"], ["chmod 644 shared/*.conf"]],
+        "traps": [["chmod o-w shared/*.conf"], ["chmod 600 shared/*.conf"], ["chmod 644 shared/web.conf shared/db.conf"]],
+        "expected_modes": {"shared/web.conf": 0o644, "shared/db.conf": 0o644, "shared/cache.conf": 0o644},
+        "hints": ["外したいのは「グループ」の書き込みです。3つ全部が対象。",
+                  "chmod に、数字（持ち主は読み書き、他は読みのみ）か、g（グループ）から w を外す記号を渡します。ワイルドカードも使えます。",
+                  _ex(["chmod 644 shared/web.conf shared/db.conf shared/cache.conf"])],
+        "explanation": "権限の3組は 持ち主(u)・グループ(g)・その他(o) の順です。664 からその他の w を外しても変わらないのは、もともとその他に書き込みがないからです。",
+        "practice": ["2-8", "6-6"],
+    },
+    {
+        "id": "fes-scenarios-31", "level": 2, "title": "用途に合わせて権限を変える",
+        "brief": "backup.sh は持ち主だけが読み書き実行でき、他の人は何もできない権限にしてください。"
+                 "また、保管用の report.txt は誰も書き換えられないよう、全員が読み取りだけの権限にします。",
+        "files": {"backup.sh": "#!/bin/bash\necho backup\n", "report.txt": "2026-11 月次報告\n"},
+        "modes": {"backup.sh": 0o644, "report.txt": 0o644},
+        "solution": ["chmod 700 backup.sh", "chmod 444 report.txt"],
+        "alt_solutions": [["chmod u=rwx,go= backup.sh", "chmod a-w report.txt"], ["chmod 700 backup.sh", "chmod ugo-w report.txt"]],
+        "traps": [["chmod +x backup.sh", "chmod 444 report.txt"], ["chmod 700 backup.sh", "chmod 400 report.txt"], ["chmod 770 backup.sh", "chmod 444 report.txt"]],
+        "expected_modes": {"backup.sh": 0o700, "report.txt": 0o444},
+        "hints": ["スクリプトは「持ち主のみ・全部できる」、保管文書は「全員・読みのみ」です。",
+                  "chmod を、数字（7=読み書き実行、4=読み、0=なし）か記号で使います。",
+                  _ex(["chmod 700 backup.sh", "chmod 444 report.txt"])],
+        "explanation": "権限の数字は 読み4・書き2・実行1 の合計です。7=4+2+1、4=読み取りのみ、0=何もなし。+x だけだと全員に実行権が付くので、持ち主だけに限りたいときは数字で指定します。",
+        "practice": ["2-8", "6-6"],
+    },
+    # ====================== 環境構築 ======================
+    {
+        "id": "fes-scenarios-32", "level": 2, "title": "プロジェクトの骨組みを作る",
+        "brief": "project フォルダ（まだ存在しません）の中に、src、logs、config の3つのフォルダを作ってください。"
+                 "さらに project/README.md、project/src/main.py、project/logs/app.log を空のファイルで作り、project/config/app.conf には debug=false の1行を書きます。",
+        "solution": ["mkdir -p project/src project/logs project/config", "touch project/README.md project/src/main.py project/logs/app.log",
+                     "echo debug=false > project/config/app.conf"],
+        "alt_solutions": [["mkdir project", "mkdir project/src", "mkdir project/logs", "mkdir project/config", "touch project/README.md",
+                           "touch project/src/main.py", "touch project/logs/app.log", "echo debug=false > project/config/app.conf"]],
+        "traps": [["mkdir project/src project/logs project/config", "touch project/README.md"],
+                  ["mkdir -p project/src project/logs project/config", "touch project/README.md project/src/main.py"],
+                  ["mkdir -p project/src project/config", "touch project/README.md project/src/main.py project/logs/app.log", "echo debug=false > project/config/app.conf"]],
+        "expected_files": {"project/README.md": "", "project/src/main.py": "", "project/logs/app.log": "", "project/config/app.conf": "debug=false\n"},
+        "checks_commands": [],
+        "hints": ["フォルダを先に、ファイルを後に。親が無いところにはファイルを作れません。",
+                  "mkdir の -p で一度に階層を作れます。空のファイルは touch、1行の内容は echo と > で作ります。logs フォルダも忘れずに。",
+                  _ex(["mkdir -p project/src project/logs project/config", "touch project/README.md project/src/main.py",
+                       "echo debug=false > project/config/app.conf"])],
+        "explanation": "touch は空のファイルを作る（既にあれば更新日時を更新する）コマンドです。環境構築は「フォルダ→空ファイル→初期内容」の順に整えるとミスが減ります。",
+        "practice": ["2-1", "6-6"],
+    },
+    {
+        "id": "fes-scenarios-33", "level": 3, "title": "秘密を入れた .env を安全に作る",
+        "brief": "アプリ用の設定ファイル .env を作ってください。1行目は APP_ENV=development、2行目は DB_HOST=db.example.test にします。"
+                 "このファイルは秘密を含むので、持ち主だけが読み書きできる権限にしてください。",
+        "solution": ["echo APP_ENV=development > .env", "echo DB_HOST=db.example.test >> .env", "chmod 600 .env"],
+        "alt_solutions": [["echo APP_ENV=development > .env", "echo DB_HOST=db.example.test >> .env", "chmod u=rw,go= .env", "ls -l"],
+                          ["touch .env", "chmod 600 .env", "echo APP_ENV=development >> .env", "echo DB_HOST=db.example.test >> .env"]],
+        "traps": [["echo APP_ENV=development > .env", "echo DB_HOST=db.example.test > .env", "chmod 600 .env"],
+                  ["echo APP_ENV=development > .env", "echo DB_HOST=db.example.test >> .env"],
+                  ["echo APP_ENV=development > .env", "echo DB_HOST=db.example.test >> .env", "chmod 644 .env"]],
+        "expected_files": {".env": "APP_ENV=development\nDB_HOST=db.example.test\n"},
+        "expected_modes": {".env": 0o600},
+        "hints": ["1行目は新しく書き、2行目は足します。最後に権限を絞ります。",
+                  "echo と、1行目は > 、2行目は >> を使います。権限は chmod で、持ち主だけ読み書き（6）に。",
+                  _ex(["echo APP_ENV=development > .env", "echo DB_HOST=db.example.test >> .env", "chmod 600 .env"])],
+        "explanation": "> は上書き、>> は追記。2行目も > で書くと1行目が消えます。名前が . で始まるファイルは通常の ls に出ません（-a で表示）。秘密を含むファイルは作った直後に権限を絞る習慣をつけましょう。",
+        "practice": ["2-8", "6-6", "1-5"],
+    },
+    {
+        "id": "fes-scenarios-34", "level": 3, "title": "自作ツールを PATH に追加する",
+        "brief": "自作のスクリプト tools/hello.sh を、自分用のコマンド置き場 bin フォルダ（まだありません）に置いてください。"
+                 "持ち主が読み書き実行、他の人は読み取りと実行ができる権限にします。さらに、bin を PATH の末尾に追加して、"
+                 "元の PATH の内容は失わないようにします（bin は /home/learner/bin）。",
+        "files": {"tools/hello.sh": "#!/bin/bash\necho hello\n"},
+        "solution": ["mkdir bin", "cp tools/hello.sh bin", "chmod 755 bin/hello.sh", "export PATH=$PATH:/home/learner/bin"],
+        "alt_solutions": [["mkdir bin", "cp tools/hello.sh bin", "chmod 755 bin/hello.sh", "export PATH=$PATH:$HOME/bin"],
+                          ["mkdir bin", "mv tools/hello.sh bin", "chmod 755 bin/hello.sh", 'export PATH="$PATH:/home/learner/bin"']],
+        "traps": [["mkdir bin", "cp tools/hello.sh bin", "chmod 755 bin/hello.sh", "export PATH=/home/learner/bin"],
+                  ["mkdir bin", "cp tools/hello.sh bin", "export PATH=$PATH:/home/learner/bin"],
+                  ["mkdir bin", "cp tools/hello.sh bin", "chmod 755 bin/hello.sh", "export PATH=/home/learner/bin:$PATH"]],
+        "expected_files": {"bin/hello.sh": "#!/bin/bash\necho hello\n"},
+        "expected_modes": {"bin/hello.sh": 0o755},
+        "expected_env": {"PATH": "/usr/local/bin:/usr/bin:/bin:/home/learner/bin"},
+        "hints": ["置き場の用意、ファイルの設置、実行権限、PATH の追加、の4つです。PATH は「元の値に足す」ことが大切です。",
+                  "mkdir、cp、chmod、そして export。PATH の値には、元の値を表す $PATH を書き、: で区切って bin を後ろに足します。",
+                  _ex(["mkdir bin", "cp tools/hello.sh bin", "chmod 755 bin/hello.sh", "export PATH=$PATH:/home/learner/bin"])],
+        "explanation": "PATH は「コマンドを探す場所のリスト」で、: で区切ります。= の右側を新しい値だけにすると、ls や cp が見つからなくなります。自分の場所は末尾か先頭に足し、既存の値は必ず引き継ぎます。",
+        "practice": ["6-5", "2-8", "6-6"],
+    },
+    {
+        "id": "fes-scenarios-35", "level": 2, "title": "不要な環境変数だけを片付ける",
+        "brief": "古い検証作業のせいで、DEBUG と HTTP_PROXY という環境変数が残っています。この2つを消してください。"
+                 "ただし、APP_ENV（staging）は今も必要なのでそのまま残します。",
+        "env": {"DEBUG": "1", "HTTP_PROXY": "http://proxy.example.test:8080", "APP_ENV": "staging"},
+        "solution": ["env", "unset DEBUG", "unset HTTP_PROXY"],
+        "alt_solutions": [["printenv", "unset DEBUG HTTP_PROXY"], ["unset HTTP_PROXY", "unset DEBUG", "env"]],
+        "traps": [["unset DEBUG"], ["unset DEBUG", "unset HTTP_PROXY", "unset APP_ENV"], ["export DEBUG=", "export HTTP_PROXY="]],
+        "expected_env": {"DEBUG": None, "HTTP_PROXY": None, "APP_ENV": "staging"},
+        "hints": ["まず現状を見る。そして、消す2つだけを狙って消します。",
+                  "現状の確認は env（または printenv）、消すのは unset。変数名には $ を付けません。",
+                  _ex(["env", "unset DEBUG", "unset HTTP_PROXY"])],
+        "explanation": "export DEBUG= のように空にしても、変数は「空の値で存在している」状態です。完全に消したいときは unset を使います。",
+        "practice": ["6-5", "6-6"],
+    },
+    {
+        "id": "fes-scenarios-36", "level": 2, "title": "調査用ツールを入れて構成を確認する",
+        "brief": "新しいサーバーに、フォルダ構造を見やすく表示する道具と、JSON を扱う道具（jq）を導入してください。"
+                 "入れたら、project フォルダの構造を実際に表示して確認します。",
+        "files": {"project/src/main.py": "print('hi')\n", "project/config/app.conf": "debug=false\n", "project/README.md": "# demo\n"},
+        "solution": ["sudo apt update", "sudo apt install tree jq", "tree project"],
+        "alt_solutions": [["sudo apt update", "sudo apt install -y tree jq", "tree ./project"],
+                          ["sudo apt update", "sudo apt install tree", "sudo apt install jq", "tree /home/learner/project"]],
+        "traps": [["sudo apt install tree jq", "tree project"], ["sudo apt update", "sudo apt install tree", "tree project"],
+                  ["sudo apt update", "sudo apt install tree jq", "ls project"]],
+        "packages": ["tree", "jq"],
+        "checks_commands": [["tree project", "tree ./project", "tree /home/learner/project"]],
+        "hints": ["道具の導入には、一覧の更新が先に必要です。導入後に、実際に使って動作を確かめます。",
+                  "sudo apt で更新と導入を行い、フォルダの木構造を見せる道具に project を渡します。",
+                  _ex(["sudo apt update", "sudo apt install tree jq", "tree project"])],
+        "explanation": "入れただけで安心せず、使ってみて確認するのが実務の流れです。tree はフォルダの階層を一目で見られるので、作業の前後で構成が変わったかの確認に役立ちます。",
+        "practice": ["4-8", "6-6"],
+    },
+    # ====================== プロセスと後始末 ======================
+    {
+        "id": "fes-scenarios-37", "level": 3, "title": "暴走した処理だけを止める",
+        "brief": "サーバーの CPU が張り付いています。ほぼ100%を使っている python3 leak.py を見つけて止めてください。"
+                 "止めたあとに、本当に消えたかも確かめます。稼働中の Web サービス（gunicorn）と、システムの cron は止めてはいけません。",
+        "processes": [{"pid": 4321, "user": "learner", "cmd": "python3 leak.py", "cpu": 99.0, "mem": 12.5, "ignores_term": True},
+                      {"pid": 4400, "user": "learner", "cmd": "gunicorn app:app", "cpu": 4.0, "mem": 8.0}],
+        "solution": ["ps aux", "kill 4321", "ps aux", "kill -9 4321", "ps aux"],
+        "alt_solutions": [["pgrep leak", "kill -9 4321", "ps aux"], ["ps aux", "kill -KILL 4321", "ps aux"]],
+        "traps": [["ps aux", "kill 4321"], ["ps aux", "kill -9 4321 4400"], ["ps aux", "kill -9 4400"]],
+        "process_gone": ["leak.py"],
+        "process_kept": ["gunicorn", "cron"],
+        "checks_commands": [["ps aux"]],
+        "hints": ["CPU の使用率で犯人を特定し、止め、止まったことを確認します。",
+                  "ps aux で PID を調べます。kill は、まず穏やかな合図で試し、それで止まらないときだけ強制的な合図（-9）を使います。無関係なプロセスは巻き込みません。",
+                  _ex(["ps aux", "kill 4321", "ps aux", "kill -9 4321", "ps aux"])],
+        "explanation": "通常の kill はプロセスに「終了してください」と頼むだけで、無視されることがあります。-9（KILL）は強制ですが、後始末ができないので最後の手段です。必ず ps で止まったことを確かめます。",
+        "practice": ["3-5", "3-7"],
+    },
+    {
+        "id": "fes-scenarios-38", "level": 3, "title": "止まったバックアップとロックを片付ける",
+        "brief": "フルバックアップ（backup.sh --full）が固まっていて、次のバックアップを妨げるロックファイル backup.lock が残っています。"
+                 "固まったプロセスを止め、ロックファイルを削除してください。夜間の差分バックアップ（backup.sh --incremental）と cron は止めません。",
+        "files": {"backup.lock": "pid=7100\n", "backup.sh": "#!/bin/bash\n"},
+        "processes": [{"pid": 7100, "user": "learner", "cmd": "backup.sh --full", "cpu": 0.0, "mem": 2.0},
+                      {"pid": 7200, "user": "learner", "cmd": "backup.sh --incremental", "cpu": 1.0, "mem": 1.0}],
+        "solution": ["ps aux", "cat backup.lock", "kill 7100", "ps aux", "rm backup.lock"],
+        "alt_solutions": [["pgrep backup", "kill 7100", "rm backup.lock"], ["cat backup.lock", "kill 7100", "rm backup.lock", "ps aux"]],
+        "traps": [["rm backup.lock"], ["kill 7100"], ["kill 7100 7200", "rm backup.lock"], ["kill 7100", "rm backup.lock", "rm backup.sh"]],
+        "process_gone": ["backup.sh --full"],
+        "process_kept": ["backup.sh --incremental", "cron"],
+        "absent": ["backup.lock"],
+        "expected_files": {"backup.sh": "#!/bin/bash\n"},
+        "hints": ["ロックを消す前に、そのロックを持つプロセスが止まっていることが大事です。残すプロセスと区別します。",
+                  "ps aux でどれが --full か調べ、kill で止めます。ロックファイルの中身（PID）も cat で確認できます。そのあと rm でロックを削除します。",
+                  _ex(["ps aux", "cat backup.lock", "kill 7100", "ps aux", "rm backup.lock"])],
+        "explanation": "ロックファイルは「いま実行中」の目印です。プロセスが生きているのにロックを消すと二重実行になります。止めてから消す、の順を守ります。",
+        "practice": ["3-5", "3-7", "6-6"],
+    },
+    {
+        "id": "fes-scenarios-39", "level": 2, "title": "一時ファイルだけを消して空き容量を作る",
+        "brief": "ディスクが逼迫しています。work フォルダの拡張子 .tmp のファイルだけを削除してください。"
+                 "report.csv と、名前に tmp を含む tmp-notes.txt は必要なので残します。削除前に、フォルダの使用量を確認してください。",
+        "files": {"work/a.tmp": "x" * 50 + "\n", "work/b.tmp": "y" * 50 + "\n", "work/report.csv": "id,total\n1,100\n",
+                  "work/tmp-notes.txt": "引き継ぎメモ\n"},
+        "solution": ["du -sh work", "rm work/*.tmp"],
+        "alt_solutions": [["du -h work", "rm work/a.tmp work/b.tmp"], ["du -sh work", "cd work", "rm *.tmp", "cd .."]],
+        "traps": [["rm work/*.tmp"], ["du -sh work", "rm work/*tmp*"], ["du -sh work", "rm work/*"]],
+        "absent": ["work/a.tmp", "work/b.tmp"],
+        "expected_files": {"work/report.csv": "id,total\n1,100\n", "work/tmp-notes.txt": "引き継ぎメモ\n"},
+        "checks_commands": [["du -sh work", "du -h work", "du -sh ./work", "du work"]],
+        "hints": ["先に使用量を確認する、が条件です。消すのは「.tmp で終わるもの」だけ。",
+                  "使用量は du（フォルダ単位の合計は -s、読みやすい単位は -h）。削除は rm と、末尾を指定したワイルドカードです。",
+                  _ex(["du -sh work", "rm work/*.tmp"])],
+        "explanation": "*tmp* は名前の途中の tmp にも一致するので、tmp-notes.txt まで消えます。ワイルドカードは「何に一致するか」を考えてから使います。",
+        "practice": ["3-8", "2-6"],
+    },
+    {
+        "id": "fes-scenarios-40", "level": 3, "title": "古い月のログを archive に移す",
+        "brief": "logs フォルダの 2026年10月分のログ（app-2026-10-で始まるもの）を、archive フォルダ（まだありません）へ移してください。"
+                 "11月分は logs に残します。移した後も、10月分のログの内容は失われてはいけません。",
+        "files": {"logs/app-2026-10-01.log": "oct 1\n", "logs/app-2026-10-15.log": "oct 15\n", "logs/app-2026-10-31.log": "oct 31\n",
+                  "logs/app-2026-11-01.log": "nov 1\n", "logs/app-2026-11-20.log": "nov 20\n"},
+        "solution": ["mkdir archive", "mv logs/app-2026-10-*.log archive"],
+        "alt_solutions": [["mkdir archive", "mv logs/app-2026-10-01.log logs/app-2026-10-15.log logs/app-2026-10-31.log archive"],
+                          ["mkdir archive", "cp logs/app-2026-10-*.log archive", "rm logs/app-2026-10-*.log"]],
+        "traps": [["mkdir archive", "rm logs/app-2026-10-*.log"], ["mkdir archive", "mv logs/*.log archive"],
+                  ["mkdir archive", "cp logs/app-2026-10-*.log archive"], ["mv logs/app-2026-10-*.log archive"]],
+        "absent": ["logs/app-2026-10-01.log", "logs/app-2026-10-15.log", "logs/app-2026-10-31.log"],
+        "expected_files": {"archive/app-2026-10-01.log": "oct 1\n", "archive/app-2026-10-15.log": "oct 15\n",
+                           "archive/app-2026-10-31.log": "oct 31\n", "logs/app-2026-11-01.log": "nov 1\n",
+                           "logs/app-2026-11-20.log": "nov 20\n"},
+        "hints": ["移動先を作ってから、10月分だけを動かします。消すのではなく「移す」。",
+                  "mkdir でフォルダを作り、mv にワイルドカード（共通の接頭辞を指定）と宛先のフォルダを渡します。",
+                  _ex(["mkdir archive", "mv logs/app-2026-10-*.log archive"])],
+        "explanation": "ログの整理は、すぐ消さずに別の場所へ退避して様子を見るのが安全です。移動先がない状態で mv すると、意図しない名前変更になることがあります。",
+        "practice": ["6-6", "2-1", "3-8"],
+    },
+]

@@ -242,7 +242,7 @@ class GuidedCurriculumTests(unittest.TestCase):
     def test_every_lesson_has_clear_beginner_instructions_and_a_unique_id(self):
         from curriculum.beginner_lessons import LESSONS
         seen = set()
-        self.assertEqual(set(LESSONS), {"intro", "basic", "advanced"})
+        self.assertEqual(set(LESSONS), {"intro", "basic", "advanced", "expert"})
         for mode, course in LESSONS.items():
             self.assertGreaterEqual(len(course), 15)
             for step in course:

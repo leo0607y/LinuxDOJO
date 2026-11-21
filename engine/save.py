@@ -18,7 +18,7 @@ RANKS = [
     (36, "Lv.7", "コンテナ魔術師"),
     (44, "Lv.8", "自動化の達人"),
     (52, "Lv.9", "本番運用マスター"),
-    (59, "Lv.MAX", "伝説のシェル仙人"),
+    (59, "Lv.10", "セキュリティ演習の探究者"),
 ]
 
 STAGE_TITLES = {
@@ -29,6 +29,12 @@ STAGE_TITLES = {
     5: "🏅 クジラ使い (Docker Whale Rider)",
     6: "🏅 自動化の錬成師",
     7: "🏅 本番環境の守り人",
+    8: "🏅 Web セキュリティの検証者",
+    9: "🏅 最小権限の監査者",
+    10: "🏅 証拠を伝える調査者",
+    11: "🏅 ストレージと復旧の調査者",
+    12: "🏅 性能と権限の調査者",
+    13: "🏅 通信とサービスの構築者",
     99: "🏅 時短の求道者",
 }
 
@@ -55,6 +61,7 @@ def learning_defaults(mode="intro"):
         "intro": {"completed": [], "cwd": ".", "packages": [], "apt_updated": False},
         "basic": {"completed": [], "cwd": ".", "packages": [], "apt_updated": False},
         "advanced": {"completed": [], "cwd": ".", "packages": [], "apt_updated": False},
+        "expert": {"completed": [], "cwd": ".", "packages": [], "apt_updated": False},
         "practice": {"mission": None},
     }
 
@@ -69,9 +76,9 @@ def load():
         learning = d.setdefault("learning", {})
         for key, value in defaults.items():
             learning.setdefault(key, value)
-        if learning["mode"] not in ("intro", "basic", "advanced", "practice"):
+        if learning["mode"] not in ("intro", "basic", "advanced", "expert", "practice"):
             learning["mode"] = legacy_mode
-        for mode in ("intro", "basic", "advanced", "practice"):
+        for mode in ("intro", "basic", "advanced", "expert", "practice"):
             for key, value in defaults[mode].items():
                 learning[mode].setdefault(key, value)
         for k, v in base.items():
@@ -128,16 +135,23 @@ def record_clear(mission, hint_level, answer_viewed, seconds):
             "activity": activity}
 
 
+def rank_table():
+    from engine.runner import load_curriculum
+    total = len(load_curriculum())
+    return [r for r in RANKS if r[0] < total] + [(total, "Lv.MAX", "全実践課題の修了者")]
+
+
 def rank_of(n_cleared):
-    cur = RANKS[0]
-    for r in RANKS:
+    table = rank_table()
+    cur = table[0]
+    for r in table:
         if n_cleared >= r[0]:
             cur = r
     return cur
 
 
 def next_rank(n_cleared):
-    for r in RANKS:
+    for r in rank_table():
         if r[0] > n_cleared:
             return r
     return None

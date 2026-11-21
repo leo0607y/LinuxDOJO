@@ -31,7 +31,8 @@ _DEFAULTS = {"expected_files": {}, "expected_modes": {}, "packages": [], "remote
 
 
 # 学ぶ順番。ここにないパックは後ろに名前順で並ぶ。
-ORDER = ["files", "logs", "config", "system", "sample_ops", "incident"]
+ORDER = ["drills", "files", "logs", "config", "system", "sample_ops", "incident", "scenarios",
+         "backup_ops", "network_ops", "operations", "scripting"]
 
 
 def _rank(name):

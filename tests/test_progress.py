@@ -1,4 +1,4 @@
-"""59問の進捗・ランクと旧セーブデータ互換性の回帰テスト。"""
+"""実践全課題の進捗・ランクと旧セーブデータ互換性の回帰テスト。"""
 from collections import Counter
 import json
 from pathlib import Path
@@ -13,20 +13,21 @@ from engine import runner, save
 
 
 class ProgressTests(unittest.TestCase):
-    def test_curriculum_contains_all_59_missions(self):
+    def test_curriculum_contains_linux_and_security_missions(self):
         missions = runner.load_curriculum()
-        self.assertEqual(len(missions), 59)
-        self.assertEqual(len({m.id for m in missions}), 59)
+        self.assertEqual(len(missions), 102)
+        self.assertEqual(len({m.id for m in missions}), 102)
         self.assertEqual(Counter(m.stage for m in missions),
-                         {1: 8, 2: 8, 3: 8, 4: 8, 5: 7, 6: 8, 7: 7, 99: 5})
+                         {1: 8, 2: 8, 3: 8, 4: 8, 5: 7, 6: 8, 7: 7, 8: 6, 9: 7, 10: 6, 11: 8, 12: 8, 13: 8, 99: 5})
         self.assertEqual({m.id for m in missions if m.stage == 7},
                          {f"7-{n}" for n in range(1, 8)})
 
-    def test_rank_boundaries_require_all_59_for_max(self):
+    def test_rank_boundaries_require_all_missions_for_max(self):
         for cleared, level, next_threshold in (
             (43, "Lv.7", 44), (44, "Lv.8", 52),
             (51, "Lv.8", 52), (52, "Lv.9", 59),
-            (58, "Lv.9", 59), (59, "Lv.MAX", None),
+            (58, "Lv.9", 59), (59, "Lv.10", 102),
+            (101, "Lv.10", 102), (102, "Lv.MAX", None),
         ):
             with self.subTest(cleared=cleared):
                 self.assertEqual(save.rank_of(cleared)[1], level)

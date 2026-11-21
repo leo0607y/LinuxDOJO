@@ -8,10 +8,12 @@ import shlex
 import shutil
 import stat
 
-from engine import runner, save, textcmd, ui, vim_sim
+from engine import commands, runner, save, textcmd, ui, vim_sim
 
-MODE_NAMES = {"intro": "はじめてモード", "basic": "基礎練習モード", "advanced": "応用練習モード", "practice": "実践モード"}
-GUIDED_MODES = ("intro", "basic", "advanced")
+MODE_NAMES = {"intro": "はじめてモード", "basic": "基礎練習モード", "advanced": "応用練習モード",
+              "expert": "達人モード", "practice": "実践モード"}
+GUIDED_MODES = ("intro", "basic", "advanced", "expert")
+INTRO_SHOWN_ANSWERS = 5  # はじめてモードは、最初の5課題だけ入力するコマンドを表示する
 PACKAGES = {
     "tree": ("フォルダの構造を枝分かれの図で表示するコマンド", "2.1.1-training"),
     "curl": ("URL からデータを取得するコマンド", "8.5.0-training"),
@@ -84,7 +86,7 @@ class Terminal:
             path = self.path(name)
             if not path.exists():
                 path.write_text(content, encoding="utf-8")
-                self.created(path, False)
+                self.set_mode(path, 0o644)
         self.progress["cwd"] = original_cwd
         remote_root = self.root / ".remote"
         if remote_root.is_symlink():
@@ -166,11 +168,12 @@ class Terminal:
         else:
             modes[self._mode_key(path)] = mode
 
-    def created(self, path, existed, mode=0o644):
-        """新しく作ったファイルの権限を、PC の umask によらず決める（本物の既定値 644 に合わせる）。"""
+    def created(self, path, existed, mode=0o666):
+        """新規作成時だけ、模擬シェルの umask を初期権限へ適用する。"""
         if not existed:
             self.forget_mode(path)
-            self.set_mode(path, mode)
+            mask = self.progress.get("users", {}).get("umask", 0o022)
+            self.set_mode(path, mode & ~mask)
 
     def _write_output(self, target, text, append):
         path = self.path(target)
@@ -206,7 +209,11 @@ class Terminal:
             current = self.path("/home/learner/" + (current / part).relative_to(self.active_root).as_posix())
             if current.exists() and not current.is_dir():
                 current.unlink()
+            existed = current.exists()
             current.mkdir(exist_ok=True)
+            if not existed:
+                # 教材の初期配置は学習者やホストの umask に依存させない。
+                self.set_mode(current, 0o755)
 
     def restore_file(self, name, content):
         target = self.path(name)
@@ -318,10 +325,11 @@ class Terminal:
             return args
         output = [args[0]]
         for arg in args[1:]:
-            if arg.startswith("-") or not GLOB_CHARS & set(arg):
+            pattern_arg = getattr(arg, "glob_pattern", arg)
+            if arg.startswith("-") or not GLOB_CHARS & set(pattern_arg) or not getattr(arg, "has_glob", True):
                 output.append(arg)
                 continue
-            head, _, pattern = arg.rpartition("/")
+            head, _, pattern = pattern_arg.rpartition("/")
             if GLOB_CHARS & set(head):
                 output.append(arg)
                 continue
@@ -350,23 +358,40 @@ class Terminal:
     def _pipeline(self, stages):
         if any(not stage for stage in stages):
             raise TrainingError("| の前と後ろにコマンドを書きます。例: cat access.log | grep 404")
-        if any(x in (">", ">>") for stage in stages[:-1] for x in stage):
-            raise TrainingError("> や >> での保存は、パイプの一番最後に書きます。")
-        last = stages[-1]
-        redirect = None
-        if any(x in (">", ">>") for x in last):
-            pos = next(i for i, x in enumerate(last) if x in (">", ">>"))
-            if pos == 0 or len(last) != pos + 2:
-                raise TrainingError("保存先を1つ指定しましょう。例: grep ERROR app.log | sort > sorted.txt")
-            redirect = (last[pos], last[-1])
-            stages[-1] = last[:pos]
         output, result = None, Result()
-        for stage in stages:
-            result = self._execute(self.expand_globs(stage), stdin=output)
+        for index, stage in enumerate(stages):
+            args, input_file, redirect = [], None, None
+            position = 0
+            while position < len(stage):
+                token = stage[position]
+                if shell_operator(token, ("<", ">", ">>")):
+                    if position + 1 >= len(stage) or shell_operator(stage[position + 1]):
+                        raise TrainingError("リダイレクトの後ろにファイル名を1つ指定します。")
+                    name = stage[position + 1]
+                    if token == "<":
+                        if input_file is not None:
+                            raise TrainingError("入力元は1つ指定しましょう。")
+                        input_file = name
+                    else:
+                        if redirect is not None:
+                            raise TrainingError("保存先は1つ指定しましょう。")
+                        redirect = (token, name)
+                    position += 2
+                else:
+                    args.append(token)
+                    position += 1
+            if not args:
+                raise TrainingError("実行するコマンドを書きましょう。")
+            if redirect and index != len(stages) - 1:
+                raise TrainingError("> や >> での保存は、パイプの一番最後に書きます。")
+            if input_file is not None:
+                text = self.path(input_file).read_text(encoding="utf-8")
+                output = text[:-1] if text.endswith("\n") else text
+            result = self._execute(self.expand_globs(args), stdin=output)
             output = result.output
-        if redirect:
-            self._write_output(redirect[1], output + ("\n" if output else ""), redirect[0] == ">>")
-            return Result(code=result.code)
+            if redirect:
+                self._write_output(redirect[1], output + ("\n" if output else ""), redirect[0] == ">>")
+                result = Result(code=result.code)
         return result
 
     def _execute_line(self, line):
@@ -375,12 +400,12 @@ class Terminal:
                 return Result("全角スペースが入っています。コマンドと対象の間は、半角スペースで区切りましょう。", 1)
             line = self.expand_variables(line)
             segments = split_pipes(line)
-            args = shlex.split(line)
+            args = shell_words(line)
             if not args:
                 return Result("コマンドを入力して Enter を押してください。", 1)
             if args[0] in ("$", "#") or args[0].endswith("$"):
                 return Result("$ は入力待ちの印です。$ を除いたコマンドだけ入力しましょう。", 1)
-            if any(a in ("||", "&&", ";", "&", "<", "2>") for a in args):
+            if any(shell_operator(a, ("||", "&&", ";", "&", "2>", "<<")) for a in args):
                 return Result("ここでは && や ; でつなぐ複数コマンドは扱いません。1つずつ入力するか、| でつなぎましょう。実践モードでは本物の bash で使えます。", 1)
             if self.progress["ssh_pending"]:
                 if args == ["no"]:
@@ -390,19 +415,7 @@ class Terminal:
                     self.progress.update(ssh_pending=False, ssh_known=True, remote=True, remote_cwd=".")
                     return Result("接続先の指紋を確認済みとして模擬接続しました。learner@training-server（実通信なし）")
                 return Result("接続確認中です。指紋を別経路で確認できたら yes、不明なら no を入力します。", 1)
-            if len(segments) > 1:
-                return self._pipeline([shlex.split(segment) for segment in segments])
-            args = self.expand_globs(args)
-            if args[0] != "echo" and any(x in (">", ">>") for x in args):
-                pos = next(i for i, x in enumerate(args) if x in (">", ">>"))
-                if pos == 0 or len(args) != pos + 2:
-                    raise TrainingError("出力先を1つ指定しましょう。例: grep ERROR app.log > errors.txt")
-                result = self._execute(args[:pos])
-                if result.code == 0:
-                    self._write_output(args[-1], result.output + ("\n" if result.output else ""), args[pos] == ">>")
-                    return Result()
-                return result
-            return self._execute(args)
+            return self._pipeline([shell_words(segment) for segment in segments])
         except (TrainingError, OSError, ValueError) as error:
             if isinstance(error, textcmd.UsageError):
                 message = str(error)
@@ -471,7 +484,7 @@ class Terminal:
         if cmd == "which" and rest:
             found = []
             for name in rest:
-                if name in BUILTIN_COMMANDS or name in self.progress["packages"] or (name == "vi" and "vim" in self.progress["packages"]):
+                if name in BUILTIN_COMMANDS or commands.available(name, self.progress["packages"]) or name in self.progress["packages"] or (name == "vi" and "vim" in self.progress["packages"]):
                     found.append(f"/usr/bin/{name}")
             return Result("\n".join(found), 0 if len(found) == len(rest) else 1)
         if cmd == "ssh":
@@ -486,13 +499,13 @@ class Terminal:
         if cmd == "sudo":
             if not rest:
                 raise TrainingError("sudo の後ろに実行するコマンドをスペースで続けます。例: sudo whoami")
-            if rest[0] not in ("whoami", "apt", "kill"):
-                raise TrainingError("練習用 sudo は whoami・apt・kill にだけ使えます。実際の管理者権限は使いません。")
+            if rest[0] not in ("whoami", "apt", "kill") and not commands.sudo_allowed(rest[0]):
+                raise TrainingError("練習用 sudo は一部のコマンドにだけ使えます。実際の管理者権限は使いません。")
             return self._execute(rest, admin=True, stdin=stdin)
         if cmd == "echo":
             if rest == ["$?"]:
                 return Result(str(self.progress["last_status"]))
-            redirect = next((i for i, a in enumerate(rest) if a in (">", ">>")), None)
+            redirect = next((i for i, a in enumerate(rest) if shell_operator(a, (">", ">>"))), None)
             if redirect is not None:
                 if len(rest) != redirect + 2:
                     raise TrainingError("保存先を1つ指定します。例: echo hello > note.txt")
@@ -539,7 +552,15 @@ class Terminal:
                     continue
                 if value.startswith("-"):
                     raise TrainingError("mkdir のオプションは -p が使えます。")
-                self.path(value).mkdir(parents=parents, exist_ok=parents)
+                path = self.path(value)
+                missing = []
+                current = path
+                while not current.exists() and current != self.active_root:
+                    missing.append(current)
+                    current = current.parent
+                path.mkdir(parents=parents, exist_ok=parents)
+                for directory in reversed(missing):
+                    self.created(directory, False, 0o777)
             return Result()
         if cmd == "touch" and rest:
             for value in rest:
@@ -565,18 +586,21 @@ class Terminal:
                 if cmd == "cp":
                     existed = dest.exists()
                     shutil.copyfile(source, dest)
-                    # 本物の cp と同じく、新しいコピーは元の権限を引き継ぐ（既存の宛先は権限を変えない）。
+                    # 新規の宛先は元の権限から umask を除く。既存の宛先の権限は変えない。
                     self.created(dest, existed, self.mode_of(source))
                 else:
                     os.replace(source, dest)
                     self.move_mode(source, dest)
             return Result()
         if cmd == "rm" and rest:
-            if any(x.startswith("-") for x in rest):
-                raise TrainingError("この練習の rm はファイルのみ削除します。-r や -f は使いません。")
+            if any(x.startswith("-") and x not in ("-f", "--force", "--") for x in rest):
+                raise TrainingError("この練習の rm はファイルのみ削除します。フォルダの再帰削除は扱いません。")
+            force = "-f" in rest or "--force" in rest
             for value in rest:
+                if value in ("-f", "--force", "--"):
+                    continue
                 target = self.path(value)
-                target.unlink()
+                target.unlink(missing_ok=force)
                 self.forget_mode(target)
             return Result()
         if cmd == "chmod" and len(rest) >= 2:
@@ -605,7 +629,12 @@ class Terminal:
             return Result("\n".join(lines))
         if cmd == "apt":
             return self._apt(rest, admin)
-        raise TrainingError(f"{cmd}: この模擬ターミナルでは未対応の入力です。スペルを確認し、hint で今回のコマンドを見てみましょう。")
+        plugin = commands.lookup(cmd)
+        if plugin is not None:
+            result = plugin(self, rest, stdin=stdin, admin=admin)
+            if result is not None:
+                return result
+        raise TrainingError(f"{cmd}: この模擬ターミナルでは未対応の入力です。スペルを確認し、hint で手がかりを見てみましょう。")
 
     def _text_command(self, cmd, rest, stdin):
         """パイプでも使うテキスト処理。対象外のコマンドなら None。"""
@@ -835,6 +864,7 @@ class Terminal:
         return Result("転送しました（模擬）。元のファイルは残ります。実通信は行いません。")
 
     def _apt(self, rest, admin):
+        rest = [arg for arg in rest if arg not in ("-y", "--yes")]
         if rest == ["--version"]:
             return Result("apt 2.7 (LinuxDOJO 訓練用シミュレーター)")
         if not rest:
@@ -870,6 +900,80 @@ class Terminal:
         raise TrainingError("対応する例: apt search vim / apt show vim / sudo apt update / sudo apt install vim / sudo apt remove vim")
 
 
+class ShellWord(str):
+    """A shell argument with quoting information retained for wildcard expansion."""
+    def __new__(cls, value, pattern, has_glob):
+        word = super().__new__(cls, value)
+        word.glob_pattern, word.has_glob = pattern, has_glob
+        return word
+
+
+def shell_operator(word, allowed=("<", ">", ">>", "<<", "|", "||", "&&", ";", "&", "2>")):
+    return not isinstance(word, ShellWord) and word in allowed
+
+
+def shell_words(line):
+    """Split a training shell line, distinguishing quoted literals from operators."""
+    words, value, pattern = [], [], []
+    quote, started, has_glob, index = None, False, False, 0
+
+    def flush():
+        nonlocal value, pattern, started, has_glob
+        if started:
+            words.append(ShellWord("".join(value), "".join(pattern), has_glob))
+        value, pattern, started, has_glob = [], [], False, False
+
+    def literal(char):
+        value.append(char)
+        pattern.append({"*": "[*]", "?": "[?]", "[": "[[]"}.get(char, char))
+
+    while index < len(line):
+        char = line[index]
+        if char == "\\" and quote != "'":
+            if index + 1 == len(line):
+                raise TrainingError("バックスラッシュの後ろに文字が必要です。")
+            following = line[index + 1]
+            if quote == '"' and following not in '$`"\\\n':
+                literal(char)
+                index += 1
+                continue
+            literal(following)
+            started = True
+            index += 2
+            continue
+        if char in "'\"" and quote in (None, char):
+            quote = None if quote == char else char
+            started = True
+            index += 1
+            continue
+        if quote is None and char.isspace():
+            flush()
+        elif quote is None and char in "<>|;&":
+            # 2> is a descriptor redirect only when the 2 is unquoted and stands alone.
+            descriptor = char == ">" and value == ["2"] and pattern == ["2"]
+            if descriptor:
+                value, pattern, started, has_glob = [], [], False, False
+            flush()
+            operator = ("2" if descriptor else "") + char
+            if index + 1 < len(line) and line[index + 1] == char:
+                operator += char
+                index += 1
+            words.append(operator)
+        else:
+            started = True
+            if quote:
+                literal(char)
+            else:
+                value.append(char)
+                pattern.append(char)
+                has_glob = has_glob or char in GLOB_CHARS
+        index += 1
+    if quote:
+        raise TrainingError("引用符を閉じてください。")
+    flush()
+    return words
+
+
 def split_pipes(line):
     """引用符の外にある | で区切る。'a|b' のように引用符の中の | は文字として残す。"""
     segments, current, quote, index = [], [], None, 0
@@ -900,7 +1004,7 @@ _PERM = {"r": 0o444, "w": 0o222, "x": 0o111}
 
 def chmod_mode(spec, current):
     """chmod の指定（644 / u+x / go-rw / a=r,u+w など）から新しい権限を計算する。"""
-    if re.fullmatch(r"[0-7]{3}", spec):
+    if re.fullmatch(r"0?[0-7]{3}", spec):
         return int(spec, 8)
     mode = current
     for part in spec.split(","):
@@ -983,6 +1087,22 @@ def matches(line, step):
         return False
 
 
+def hint_text(step, level):
+    """ヒントを段階的に返す。level は 0 から。課題に hints があればそれを使い、なければ自動で作る。
+
+    1段階目は考え方、2段階目は使う道具、3段階目は入力例（答え）。
+    """
+    hints = step.get("hints")
+    if hints is None:
+        words = shlex.split(step["command"]) if step["command"] else []
+        head = words[0] if words else ""
+        hints = ["「やってみよう」をもう一度読みましょう。何を実現したいか → どの道具（コマンド）が合うか、の順に考えます。"
+                 "lesson で説明を読み直せます。",
+                 f"使う道具は「{head}」です。{len(words)} 個の言葉（道具の名前と、その対象や指定）を並べます。",
+                 "入力例: " + step["command"]]
+    return hints[min(level, len(hints) - 1)], min(level, len(hints) - 1) == len(hints) - 1
+
+
 def expected_code(step):
     return step.get("expected_code", 100 if step["command"] == "apt update" else 0)
 
@@ -1050,6 +1170,7 @@ def prepare_step(terminal, step, fresh=False):
         terminal.restore_file(name, content)
     for name, mode in step.get("modes", {}).items():
         terminal.set_mode(terminal.path(name), mode)
+    commands.prepare(terminal, step)
     # 前の課題で学習者が作ったファイルを使う課題。なければ代わりの内容を用意する。
     for name, content in step.get("initial_files", {}).items():
         if not terminal.path(name).is_file():
@@ -1087,10 +1208,13 @@ def play(mode, start=None):
         print(ui.box([f"{MODE_NAMES[mode]}  {index + 1}/{len(course)}  {step['title']}",
                       *([f"ユニット: {step['unit']}"] if step.get("unit") else []), "",
                       *step["explanation"].splitlines(), "", "やってみよう: " + step["task"]], color="green"))
-        if mode == "intro":
+        if mode == "intro" and index < INTRO_SHOWN_ANSWERS:
             print("\n  入力するコマンド: " + ui.c(step["command"], "bcyan"))
+        elif mode == "intro":
+            print("\n  答えは書いてありません。まず自分で考えて入力してみましょう。")
         print("\n  訓練用の模擬ターミナルです。実際の sudo・apt・シェルは実行しません。")
-        print("  hint: 入力例 / lesson: 説明を再表示 / reset: この課題を復元 / menu: 保存して戻る")
+        print("  hint: ヒントを1段階ずつ表示 / answer: 答えを見る / lesson: 説明を再表示 / reset: この課題を復元 / menu: 保存して戻る")
+        hint_level = 0
         if terminal.progress.get("editor"):
             print("\n" + vim_sim.render(terminal.progress["editor"]))
         while True:
@@ -1104,8 +1228,15 @@ def play(mode, start=None):
             if line == "menu" or (not in_editor and (line == "quit" or (line == "exit" and not terminal.progress["remote"]))):
                 remember(mode, progress)
                 return
-            if line == "hint" or (not in_editor and line in ("answer", "help")):
-                print(f"  入力例: {step['command']}\n  ヒントや解答を何度見ても減点はありません。")
+            if line == "hint" or (not in_editor and line == "help"):
+                text, last = hint_text(step, hint_level)
+                print(f"  💡 ヒント {hint_level + 1}: {text}")
+                print("  （もう一度 hint で次のヒント）" if not last else "  （これが最後のヒントです）")
+                hint_level += 1
+                continue
+            if not in_editor and line == "answer":
+                print("  入力例: " + " / ".join(answers(step)[:3]))
+                print("  見ても減点はありません。答えを見たら、何も見ずにもう一度打ってみましょう。")
                 continue
             if line == "lesson" or (not in_editor and line == "mission"):
                 print(step["explanation"] + "\nやってみよう: " + step["task"])
@@ -1149,7 +1280,7 @@ def play(mode, start=None):
                 return
             break
     print(ui.box([f"{MODE_NAMES[mode]}を最後まで学習しました！", "何度でもレッスン選択から復習できます。",
-                  "はじめて → 基礎練習 → 応用練習 → 実践 の順に進めます。", "総合復習の「課題まつり」で、手本なしの力試しもできます。", "メインメニューの [7] モード選択で切り替えましょう。"], color="green"))
+                  "はじめて → 基礎練習 → 応用練習 → 達人 → 実践 の順に進めます。", "総合復習の「課題まつり」で、手本なしの力試しもできます。", "メインメニューの [7] モード選択で切り替えましょう。"], color="green"))
     try:
         input("Enter でメニューへ > ")
     except (EOFError, KeyboardInterrupt):

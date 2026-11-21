@@ -1,4 +1,4 @@
-"""基本操作を組み合わせて解く総合復習。実践59問とは別枠で進捗を保存する。"""
+"""基本操作を組み合わせて解く総合復習。実践ミッションとは別枠で進捗を保存する。"""
 from pathlib import Path
 import shlex
 import shutil
@@ -22,7 +22,7 @@ def prepare(scenario, root, progress=None):
     state = progress if progress is not None else {}
     state.clear()
     terminal = guided.Terminal(directory, state)
-    guided.prepare_step(terminal, {"cwd": ".", "remote": False,
+    guided.prepare_step(terminal, {**scenario, "cwd": scenario.get("cwd", "."), "remote": False,
                                   "files": scenario["files"], "remote_files": scenario["remote_files"],
                                   "packages": scenario.get("initial_packages", []),
                                   "apt_updated": scenario.get("apt_updated", False),
@@ -69,6 +69,10 @@ def check(scenario, terminal):
     try:
         if terminal.progress.get("editor"):
             return False, "vim がまだ開いています。:wq で保存して閉じてから check しましょう。"
+        from engine import commands
+        problem = commands.check(scenario, terminal)
+        if problem:
+            return problem
         if scenario["require_disconnected"] and terminal.progress["remote"]:
             return False, "まだ接続先にいます。exit で手元へ戻りましょう。"
         for name, content in scenario["expected_files"].items():
@@ -234,27 +238,42 @@ def _pack(name):
     return [s["id"] for pack, _, items in packs() if pack == name for s in items]
 
 
+def _expert(*units):
+    return [s["id"] for s in guided.lessons("expert")
+            if s["id"].startswith(tuple(f"ex-{unit}-" for unit in units))]
+
+
 def mastery_areas():
     """(分野名, レッスンID, 総合復習・課題まつりのID, 実践ミッションID) の一覧。"""
     from curriculum import advanced_lessons as adv
     return [
         ("ファイルとフォルダを自在に整理する",
-         _lesson_ids("intro") + _lesson_ids("basic", 1, 19) + _lesson_ids("advanced", unit=adv._WILD),
+         _lesson_ids("intro") + _lesson_ids("basic", 1, 19) + _lesson_ids("advanced", unit=adv._WILD) + _expert("archive_find"),
          ["ready-01", "ready-04"] + _pack("files"), _practice("1-")),
         ("ログやデータを検索・集計する",
-         _lesson_ids("basic", 25, 32) + _lesson_ids("advanced", unit=adv._PIPE) + _lesson_ids("advanced", unit=adv._GREP),
+         _lesson_ids("basic", 25, 32) + _lesson_ids("advanced", unit=adv._PIPE) + _lesson_ids("advanced", unit=adv._GREP) + _expert("textproc"),
          ["ready-02", "ready-07"] + _pack("logs"), _practice("2-", "EX-3", "EX-5")),
         ("vim で設定ファイルを書き換える",
          _lesson_ids("basic", 49, 66) + _lesson_ids("advanced", unit=adv._VIM),
          ["ready-03"] + _pack("config"), _practice("6-6", "3-1", "3-2")),
         ("プロセス・容量・環境・ソフトを管理する",
          _lesson_ids("basic", 20, 24) + _lesson_ids("advanced", unit=adv._ENV) + _lesson_ids("advanced", unit=adv._PROC)
-         + _lesson_ids("advanced", unit=adv._DISK),
+         + _lesson_ids("advanced", unit=adv._DISK) + _expert("sample_unit"),
          ["ready-05", "ready-08"] + _pack("system") + _pack("sample_ops"), _practice("3-3", "3-4", "3-5", "3-6", "3-7", "3-8")),
         ("リモート作業と障害対応",
-         _lesson_ids("basic", 33, 48), ["ready-06"] + _pack("incident"), _practice("4-")),
+         _lesson_ids("basic", 33, 48) + _expert("network"), ["ready-06"] + _pack("incident"), _practice("4-")),
         ("自動化・サービス・コンテナ（実践）",
-         [], [], _practice("5-", "6-1", "6-2", "6-3", "6-4", "6-5", "6-7", "6-8", "7-", "EX-1", "EX-2", "EX-4")),
+         _expert("services", "scripting"), [], _practice("5-", "6-1", "6-2", "6-3", "6-4", "6-5", "6-7", "6-8", "7-", "EX-1", "EX-2", "EX-4")),
+        ("ユーザー・グループ・アクセス権を管理する", _expert("users"), [], []),
+        ("Git で変更を記録・復旧する", _expert("git"), [], []),
+        ("目的から手順を組み立てる総合演習", [],
+         _pack("drills") + _pack("scenarios") + _pack("operations") + _pack("network_ops") + _pack("scripting") + _pack("backup_ops"), []),
+        ("Web の認証・認可・設定を検証する", [], [], _practice("8-")),
+        ("Linux の安全性を監査・修正する", [], [], _practice("9-")),
+        ("証拠を保全して調査・報告する", [], [], _practice("10-")),
+        ("ストレージ・起動・復旧を診断する", [], [], _practice("11-")),
+        ("性能・更新・高度な権限を調べる", [], [], _practice("12-")),
+        ("通信・TLS・データと構成を管理する", [], [], _practice("13-")),
     ]
 
 
@@ -263,7 +282,7 @@ def mastery(d=None):
     d = d or save.load()
     lessons_done = set()
     for mode in guided.GUIDED_MODES:
-        lessons_done |= set(d["learning"][mode].get("completed", []))
+        lessons_done |= set(d["learning"].get(mode, {}).get("completed", []))
     challenges_done = set(d["learning"].get("readiness", {}).get("completed", {}))
     cleared = set(d["cleared"])
     rows, done_all, total_all = [], 0, 0
@@ -277,14 +296,19 @@ def mastery(d=None):
 
 
 def mastery_lines(d=None):
+    d = d or save.load()
     rows, ratio = mastery(d)
     lines = [f"Linux 自由自在度  {ui.progress_bar(ratio, 20)} {ratio * 100:.0f}%"]
     for name, done, total in rows:
         lines.append(f"  {ui.pad(name, 40)} {ui.progress_bar(done / total if total else 0, 10)} {done}/{total}")
-    if ratio >= 1:
+    records = d["learning"].get("readiness", {}).get("completed", {})
+    challenge_ids = {s["id"] for s in scenarios()}
+    independent = sum(records.get(key, {}).get("assisted") is False for key in challenge_ids)
+    lines.append(f"  手本なしで解けた総合課題: {independent}/{len(challenge_ids)}（hint / answer を使った課題は復習できます）")
+    if ratio >= 1 and independent == len(challenge_ids):
         lines.append(ui.c("🐧 すべて制覇！ Linux 自由自在マスターです。", "bold", "bmagenta"))
     else:
-        lines.append("全部の分野が100%になれば、日常の Linux 作業は自分の力でこなせます。")
+        lines.append("全分野の学習と、手本なしの総合課題に取り組み、実践モードで本物の bash でも確かめましょう。")
     return lines
 
 
