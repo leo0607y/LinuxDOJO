@@ -578,7 +578,14 @@ def launch_shell(mission: Mission, token: str) -> str:
         (STATE / "intent").unlink()
     except OSError:
         pass
-    subprocess.call(["bash", "--rcfile", str(SHELLRC), "-i"], cwd=str(stage_dir(mission.stage)), env=env)
+    from engine import ui
+    ctx = Ctx(mission, token)
+    title = f"実践  {mission.id}  {mission.title}"
+    objectives = ["・" + mission.render(item, ctx.data) for item in mission.objectives]
+    summary = [title, "", "やってみよう", *objectives]
+    header = [title, "", *mission.render(mission.story, ctx.data).splitlines(), "", "やってみよう", *objectives]
+    with ui.QuestionScreen(header, summary=summary):
+        subprocess.call(["bash", "--rcfile", str(SHELLRC), "-i"], cwd=str(stage_dir(mission.stage)), env=env)
     try:
         return (STATE / "intent").read_text().strip()
     except OSError:

@@ -179,10 +179,6 @@ def start(lab_id, directory=None):
             raise ValueError("準備が途中で失敗しています。原因を解消して新しいフォルダでsetupします。")
     else:
         setup(lab_id, directory)
-    print("\n" + lab["title"] + "\n" + lab["task"])
-    print("\n作業先: " + str(directory))
-    print("check: 検査 / task: 課題文 / answer: 解答表示 / cleanup: 専用リソース解除 / exit: 戻る")
-    print("本物のbashです。操作対象はこの実習フォルダです。")
     command = " ".join(shlex.quote(str(x)) for x in (sys.executable, Path(__file__).resolve()))
     args = " --directory " + shlex.quote(str(directory))
     rc = directory / ".dojo" / "shell.bash"
@@ -195,7 +191,15 @@ def start(lab_id, directory=None):
         encoding="utf-8")
     with rc.open("a", encoding="utf-8") as stream:
         stream.write("cleanup() { " + command + " cleanup" + args + "; }\n")
-    subprocess.run(["bash", "--noprofile", "--rcfile", str(rc), "-i"], cwd=directory, check=False)
+    from engine import ui
+    title = f"常用コース  {lab_id}  {lab['title']}"
+    summary = [title, "", "やってみよう: " + lab["task"].splitlines()[0],
+               "task: 課題全文 / check: 判定 / answer: 手本 / exit: 戻る"]
+    with ui.QuestionScreen([title, "", *lab["task"].splitlines()], summary=summary):
+        print(ui.c("\n  作業先: " + str(directory), "gray"))
+        print("  check: 判定 / task: 課題文 / answer: 手本 / cleanup: 専用リソース解除 / exit: 戻る")
+        print(ui.c("  本物のbashです。操作対象はこの実習フォルダです。", "gray"))
+        subprocess.run(["bash", "--noprofile", "--rcfile", str(rc), "-i"], cwd=directory, check=False)
     return directory
 
 
@@ -238,9 +242,15 @@ def menu():
     """既存ゲームの進捗とは別枠。検索・実機実習・必要ツールをひとつの入口に。"""
     from engine import ui
     while True:
-        print("\nLinux常用コース — [1] 分野検索 [2] 実機実習 [3] 必要ツール [4] 手引き [b] 戻る")
+        ui.clear()
+        print(ui.box([ui.c("🔧 Linux常用コース", "bold", "bwhite"), "",
+                      "目的から課題を探し、本物の道具で練習します。",
+                      "既存の実践モードとは別に、専用フォルダへ保存します。"], color="green"))
+        for key, label in (("1", "目的・コマンドから探す"), ("2", "実機実習を選ぶ"),
+                           ("3", "必要ツールを確認"), ("4", "学習ガイドを読む"), ("b", "戻る")):
+            print("   " + ui.c(f"[{key}]", "bold", "bcyan") + "  " + label)
         try:
-            choice = input("> ").strip().lower()
+            choice = input("\n  メニュー番号 > ").strip().lower()
             if choice in ("b", "q", ""):
                 return
             if choice == "1":
@@ -257,7 +267,8 @@ def menu():
             elif choice in ("2", "3"):
                 for key, lab in labs().items():
                     availability = "未導入: " + ",".join(missing_tools(lab)) if missing_tools(lab) else "実行可能"
-                    print(f"  {key}: {lab['title']} [{availability}]")
+                    status_color = "yellow" if missing_tools(lab) else "bgreen"
+                    print("   " + ui.c(f"[{key}]", "bold", "bcyan") + f" {lab['title']} " + ui.c(f"({availability})", status_color))
                 key = input("実習ID（空欄で戻る） > ").strip()
                 if key:
                     if choice == "3":
@@ -271,7 +282,11 @@ def menu():
             print()
             return
         except (OSError, ValueError, subprocess.SubprocessError) as error:
-            print(str(error))
+            print(ui.c(str(error), "bred"))
+        try:
+            input(ui.c("\n  Enter で常用コースへ戻る > ", "gray"))
+        except (EOFError, KeyboardInterrupt):
+            return
 
 
 def main(argv=None):

@@ -6,6 +6,7 @@
 import os
 import re
 import shutil
+import signal
 import sys
 import unicodedata
 
@@ -146,6 +147,106 @@ def clear():
     if sys.stdout.isatty():
         sys.stdout.write("\x1b[H\x1b[2J\x1b[3J")
         sys.stdout.flush()
+
+
+class QuestionScreen:
+    """Keep the question above an independently scrolling response area.
+
+    Use ``with QuestionScreen(lines, summary=[title, task]) as screen`` and call
+    ``screen.refresh()`` before each prompt. A long explanation may give way to
+    the complete summary, but the task is never silently shortened. Terminals
+    too small for that summary, redirected output and TERM=dumb use plain output.
+    This context owns no input handling and restores the normal scroll region on
+    every exit, including exceptions and KeyboardInterrupt.
+    """
+
+    def __init__(self, header_lines, summary=None, min_body=8, color="green"):
+        self.header_lines = list(header_lines)
+        self.summary = list(summary) if summary is not None else self.header_lines
+        self.min_body = max(4, min_body)
+        self.color = color
+        self.active = False
+        self._size = None
+        self._entered = False
+        self._previous_resize = None
+        self._resize_installed = False
+
+    def _dimensions(self):
+        try:
+            return os.get_terminal_size(sys.stdout.fileno())
+        except (AttributeError, OSError, ValueError):
+            return shutil.get_terminal_size((80, 24))
+
+    def _supported(self):
+        return (sys.stdout.isatty() and sys.stdin.isatty()
+                and os.environ.get("TERM", "") not in ("", "dumb"))
+
+    def _lines(self, source, columns):
+        return box(source, w=columns, color=self.color).splitlines()
+
+    def _draw(self):
+        dimensions = self._dimensions()
+        self._size = dimensions
+        columns, rows = dimensions
+        # Leave the last column unused to avoid automatic wrapping in the header.
+        usable = max(1, columns - 1)
+        lines = self._lines(self.header_lines, usable)
+        budget = rows - self.min_body
+        if len(lines) > budget:
+            lines = self._lines(self.summary, usable)
+        if columns < 30 or budget < 2 or len(lines) > budget:
+            if self.active:
+                sys.stdout.write("\x1b[r\x1b[H\x1b[2J")
+                self.active = False
+            print("\n".join(self.header_lines))
+            sys.stdout.flush()
+            return
+        sys.stdout.write("\x1b[r\x1b[H\x1b[2J")
+        for row, line in enumerate(lines, 1):
+            sys.stdout.write(f"\x1b[{row};1H" + line)
+        top = len(lines) + 1
+        sys.stdout.write(f"\x1b[{top};{rows}r\x1b[{top};1H")
+        sys.stdout.flush()
+        self.active = True
+
+    def __enter__(self):
+        self._entered = True
+        if self._supported():
+            self._draw()
+            if hasattr(signal, "SIGWINCH"):
+                try:
+                    self._previous_resize = signal.getsignal(signal.SIGWINCH)
+                    signal.signal(signal.SIGWINCH, self._on_resize)
+                    self._resize_installed = True
+                except (OSError, ValueError):
+                    # Signal ownership is unavailable outside the main Python thread.
+                    pass
+        else:
+            print(box(self.header_lines, color=self.color))
+        return self
+
+    def _on_resize(self, signum, frame):
+        self.refresh()
+        if callable(self._previous_resize):
+            self._previous_resize(signum, frame)
+
+    def refresh(self):
+        """Reflow the fixed question after a terminal resize, not after an error."""
+        if self._entered and self._supported() and self._dimensions() != self._size:
+            self._draw()
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if self._resize_installed:
+            signal.signal(signal.SIGWINCH, self._previous_resize)
+            self._resize_installed = False
+        if self.active:
+            # Reset margins before returning control to a menu or the caller's shell.
+            rows = self._dimensions().lines
+            sys.stdout.write(f"\x1b[r\x1b[{rows};1H\n")
+            sys.stdout.flush()
+        self.active = False
+        self._entered = False
+        return False
 
 
 def hr(ch="─", color="gray"):

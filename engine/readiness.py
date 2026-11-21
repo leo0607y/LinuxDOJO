@@ -162,57 +162,58 @@ def play(scenario):
         terminal = prepare(scenario, root)
         assisted = False
     hint_level = 0
-    ui.clear()
-    print(ui.box([scenario["title"], scenario["brief"], "",
-                  "目的に合わせて複数のコマンドを組み合わせ、check で判定します。",
-                  "ヒントなしでできるか試してみましょう。hint / answer も使えます。",
-                  "模擬環境なので実際の PC やサーバーは操作しません。",
-                  "mission: 目的再表示 / hint: ヒント / answer: 手順 / reset: やり直し / menu: 保存して戻る"], color="green"))
-    persist(scenario, terminal, assisted)
-    while True:
-        try:
-            raw = input("\n 復習 " + terminal.prompt_text())
-        except (EOFError, KeyboardInterrupt):
-            persist(scenario, terminal, assisted)
-            return
-        line = raw.strip()
-        if line in ("menu", "quit"):
-            persist(scenario, terminal, assisted)
-            return
-        if line == "mission":
-            print(scenario["brief"])
-            continue
-        if line == "reset":
-            terminal = prepare(scenario, root)
-            hint_level = 0
-            assisted = False
-            persist(scenario, terminal, assisted)
-            print("この課題の作業場所を初期状態に戻しました。")
-            continue
-        if line == "hint":
-            assisted = True
-            print(scenario["hints"][min(hint_level, 2)])
-            hint_level += 1
-            persist(scenario, terminal, assisted)
-            continue
-        if line == "answer":
-            assisted = True
-            print("\n".join(scenario["solution"]))
-            persist(scenario, terminal, assisted)
-            continue
-        if line == "check":
-            good, message = check(scenario, terminal)
-            print(message)
-            if good:
-                record_result(scenario, assisted)
-                print(ui.c("✓ 総合復習クリア！ " + ("手本ありで達成。reset で自力の復習もできます。" if assisted else "ヒントなしで達成できました。"), "bgreen"))
-                print(scenario["explanation"])
-                print("本物の bash で試す次の問題: " + " / ".join(scenario["practice"]))
-            continue
-        result = terminal.execute(raw.rstrip("\r") if terminal.progress.get("editor") else line)
-        if result.output:
-            print(result.output)
+    header = [scenario["title"], scenario["brief"], "",
+              "目的に合わせて複数のコマンドを組み合わせ、check で判定します。",
+              "ヒントなしでできるか試してみましょう。hint / answer も使えます。",
+              "模擬環境なので実際の PC やサーバーは操作しません。",
+              "mission: 目的再表示 / hint: ヒント / answer: 手順 / reset: やり直し / menu: 保存して戻る"]
+    with ui.QuestionScreen(header, summary=[scenario["title"], scenario["brief"]]) as screen:
         persist(scenario, terminal, assisted)
+        while True:
+            screen.refresh()
+            try:
+                raw = input("\n 復習 " + terminal.prompt_text())
+            except (EOFError, KeyboardInterrupt):
+                persist(scenario, terminal, assisted)
+                return
+            line = raw.strip()
+            if line in ("menu", "quit"):
+                persist(scenario, terminal, assisted)
+                return
+            if line == "mission":
+                print(scenario["brief"])
+                continue
+            if line == "reset":
+                terminal = prepare(scenario, root)
+                hint_level = 0
+                assisted = False
+                persist(scenario, terminal, assisted)
+                print("この課題の作業場所を初期状態に戻しました。")
+                continue
+            if line == "hint":
+                assisted = True
+                print(scenario["hints"][min(hint_level, 2)])
+                hint_level += 1
+                persist(scenario, terminal, assisted)
+                continue
+            if line == "answer":
+                assisted = True
+                print("\n".join(scenario["solution"]))
+                persist(scenario, terminal, assisted)
+                continue
+            if line == "check":
+                good, message = check(scenario, terminal)
+                print(message)
+                if good:
+                    record_result(scenario, assisted)
+                    print(ui.c("✓ 総合復習クリア！ " + ("手本ありで達成。reset で自力の復習もできます。" if assisted else "ヒントなしで達成できました。"), "bgreen"))
+                    print(scenario["explanation"])
+                    print("本物の bash で試す次の問題: " + " / ".join(scenario["practice"]))
+                continue
+            result = terminal.execute(raw.rstrip("\r") if terminal.progress.get("editor") else line)
+            if result.output:
+                print(result.output)
+            persist(scenario, terminal, assisted)
 
 
 # ---------------------------------------------------------------- 自由自在マップ

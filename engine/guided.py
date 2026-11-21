@@ -1204,81 +1204,82 @@ def play(mode, start=None):
         progress["cursor"] = step["id"]
         prepare_step(terminal, step)
         remember(mode, progress)
-        ui.clear()
-        print(ui.box([f"{MODE_NAMES[mode]}  {index + 1}/{len(course)}  {step['title']}",
-                      *([f"ユニット: {step['unit']}"] if step.get("unit") else []), "",
-                      *step["explanation"].splitlines(), "", "やってみよう: " + step["task"]], color="green"))
-        if mode == "intro" and index < INTRO_SHOWN_ANSWERS:
-            print("\n  入力するコマンド: " + ui.c(step["command"], "bcyan"))
-        elif mode == "intro":
-            print("\n  答えは書いてありません。まず自分で考えて入力してみましょう。")
-        print("\n  訓練用の模擬ターミナルです。実際の sudo・apt・シェルは実行しません。")
-        print("  hint: ヒントを1段階ずつ表示 / answer: 答えを見る / lesson: 説明を再表示 / reset: この課題を復元 / menu: 保存して戻る")
-        hint_level = 0
-        if terminal.progress.get("editor"):
-            print("\n" + vim_sim.render(terminal.progress["editor"]))
-        while True:
-            try:
-                raw = input("\n " + terminal.prompt_text())
-            except (EOFError, KeyboardInterrupt):
+        title = f"{MODE_NAMES[mode]}  {index + 1}/{len(course)}  {step['title']}"
+        header = [title, *([f"ユニット: {step['unit']}"] if step.get("unit") else []), "",
+                  *step["explanation"].splitlines(), "", "やってみよう: " + step["task"]]
+        with ui.QuestionScreen(header, summary=[title, "やってみよう: " + step["task"]]) as screen:
+            if mode == "intro" and index < INTRO_SHOWN_ANSWERS:
+                print("\n  入力するコマンド: " + ui.c(step["command"], "bcyan"))
+            elif mode == "intro":
+                print("\n  答えは書いてありません。まず自分で考えて入力してみましょう。")
+            print("\n  訓練用の模擬ターミナルです。実際の sudo・apt・シェルは実行しません。")
+            print("  hint: ヒントを1段階ずつ表示 / answer: 答えを見る / lesson: 説明を再表示 / reset: この課題を復元 / menu: 保存して戻る")
+            hint_level = 0
+            if terminal.progress.get("editor"):
+                print("\n" + vim_sim.render(terminal.progress["editor"]))
+            while True:
+                screen.refresh()
+                try:
+                    raw = input("\n " + terminal.prompt_text())
+                except (EOFError, KeyboardInterrupt):
+                    remember(mode, progress)
+                    return
+                line = raw.strip()
+                in_editor = bool(terminal.progress.get("editor"))
+                if line == "menu" or (not in_editor and (line == "quit" or (line == "exit" and not terminal.progress["remote"]))):
+                    remember(mode, progress)
+                    return
+                if line == "hint" or (not in_editor and line == "help"):
+                    text, last = hint_text(step, hint_level)
+                    print(f"  💡 ヒント {hint_level + 1}: {text}")
+                    print("  （もう一度 hint で次のヒント）" if not last else "  （これが最後のヒントです）")
+                    hint_level += 1
+                    continue
+                if not in_editor and line == "answer":
+                    print("  入力例: " + " / ".join(answers(step)[:3]))
+                    print("  見ても減点はありません。答えを見たら、何も見ずにもう一度打ってみましょう。")
+                    continue
+                if line == "lesson" or (not in_editor and line == "mission"):
+                    print(step["explanation"] + "\nやってみよう: " + step["task"])
+                    continue
+                if line == "reset":
+                    prepare_step(terminal, step, fresh=True)
+                    print("課題のファイルと開始場所を復元しました。もう一度試せます。")
+                    continue
+                # vim の入力モードでは先頭の空白も文字として残す。
+                result = terminal.execute(raw.rstrip("\r") if in_editor else line)
+                if result.output:
+                    print(result.output)
                 remember(mode, progress)
-                return
-            line = raw.strip()
-            in_editor = bool(terminal.progress.get("editor"))
-            if line == "menu" or (not in_editor and (line == "quit" or (line == "exit" and not terminal.progress["remote"]))):
+                if not accepted(line, result, step, terminal):
+                    if result.code == 0 and not in_editor:
+                        print("  実行できました。今回の課題も試しましょう。hint で入力例を見られます。")
+                    continue
+                print(ui.c("\n  ✓ できました！ " + step["success"], "bgreen"))
+                others = [answer for answer in answers(step) if not matches(line, {"command": answer})]
+                if others:
+                    print("  ほかの書き方でも正解です: " + " / ".join(others))
+                completed = progress.setdefault("completed", [])
+                if step["id"] not in completed:
+                    completed.append(step["id"])
+                index += 1
+                progress["cursor"] = course[index]["id"] if index < len(course) else step["id"]
+                if index == len(course):
+                    progress["reviewing"] = False
                 remember(mode, progress)
-                return
-            if line == "hint" or (not in_editor and line == "help"):
-                text, last = hint_text(step, hint_level)
-                print(f"  💡 ヒント {hint_level + 1}: {text}")
-                print("  （もう一度 hint で次のヒント）" if not last else "  （これが最後のヒントです）")
-                hint_level += 1
-                continue
-            if not in_editor and line == "answer":
-                print("  入力例: " + " / ".join(answers(step)[:3]))
-                print("  見ても減点はありません。答えを見たら、何も見ずにもう一度打ってみましょう。")
-                continue
-            if line == "lesson" or (not in_editor and line == "mission"):
-                print(step["explanation"] + "\nやってみよう: " + step["task"])
-                continue
-            if line == "reset":
-                prepare_step(terminal, step, fresh=True)
-                print("課題のファイルと開始場所を復元しました。もう一度試せます。")
-                continue
-            # vim の入力モードでは先頭の空白も文字として残す。
-            result = terminal.execute(raw.rstrip("\r") if in_editor else line)
-            if result.output:
-                print(result.output)
-            remember(mode, progress)
-            if not accepted(line, result, step, terminal):
-                if result.code == 0 and not in_editor:
-                    print("  実行できました。今回の課題も試しましょう。hint で入力例を見られます。")
-                continue
-            print(ui.c("\n  ✓ できました！ " + step["success"], "bgreen"))
-            others = [answer for answer in answers(step) if not matches(line, {"command": answer})]
-            if others:
-                print("  ほかの書き方でも正解です: " + " / ".join(others))
-            completed = progress.setdefault("completed", [])
-            if step["id"] not in completed:
-                completed.append(step["id"])
-            index += 1
-            progress["cursor"] = course[index]["id"] if index < len(course) else step["id"]
-            if index == len(course):
-                progress["reviewing"] = False
-            remember(mode, progress)
-            d = save.load()
-            reward = save.record_activity(d, mode + ":" + step["id"])
-            save.store(d)
-            if reward["earned"]:
-                print(ui.c(f"  +{reward['earned']} XP！", "byellow"))
-            print("  " + save.activity_line(d))
-            try:
-                choice = input("\n  Enter: 次の練習へ / menu: 保存して戻る > ").strip().lower()
-            except (EOFError, KeyboardInterrupt):
-                return
-            if choice in ("menu", "q", "exit"):
-                return
-            break
+                d = save.load()
+                reward = save.record_activity(d, mode + ":" + step["id"])
+                save.store(d)
+                if reward["earned"]:
+                    print(ui.c(f"  +{reward['earned']} XP！", "byellow"))
+                print("  " + save.activity_line(d))
+                try:
+                    choice = input("\n  Enter: 次の練習へ / menu: 保存して戻る > ").strip().lower()
+                except (EOFError, KeyboardInterrupt):
+                    return
+                if choice in ("menu", "q", "exit"):
+                    return
+                break
     print(ui.box([f"{MODE_NAMES[mode]}を最後まで学習しました！", "何度でもレッスン選択から復習できます。",
                   "はじめて → 基礎練習 → 応用練習 → 達人 → 実践 の順に進めます。", "総合復習の「課題まつり」で、手本なしの力試しもできます。", "メインメニューの [7] モード選択で切り替えましょう。"], color="green"))
     try:
