@@ -31,7 +31,7 @@ test('status badges are honest: unverified VM modules are never labelled verifie
 
 test('coverage totals add up and no emoji in data', () => {
   const { exams, total } = data.coverage;
-  for (const k of ['rows', 'covered', 'partial', 'missing']) assert.equal(exams.reduce((a, e) => a + e[k], 0), total[k]);
-  assert.equal(total.covered + total.partial + total.missing, total.rows);
+  for (const k of ['rows', 'covered', 'unverified', 'partial', 'missing']) assert.equal(exams.reduce((a, e) => a + e[k], 0), total[k]);
+  assert.equal(total.covered + total.unverified + total.partial + total.missing, total.rows);
   assert.doesNotMatch(JSON.stringify(data), /[\u{1F000}-\u{1FAFF}\u2705\u274C\u2728]/u);
 });

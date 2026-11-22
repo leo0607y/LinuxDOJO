@@ -37,7 +37,10 @@
 - 周辺機器の模擬パック31問を取り込み。`python3 -m unittest discover -s tests -p test_desktop_sim.py`: 11テスト成功（初期未達成・全正解・罠拒否・ホストsubprocess禁止を含む）。実機検証ではない。
 - FTP実VM再検証完了: `docs/vm_verification/g8-ftp.md`。ACL再検証と追加修正完了: `permissions-recheck.md`。再実行スクリプトは `tools/vmtest/scenarios/`。FTPの単体6テストも成功。g8全体の完了ではない。
 - サイトの `npm test` 7テスト成功、静的ビルド成功。ブラウザE2E実行中。
-- 全Pythonテストを実行中。ログ `/tmp/training-unittest.log` は一時保存で、結果を確認後にここへ追記する。
+- 全Pythonテスト初回: 611件、errors=1、skip=49（190秒）。講座データが対応表の旧3区分を前提にしていたため失敗。4区分対応と目標行の集計照合を修正し、関連7テスト成功（nodeなしの1件skip）。
+- 講座のVM表示に記録済みg2とFTPを反映。追加native実習を既定で「検証済み」にしない。ビルド時に講座データも毎回再生成する。
+- サイトの初回E2E 14/14成功。上記講座変更後のビルド/E2Eは改めて実行する。
+- firewall/lynisの実VM再検証を進行中。未完了は通過扱いにしない。
 - 未コミットのVMモジュール10本は前担当の途中変更。レビュー・検証後に別単位でコミットする。
 
 ### 実装済みの範囲

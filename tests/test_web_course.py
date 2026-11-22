@@ -40,6 +40,8 @@ class CourseDataTests(unittest.TestCase):
         for module in bcd.VM_NEW:
             self.assertIn("実VM未実施", bcd.vm_status(module)[1])
         self.assertEqual(bcd.vm_status("boot")[0], "real")
+        self.assertEqual(bcd.vm_status("sshd")[0], "real")
+        self.assertEqual(bcd.native_status("not-yet-verified")[0], "new")
         listed = {v["id"] for t in self.data["topics"] for v in t["vm"]}
         self.assertTrue(listed <= set(self.data["vmModules"]))
 
@@ -47,8 +49,14 @@ class CourseDataTests(unittest.TestCase):
         cov = self.data["coverage"]
         for exam in cov["exams"]:
             counted = cov["counted"][exam["exam"]]
-            for key in ("covered", "partial", "missing"):
+            for key in ("covered", "unverified", "partial", "missing"):
                 self.assertEqual(exam[key], counted[key], exam["exam"])
+
+    def test_unverified_is_separate_and_bad_summary_is_rejected(self):
+        source = (ROOT / "docs/objectives_matrix.md").read_text()
+        self.assertGreater(bcd.matrix_summary(source)["total"]["unverified"], 0)
+        with self.assertRaises(ValueError):
+            bcd.matrix_summary(source.replace("IMPLEMENTED-UNVERIFIED |", "PARTIAL |", 1))
 
     def test_generated_files_are_git_ignored_and_no_emoji(self):
         out = subprocess.run(["git", "check-ignore", "web/danganlog/public/course-data.json",

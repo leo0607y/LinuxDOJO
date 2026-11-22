@@ -23,11 +23,14 @@ NATIVE_UNIT = "ネイティブ: 実ツールの単体テスト通過、実機検
 NATIVE_NEW = "ネイティブ: 追加直後、実機での検証記録は未整理"
 NATIVE_STATUS = {"logrotate": ("unit", NATIVE_UNIT), "cron": ("new", NATIVE_NEW), "trap": ("new", NATIVE_NEW),
                  "tcpdump": ("new", NATIVE_NEW), "debbuild": ("new", NATIVE_NEW)}
+NATIVE_REAL = {"shell", "find", "archive", "rsync", "git", "vim", "jq", "rg", "curl", "ssh", "tmux",
+               "sqlite", "python", "build", "fzf", "tls", "incident", "release", "docker", "python-packages"}
 
-# VM 実習の検証状況。実VM検証済みは coverage.md の「実VM 9モジュール」。
-VM_REAL = {"boot", "storage", "packages", "permissions", "software", "ssh", "network", "performance", "webstack"}
+# VM 実習の検証状況。追加分の実出力は docs/vm_verification/ を参照。
+VM_REAL = {"boot", "storage", "packages", "permissions", "software", "ssh", "network", "performance", "webstack",
+           "sshd", "mounts", "journald", "sysctl", "limits", "ftp"}
 VM_STATIC = {"users", "netconfig", "firewall", "restore", "osupdate"}
-VM_NEW = {"sshd", "mounts", "journald", "sysctl", "limits", "timesync", "guard"}
+VM_NEW = {"timesync", "guard"}
 VM_LABEL = {"real": "VM: 実VMで検証済み",
             "static": "VM: 静的検証のみ、実VM未実施",
             "new": "VM: 追加直後、静的検査のみで実VM未実施"}
@@ -49,7 +52,7 @@ def vm_status(module):
 
 
 def native_status(lab):
-    return NATIVE_STATUS.get(lab, ("verified", NATIVE_VERIFIED))
+    return NATIVE_STATUS.get(lab, ("verified", NATIVE_VERIFIED) if lab in NATIVE_REAL else ("new", NATIVE_NEW))
 
 
 def split_sections(text):
@@ -107,17 +110,20 @@ def plain(text):
 
 
 def matrix_summary(text):
-    """「## 集計」の表。行ごとの状態 (COVERED/PARTIAL/MISSING) も数えて突き合わせる。"""
+    """四区分の集計表と各目標行を照合する。未検証を検証済みに混ぜない。"""
     block = text.split("## 集計", 1)[1].split("\n## ", 1)[0]
     rows = []
     for line in block.split("\n"):
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
-        if len(cells) == 5 and cells[1].isdigit():
+        if len(cells) == 6 and cells[1].isdigit():
             rows.append({"exam": cells[0], "rows": int(cells[1]), "covered": int(cells[2]),
-                         "partial": int(cells[3]), "missing": int(cells[4])})
+                         "unverified": int(cells[3]), "partial": int(cells[4]), "missing": int(cells[5])})
     exams = [r for r in rows if not r["exam"].startswith("合計")]
-    total = next(r for r in rows if r["exam"].startswith("合計"))
-    total = {k: total[k] for k in ("rows", "covered", "partial", "missing")}
+    total = next((r for r in rows if r["exam"].startswith("合計")), None)
+    if total is None:
+        raise ValueError("objectives_matrix.md に四区分の集計表がありません")
+    keys = ("covered", "unverified", "partial", "missing")
+    total = {k: total[k] for k in ("rows", *keys)}
     if total != {k: sum(r[k] for r in exams) for k in total}:
         raise SystemExit("objectives_matrix.md の集計表の合計が各行の和と一致しません")
     counted = {}
@@ -126,10 +132,14 @@ def matrix_summary(text):
         h = re.match(r"^## (LPIC-1|LPIC-2|LFCS|RHCSA)", line)
         if h:
             section = h.group(1)
-        m = re.match(r"^\| .*? \| (COVERED|PARTIAL|MISSING) \|", line)
+        m = re.match(r"^\| .*? \| (COVERED-REAL|IMPLEMENTED-UNVERIFIED|PARTIAL|MISSING) \|", line)
         if m and section:
-            c = counted.setdefault(section, {"covered": 0, "partial": 0, "missing": 0})
-            c[m.group(1).lower()] += 1
+            c = counted.setdefault(section, dict.fromkeys(keys, 0))
+            key = {"COVERED-REAL": "covered", "IMPLEMENTED-UNVERIFIED": "unverified"}.get(m.group(1), m.group(1).lower())
+            c[key] += 1
+    for exam in exams:
+        if sum(exam[k] for k in keys) != exam["rows"] or counted.get(exam["exam"]) != {k: exam[k] for k in keys}:
+            raise ValueError(f"objectives_matrix.md の {exam['exam']} の集計と目標行が一致しません")
     notes = block.strip().split("\n")[-1]
     return {"exams": exams, "total": total, "counted": counted,
             "note": plain(notes) if not notes.startswith("|") else ""}
