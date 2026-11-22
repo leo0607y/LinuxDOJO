@@ -10,7 +10,7 @@ import Masthead from './Masthead.jsx';
 import { applyTheme, readPrefs, savePrefs } from './preferences.js';
 
 const MAX_ENTRIES = 200;
-const STARTER_COMMANDS = [['hint', 'ヒントを読む'], ['menu', 'レッスンを選ぶ'], ['modes', 'コースを選ぶ']];
+const STARTER_COMMANDS = [['hint', '課題のヒント'], ['answer', '入力例を見る'], ['menu', '問題一覧を開く']];
 const LOCAL_COMMANDS = ['help', 'hint', 'answer', 'next', 'prev', 'menu', 'modes', 'progress', 'goto', 'theme', 'simple', 'clear', 'data', 'course', 'reset', 'check'];
 const HELP_TEXT = [
   'help           このヘルプ',
@@ -409,6 +409,7 @@ export default function Dojo() {
   const pct = loadInfo.total ? Math.min(99, Math.floor(loadInfo.loaded * 100 / loadInfo.total)) : 0;
   const lessonNo = view ? pad2(view.index + 1) : '--';
   const hasNext = !!(view && view.completed && course && view.index + 1 < total);
+  const hasPrev = !!(view && view.index > 0);
   const act = (cmd) => () => runLocal(cmd);
 
   return (
@@ -417,7 +418,7 @@ export default function Dojo() {
       <main className="screen">
         <div className="workbench" ref={workbenchRef} tabIndex={0} aria-label="レッスンの説明と出力">
           <section className="motd" aria-labelledby="lesson-title" key={viewMode + lessonNo} tabIndex={0}>
-            <p className="lesson-meta"><span>LESSON <b>{lessonNo}</b>{course && ' / ' + pad2(course.total)}</span>{course?.name}</p>
+            <p className="lesson-meta"><span>問題 <b>{lessonNo}</b>{course && ' / ' + pad2(course.total)}</span>{course?.name}</p>
             <h1 id="lesson-title">{lesson ? lesson.title : 'Linux 道場'}</h1>
             <div className="motd-text">{lesson ? lesson.explanation : 'ブラウザー内の模擬環境です。実際のPCは変更しません。help で使い方、Tab で補完できます。'}</div>
             {course && <div className="course-progress">
@@ -427,10 +428,11 @@ export default function Dojo() {
           </section>
           <section className="console" aria-labelledby="console-title">
             <div className="console-tools">
-              <h2 id="console-title">模擬ターミナル</h2>
+              <h2 id="console-title">Linux コマンドを試す</h2>
               {!simple && <button className="help-button" type="button" disabled={off} onClick={act('help')}>操作ヘルプ</button>}
             </div>
             {!simple && ready && lesson && !entries.length && <div className="starter-commands">
+              <p>困ったときの操作 <span>Linux コマンドではなく、道場の機能です</span></p>
               {STARTER_COMMANDS.map(([command, label]) => (
                 <button key={command} type="button" disabled={off} onClick={() => { inputRef.current?.focus(); runLocal(command); }}>
                   <code>{command}</code><span>{label}</span>
@@ -464,7 +466,7 @@ export default function Dojo() {
             </div>
           </section>
         </div>
-        <div className="mission"><span className="mission-label">課題 {lessonNo}</span><span id="mission-text">{lesson ? lesson.task : '準備ができると課題が表示されます。'}</span></div>
+        <div className="mission"><span className="mission-label">今回の課題</span><span id="mission-text">{lesson ? lesson.task : '準備ができると課題が表示されます。'}</span></div>
         <form className="prompt" onSubmit={submit} autoComplete="off" aria-busy={busy}>
           <label htmlFor="terminal-input" className="ps"><Ps prompt={(view && view.prompt) || 'learner@danganlog ~'} /></label>
           <span className="field">
@@ -481,17 +483,25 @@ export default function Dojo() {
             <button type="submit" className="kbtn enter" disabled={off}>Enter</button>
           </div>
         </form>
-        {simple ? (
-          <div className="actions" role="group" aria-label="操作ボタン">
+        <div className="actions">
+          {simple ? <div className="quick-actions" role="group" aria-label="学習補助">
             <button type="button" className="kbtn" disabled={off} onClick={act('hint')}>ヒント</button>
             <button type="button" className="kbtn" disabled={off} onClick={act('answer')}>入力例</button>
-            <button type="button" className="kbtn" disabled={off} onClick={act('prev')}>前へ</button>
-            <button type="button" className={'kbtn' + (hasNext ? ' enter' : '')} disabled={off} onClick={act('next')}>次へ</button>
-            <button type="button" className="kbtn" disabled={off} onClick={act('menu')}>一覧</button>
             <button type="button" className="kbtn" disabled={off} onClick={act('modes')}>コース</button>
             <button type="button" className="kbtn" disabled={off} onClick={() => runLocal('help')}>ヘルプ</button>
-          </div>
-        ) : null}
+          </div> : null}
+          <nav className="lesson-nav" aria-label="問題の移動">
+            <button type="button" className="nav-prev" disabled={off || !hasPrev} onClick={act('prev')}>← 前の問題</button>
+            <div className="nav-status" aria-live="polite">
+              <span>{course ? course.name + '　' : ''}問題 {lessonNo} / {pad2(total || 0)}</span>
+              <small>{view?.completed ? '達成済み。次へ進めます。' : '課題を達成すると次の問題へ進めます。'}</small>
+            </div>
+            <button type="button" className="nav-next" disabled={off || !hasNext} onClick={act('next')}>
+              {view?.completed && view.index + 1 >= total ? 'コース達成' : '次の問題へ →'}
+            </button>
+            <button type="button" className="nav-list" disabled={off} onClick={act('menu')}>問題一覧</button>
+          </nav>
+        </div>
       </main>
       <footer className="foot">
         <span className="foot-keys">help / Tab 補完 / ↑↓ 履歴</span>

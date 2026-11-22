@@ -82,7 +82,9 @@ html.app-lock, html.app-lock body { height: 100%; overflow: hidden; overscroll-b
 .console-tools h2 { margin: 0; font-size: .9rem; letter-spacing: .04em; }
 .help-button, .foot button { border: 0; padding: .5rem 0; background: transparent; color: inherit; text-decoration: underline; font-size: .875rem; }
 .help-button:hover, .foot button:hover { color: var(--accent); }
-.starter-commands { display: grid; gap: .4rem; align-self: start; padding: 1.15rem var(--gutter) .5rem; }
+.starter-commands { display: grid; gap: .28rem; align-self: start; padding: 1rem var(--gutter) .65rem; border-bottom: 1px solid var(--line); }
+.starter-commands > p { display: flex; flex-wrap: wrap; gap: .25rem .8rem; margin: 0 0 .35rem; color: var(--fg); font-size: .82rem; font-weight: 700; }
+.starter-commands > p span { color: var(--dim); font-size: .78rem; font-weight: 400; }
 .starter-commands button { display: flex; align-items: baseline; gap: 1rem; padding: .25rem 0; background: transparent; border: 0; text-align: left; }
 .starter-commands code { min-width: 5ch; color: var(--user); font-weight: 700; }
 .starter-commands span { color: var(--dim); font-size: .9rem; }
@@ -114,7 +116,18 @@ html.app-lock, html.app-lock body { height: 100%; overflow: hidden; overscroll-b
 .kbtn { display: inline-flex; align-items: center; justify-content: center; min-height: 2.5rem; padding: 0 .65rem; background: var(--panel); border: 1px solid var(--line); border-radius: 0; color: var(--fg); font-size: .9rem; }
 .kbtn:hover:not(:disabled) { border-color: var(--fg); }
 .kbtn.enter { background: var(--fg); color: var(--panel); border-color: var(--fg); font-weight: 700; }
-.actions { grid-area: actions; display: flex; flex-wrap: wrap; gap: .35rem; padding: 0 var(--gutter) .5rem; }
+.actions { grid-area: actions; display: flex; align-items: center; gap: .7rem; padding: .55rem var(--gutter) .7rem; border-top: 1px solid var(--line); background: var(--bg); }
+.quick-actions { display: flex; flex-wrap: wrap; gap: .35rem; }
+.lesson-nav { display: grid; grid-template-columns: auto minmax(10rem, 1fr) auto auto; align-items: center; gap: .6rem; width: 100%; }
+.lesson-nav button { min-height: 2.55rem; padding: .35rem .7rem; border: 1px solid var(--line); border-radius: 0; background: var(--panel); color: var(--fg); font-size: .88rem; font-weight: 650; white-space: nowrap; }
+.lesson-nav button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.lesson-nav .nav-next { border-color: #a84b27; background: #a84b27; color: #fffaf3; }
+.lesson-nav .nav-next:hover:not(:disabled) { border-color: #78371f; background: #78371f; color: #fffaf3; }
+.lesson-nav .nav-next:disabled { border-color: var(--line); background: var(--raise); color: var(--dim); opacity: 1; }
+.nav-status { display: grid; gap: .05rem; min-width: 0; color: var(--fg); font-size: .82rem; font-weight: 700; }
+.nav-status span, .nav-status small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-status small { color: var(--dim); font-size: .74rem; font-weight: 400; }
+.lesson-nav .nav-list { border-style: dashed; background: transparent; }
 .foot { flex: none; min-height: 2.4rem; padding: 0 var(--gutter, 1.5rem); display: flex; justify-content: space-between; align-items: center; gap: .75rem; background: var(--bg); color: var(--dim); border-top: 1px solid var(--line); font: .8rem/1.4 var(--mono); }
 .foot-r { display: flex; align-items: center; gap: 1.2rem; }
 .foot [aria-pressed="true"] { font-weight: 700; color: var(--fg); }
@@ -144,6 +157,13 @@ dialog::backdrop { background: rgb(0 0 0 / 65%); }
   .console-tools { min-height: 2.7rem; }
   .term-out { overflow: visible; }
   .mission, .prompt, .actions { flex: none; }
+  .actions { display: block; padding: .45rem var(--gutter) .55rem; }
+  .quick-actions { margin-bottom: .4rem; }
+  .lesson-nav { grid-template-columns: auto 1fr auto; gap: .4rem; }
+  .lesson-nav button { min-height: 2.7rem; padding-inline: .5rem; font-size: .8rem; }
+  .lesson-nav .nav-list { grid-column: 1 / -1; min-height: 2.2rem; border: 0; border-top: 1px dashed var(--line); background: transparent; }
+  .nav-status { font-size: .73rem; }
+  .nav-status small { font-size: .68rem; }
 }
 @media (max-width: 42.5rem), (hover: none) and (pointer: coarse) {
   .prompt { flex-wrap: wrap; gap: .2rem .5rem; }
