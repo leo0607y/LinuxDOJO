@@ -1,24 +1,25 @@
 :root {
   color-scheme: light dark;
-  --bg: light-dark(#ffffff, #0c0c0e);
-  --fg: light-dark(#16171a, #ececef);
-  --dim: light-dark(#666a72, #8d9199);
-  --line: light-dark(#e7e7ea, #24262b);
-  --panel: light-dark(#ffffff, #0c0c0e);
-  --raise: light-dark(#f6f6f8, #131418);
-  --accent: light-dark(#4338ca, #9aa2ff);
-  --user: light-dark(#0b6b5f, #5eead4);
-  --path: light-dark(#2f4fc4, #9db8ff);
-  --err: light-dark(#b42318, #ff8f85);
+  --bg: light-dark(#faf9f5, #262624);
+  --fg: light-dark(#2b2a26, #ecebe4);
+  --dim: light-dark(#6a665b, #a9a699);
+  --line: light-dark(#e6e2d6, #3b3a36);
+  --panel: light-dark(#ffffff, #30302e);
+  --raise: light-dark(#f2f0e8, #1f1e1d);
+  --accent: light-dark(#b4532e, #e8916b);
+  --user: light-dark(#2f6b4f, #8fd6b0);
+  --path: light-dark(#3a5aa8, #9bb8f0);
+  --err: light-dark(#b3261e, #ff9a90);
   --ok: var(--user);
-  --hint: light-dark(#8a4b08, #f5c36b);
-  --focus: light-dark(#4338ca, #9aa2ff);
+  --hint: light-dark(#8a5a0a, #f0c675);
+  --focus: light-dark(#b4532e, #e8916b);
   --mast: var(--bg);
   --mast-fg: var(--fg);
   --brand: var(--accent);
-  --radius: 8px;
+  --radius: 14px;
   --mono: "DejaVu Sans Mono", "Liberation Mono", "Noto Sans Mono CJK JP", Menlo, Consolas, monospace;
   --sans: "Inter", "Noto Sans CJK JP", "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic", system-ui, sans-serif;
+  --serif: "Noto Serif CJK JP", "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", Georgia, serif;
 }
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"] { color-scheme: dark; }
@@ -198,58 +199,73 @@ dialog::backdrop { background: rgb(0 0 0 / 65%); }
 }
 
 
-/* ===== Minimal / modern theme ===== */
-::selection { background: color-mix(in srgb, var(--accent) 30%, transparent); color: inherit; }
-body { font-size: 15.5px; -webkit-font-smoothing: antialiased; }
-.masthead { border-bottom: 1px solid var(--line); }
-.masthead-inner { min-height: 3.4rem; }
-.wordmark { font: 650 .95rem/1 var(--sans); letter-spacing: .14em; gap: .65rem; }
-.shell-mark { width: 1.7rem; height: 1.7rem; padding: 0; border-radius: 7px; background: var(--accent); color: #fff; font-size: .8rem; letter-spacing: -.08em; }
-.masthead-nav { font-size: .85rem; gap: clamp(1rem, 2.4vw, 2rem); }
+
+/* ===== AI-style single column: lesson + terminal flow vertically, composer pinned at the bottom ===== */
+::selection { background: color-mix(in srgb, var(--accent) 28%, transparent); color: inherit; }
+body { font-size: 16px; -webkit-font-smoothing: antialiased; }
+.masthead { border: 0; }
+.masthead-inner { min-height: 3.4rem; max-width: 64rem; margin: 0 auto; width: 100%; }
+.wordmark { font: 600 1rem/1 var(--serif); letter-spacing: .02em; }
+.shell-mark { width: 1.7rem; height: 1.7rem; padding: 0; border-radius: 8px; background: var(--accent); color: #fff; font-size: .78rem; letter-spacing: -.08em; }
+.masthead-nav { font-size: .85rem; gap: clamp(1rem, 2.4vw, 1.8rem); }
 .masthead-nav > * { text-decoration: none; color: var(--dim); }
-.masthead-nav [aria-current] { color: var(--fg); font-weight: 600; box-shadow: inset 0 -2px var(--accent); }
+.masthead-nav [aria-current] { color: var(--fg); font-weight: 600; box-shadow: none; }
 .masthead a:hover { color: var(--fg); }
 .masthead :focus-visible { outline-color: var(--focus); }
 
-.screen { background: var(--raise); }
-.motd h1 { font: 650 clamp(1.7rem, 2.6vw, 2.5rem)/1.3 var(--sans); letter-spacing: -.035em; margin-bottom: 1.6rem; max-width: 22ch; }
-.lesson-meta { margin-bottom: 1.4rem; font-size: .78rem; font-weight: 500; letter-spacing: .06em; color: var(--dim); }
-.lesson-meta span { color: var(--accent); font: 600 .78rem/1.4 var(--mono); }
-.lesson-meta b { font-weight: 500; }
-.motd-text { white-space: normal; max-width: 34rem; font-size: 1rem; line-height: 1.95; color: var(--dim); }
-.motd-text p { margin: 0 0 1.1em; }
-.motd-text p:first-child { color: var(--fg); font-size: 1.08rem; font-weight: 500; }
-.course-progress { margin-top: 2.5rem; }
-.course-progress progress { height: 4px; border-radius: 99px; overflow: hidden; background: var(--line); color: var(--accent); }
+.screen { --gutter: clamp(1rem, 4vw, 1.5rem); display: flex; flex-direction: column; background: var(--bg); }
+.workbench { display: block; flex: 1; min-height: 0; overflow: auto; scrollbar-width: thin; }
+.workbench > * { max-width: 46rem; margin-inline: auto; width: 100%; }
+.motd { border: 0; background: transparent; overflow: visible; padding: clamp(1.5rem, 5vh, 3.5rem) var(--gutter) 1rem; }
+.lesson-meta { margin: 0 0 .9rem; font-size: .8rem; font-weight: 500; color: var(--dim); }
+.lesson-meta span { color: var(--accent); font: 600 .8rem/1.4 var(--mono); }
+.lesson-meta b { font-weight: 600; }
+.motd h1 { font: 500 clamp(1.7rem, 4vw, 2.4rem)/1.35 var(--serif); letter-spacing: -.01em; margin: 0 0 1.2rem; max-width: none; text-wrap: balance; }
+.motd-text { white-space: normal; max-width: none; font-size: 1.02rem; line-height: 1.9; color: var(--fg); }
+.motd-text p { margin: 0 0 1em; }
+.motd-text p:first-child { font-size: 1.1rem; }
+.course-progress { max-width: 18rem; margin-top: 1.6rem; }
+.course-progress progress { height: 4px; border-radius: 99px; overflow: hidden; background: var(--line); }
 .course-progress progress::-webkit-progress-bar { background: var(--line); border-radius: 99px; }
 .course-progress progress::-webkit-progress-value { background: var(--accent); border-radius: 99px; }
 .course-progress progress::-moz-progress-bar { background: var(--accent); }
 
-.console { background: var(--raise); }
-.console-tools { margin: 0; padding: 0 var(--gutter); min-height: 3.2rem; border-bottom: 1px solid var(--line); background: var(--panel); }
-.console-tools h2 { font: 600 .78rem/1 var(--sans); letter-spacing: .08em; color: var(--dim); }
-.help-button, .foot button { text-decoration: none; padding: .3rem .75rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); font-size: .8rem; }
+.console { display: block; margin-top: .5rem; margin-bottom: 1.5rem; padding-inline: var(--gutter); background: transparent; }
+.console-tools { margin: 0; min-height: 0; padding: .4rem 0 .6rem; border: 0; background: transparent; }
+.console-tools h2 { font: 600 .78rem/1 var(--sans); letter-spacing: .06em; color: var(--dim); }
+.help-button, .foot button { text-decoration: none; padding: .3rem .8rem; border: 1px solid var(--line); border-radius: 99px; background: var(--panel); font-size: .8rem; }
 .help-button:hover, .foot button:hover { border-color: var(--dim); color: var(--fg); }
-.starter-commands { background: transparent; border-bottom: 1px solid var(--line); align-self: stretch; padding-block: 1.2rem; }
-.starter-commands > p { color: var(--dim); font-weight: 600; font-size: .75rem; letter-spacing: .06em; }
-.starter-commands button { margin-inline: -.6rem; padding: .35rem .6rem; border-radius: 6px; }
-.starter-commands button:hover { background: var(--panel); }
+.starter-commands { padding: .9rem 1.1rem; margin-bottom: .6rem; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+.starter-commands > p { color: var(--dim); font-size: .78rem; }
+.starter-commands button { margin-inline: -.5rem; padding: .35rem .5rem; border-radius: 8px; }
+.starter-commands button:hover { background: var(--raise); }
 .starter-commands button:hover span { text-decoration: none; color: var(--fg); }
 .starter-commands code { color: var(--accent); }
-.term-out { padding-top: 1.1rem; font-size: .95rem; }
+.term-out { overflow: visible; padding: 1rem 1.1rem; background: var(--raise); border: 1px solid var(--line); border-radius: var(--radius); font-size: .93rem; min-height: 5rem; }
 
-.mission { background: var(--panel); border: 0; border-top: 1px solid var(--line); padding-block: .95rem; }
-.mission-label { font: 600 .72rem var(--sans); letter-spacing: .1em; color: var(--accent); }
-.prompt { background: var(--panel); padding-block: .75rem; font-size: .95rem; }
+.mission, .prompt, .actions { width: 100%; max-width: 46rem; margin-inline: auto; flex: none; }
+.mission { background: transparent; border: 0; padding: .4rem var(--gutter) .5rem; font-size: .92rem; color: var(--dim); max-height: 5.5rem; }
+.mission-label { font: 600 .72rem var(--sans); letter-spacing: .08em; color: var(--accent); }
+#mission-text { color: var(--fg); }
+.prompt { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: .5rem .9rem; width: calc(100% - 2 * var(--gutter)); box-shadow: 0 2px 14px rgb(0 0 0 / 6%); font-size: .95rem; }
+.prompt:focus-within { border-color: var(--accent); }
 .field:focus-within { box-shadow: 0 2px 0 var(--accent); }
-.actions { background: var(--panel); border-top: 1px solid var(--line); }
-.kbtn, .lesson-nav button { border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line); color: var(--fg); font-weight: 500; }
-.lesson-nav button:hover:not(:disabled), .kbtn:hover:not(:disabled) { border-color: var(--dim); color: var(--fg); background: var(--raise); }
-.kbtn.enter { background: var(--fg); border-color: var(--fg); color: var(--panel); }
+.actions { background: transparent; border: 0; padding: .6rem var(--gutter) .8rem; }
+.kbtn, .lesson-nav button { border-radius: 99px; background: var(--panel); border: 1px solid var(--line); color: var(--fg); font-weight: 500; }
+.lesson-nav button:hover:not(:disabled), .kbtn:hover:not(:disabled) { border-color: var(--dim); background: var(--raise); color: var(--fg); }
+.kbtn.enter { background: var(--accent); border-color: var(--accent); color: #fff; }
 .lesson-nav .nav-next { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
-.lesson-nav .nav-next:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 85%, #000); border-color: transparent; color: #fff; }
-.lesson-nav .nav-next:disabled { background: var(--raise); border-color: var(--line); color: var(--dim); }
+.lesson-nav .nav-next:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 88%, #000); border-color: transparent; color: #fff; }
+.lesson-nav .nav-next:disabled { background: transparent; border-color: var(--line); color: var(--dim); }
 .lesson-nav .nav-list { border-style: solid; background: transparent; }
-.foot { background: var(--panel); border-top: 1px solid var(--line); }
-dialog { border-radius: 14px; border: 1px solid var(--line); box-shadow: 0 20px 50px rgb(0 0 0 / 18%); }
-@media (max-width: 55rem) { .motd { border-bottom: 1px solid var(--line); } .motd-text { line-height: 1.85; } }
+.foot { background: var(--bg); border-top: 1px solid var(--line); }
+dialog { border-radius: 18px; border: 1px solid var(--line); box-shadow: 0 24px 60px rgb(0 0 0 / 20%); }
+.motd { padding-top: clamp(1rem, 3vh, 2.2rem); }
+.motd h1 { font-size: clamp(1.5rem, 3.2vw, 2rem); margin-bottom: .8rem; }
+.motd-text { font-size: .96rem; line-height: 1.75; }
+.motd-text p { margin-bottom: .55em; }
+.motd-text p:first-child { font-size: 1.02rem; }
+.course-progress { margin-top: 1rem; }
+.console { margin-top: .2rem; }
+
+.kbtn.enter, .lesson-nav .nav-next, .lesson-nav .nav-next:hover:not(:disabled) { color: light-dark(#fff, #1f1e1d); }
