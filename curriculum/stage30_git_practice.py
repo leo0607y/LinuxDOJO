@@ -641,7 +641,7 @@ git bisect reset'''
 mission(13, 'git bisect run で原因commitを自動特定する',
         '「いつから壊れたか」を履歴の二分探索で見つけます。判定スクリプトを渡せば、git bisect run が良い/悪いを自動で判定して原因を絞り込みます。',
         ['最初に壊れたcommitをculprit.txtへ', 'bisect reset で探索を終える'], s13, c13, SOL13,
-        ["cd repo\ngit rev-parse HEAD~5 > ../culprit.txt", "cd repo\ngit bisect start HEAD good\ngit bisect run ./test.sh\ngit rev-parse refs/bisect/bad > ../culprit.txt"],
+        ["cd repo\ngit rev-parse good > ../culprit.txt", "cd repo\ngit bisect start HEAD good\ngit bisect run ./test.sh\ngit rev-parse refs/bisect/bad > ../culprit.txt"],
         'git bisect start <bad> <good> で範囲を決め、git bisect run <script> は終了コード0=良い、1〜127(125除く)=悪い として自動で二分探索します（125は判定不能でスキップ）。結果は refs/bisect/bad に入ります。最後に git bisect reset で元のブランチへ戻ります。手動なら git bisect good / bad を繰り返します。',
         '14個ならおよそ4回の判定で特定できます。', 'git bisect start / git bisect run ./test.sh / git bisect reset')
 

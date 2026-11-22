@@ -18,6 +18,7 @@
 - firewall: `381b0bc`。実nft/netns、HTTP部分受信の誤判定を修正。通信・抜け道拒否・再読込・専用資源の撤去を確認。
 - localca: `045a20b`。実TLSテストのpipe未closeを修正。ResourceWarningをerrorにして4テスト成功。
 - 前担当の途中修正保存: `5e93b15`。guard/libvirt/netlink/pam/podman/postgres/systemdadv/tunedは、この時点では**実VM未検証**。その後の個別完了記録を優先する。
+- Git30-13: 固定HEAD~5を誤答としていたが、ランダムな故障位置と一致する場合があった。誤答を必ず正常なgoodタグへ変更（採点条件は変更なし）。個別検証後、全501問を再実行: `/tmp/training-release-missions.log`。
 - Vim31-17: ERROR行をFIXマーカーで上書きした際の期待件数を修正。生成後の実内容で集計。ERROR行/INFO行の両ケースの回帰テストと実Vim操作31-17成功。
 - ターミナル起動: `b91a92f`。ペンギンと青/紫/シアン、瞬き・ウインク・笑顔。`LQ_NO_ANIMATION=1`で静止。NO_COLOR/非TTYでも静止。PTYで起動とEnter終了を確認。関連10テスト成功。
 - Podman: `170ae81`。rootless Quadlet、公開範囲・実bind mount/heartbeat、UID/GID対応・起動失敗修復・user manager再起動・2周の専用資源撤去を確認。実出力 `g7-podman.md`。
