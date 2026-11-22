@@ -42,7 +42,9 @@
 - サイトの初回E2E 14/14成功。上記講座変更後のビルド/E2Eは改めて実行する。
 - firewall実VM再検証完了（`g1-firewall.md`）。HTTPの部分受信による誤拒否も修正。g1全体は未完了。lynisは再検証中。
 - 対応表へg2の13行とFTPを反映。印刷は模擬のためPARTIAL。集計は生成処理で実際の目標行と照合する。
-- 未コミットのVMモジュール10本は前担当の途中変更。レビュー・検証後に別単位でコミットする。
+- 前担当の途中変更: guard/libvirt/netlink/pam/podman/postgres/systemdadv/tuned。VM関連単体テスト202件は成功したが、この8本の実VM通過は未確認。作業消失防止のWIPとして保存し、実VM確認を続ける。
+- localcaの実TLSテスト中にパイプ未closeのResourceWarningが出たため修正。ResourceWarningをerrorにした4テストが成功（33秒）。
+- lynisは正解候補でも指標59→59、BANN-7130残留で拒否。まだ完了扱いにしない。調査中。
 
 ### 実装済みの範囲
 - VMモジュール: 合計 約65（`labs/vm/guest/modules/*.sh`、`ls` で数える）。既存9（packages software ssh permissions network performance storage boot webstack）は以前の実VMで検証済み。追加分は下記の実VM検証を進行中。RHEL系3本（selinux dnf firewalld）は RHEL 系 VM が必要で、`labs/vm/RHEL.md` に手動手順がある。Ubuntu VMでは常に拒否される。

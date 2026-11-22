@@ -254,6 +254,8 @@ def _tls_handshake(root, name, host, cert, key, extra_client=(), extra_server=()
     finally:
         server.kill()
         server.wait()
+        server.stdin.close()
+        server.stdout.close()
     server = subprocess.Popen(["openssl", "s_server", "-accept", str(port), "-cert", cert, "-key", key,
                                "-naccept", "1", "-quiet", *extra_server], cwd=root,
                               stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
