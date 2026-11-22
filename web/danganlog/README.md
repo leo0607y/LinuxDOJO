@@ -17,7 +17,7 @@ Pyodide も同じサイトから配信するため、実行時に第三者のサ
 
 ## ビルドとローカル確認
 
-Node.js 20.9 以上 (推奨 22) と Python 3.9 以上が必要です。リポジトリ全体 (`engine/`, `curriculum/`, `tools/`) が手元にある状態で実行してください。
+Node.js 20.9 以上 (推奨 22。wrangler でデプロイするなら 22.12 以上) と Python 3.9 以上が必要です。リポジトリ全体 (`engine/`, `curriculum/`, `tools/`) が手元にある状態で実行してください。
 
 ```
 cd web/danganlog
@@ -49,7 +49,7 @@ Cloudflare にログインできる人が、ダッシュボードで設定しま
    - Build output directory: `out`
    - 環境変数: `NODE_VERSION` = `22` (`.node-version` でも指定済み)
 3. ビルドには `engine/` などのリポジトリ全体と Python 3 が必要です (Pages のビルド環境に含まれます。使えない場合は `PYTHON_VERSION` を設定)。
-4. デプロイ後、Pages プロジェクトの「Custom domains」で `danganlog.com` を追加します。同じ Cloudflare アカウントのドメインなら DNS レコード (CNAME) が自動で作られます。`www` も使う場合は別途追加してリダイレクトします。
+4. デプロイ後は `https://<プロジェクト名>.pages.dev/` (無料) で公開されます。独自ドメインを使う場合のみ、自分が所有するドメインを Pages プロジェクトの「Custom domains」に追加します (任意)。
 5. Functions、KV、D1、R2、Workers、Analytics は有効にしないでください。静的ファイルの配信だけで動きます。
 
 最大のファイルは `pyodide.asm.wasm` (約10MB) で、Pages の1ファイル25MiB制限に収まります。
