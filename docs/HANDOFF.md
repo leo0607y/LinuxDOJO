@@ -46,7 +46,7 @@
 - daily_cron担当は制限残25%のため設計確認だけで停止。リポジトリ/VM変更なし。実装は未着手で、次回はDAILY_USE_AUDITの方針から開始する。
 
 ### 環境とログの場所
-- Node 22: `<node-dir>/bin` をPATHへ追加。消えていれば別途用意する。
+- Node 22 (20.9以上) を PATH に用意する（無ければ別途導入）。
 - VM: `~/.cache/linuxdojo-vm/vms/`。g1-app/client、g3-app〜g8-appを保持。`up NAME` で停止済みを再開できる。g6/g7の担当作業は完了し、専用資源は撤去済み。記録を確認して再利用する。
 - `vmtest.py install` は共有 `bundle/` を書き換えるため並列実行しない。VM内の試験自体は別VMなら並列可。
 - 一時ログ: `/tmp/training-*.log`。**実VM通過ログはdocsへ保存するまで完了としない**。画像: `/tmp/dangan-{terminal,course,detail,coverage}-{1280,375,320}.png`。
@@ -99,7 +99,7 @@
 - 起動: Node 22 が必要（この環境ではスクラッチパッドに展開したもの）。`cd web/danganlog && npm ci && npm run dev -- -p 3000`。ビルド: `npm run build`（`tools/build_web.py` が `python-source.json` を生成）。
 - テスト: `npm test`（node）、`npm run test:e2e`（Playwright、実ブラウザ。14件通過を確認済み）。
 - `/course/`: 32トピックの講座ページ（`tools/build_course_data.py` が生成）。見た目を Ubuntu 端末風に揃える作業が未確認。
-- Cloudflare: `wrangler login` 済み。アカウントには別の既存プロジェクトがあり、**触らない**。新規プロジェクト名は `danganlog` の予定。デプロイは利用者の見た目確認後。手順は `web/danganlog/README.md`。
+- Cloudflare: `wrangler login` 済みの前提。既存の別プロジェクトには触らない。デプロイは `web/danganlog/scripts/deploy.sh`（設定は `.env.deploy`、Git管理外。手順は `web/danganlog/README.md`）。利用者の見た目確認後に実行する。
 
 ### 残りの作業（優先順）
 1. 実VM検証の結果（`docs/vm_verification/`）を、各表に反映し、`FIRST_RUN.md` を「実VMで確認した事項」に更新する。

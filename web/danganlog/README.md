@@ -54,6 +54,19 @@ Cloudflare にログインできる人が、ダッシュボードで設定しま
 
 最大のファイルは `pyodide.asm.wasm` (約10MB) で、Pages の1ファイル25MiB制限に収まります。
 
+## スクリプトでデプロイする (wrangler)
+
+```
+cd web/danganlog
+cp .env.deploy.example .env.deploy    # CLOUDFLARE_PAGES_PROJECT などを記入 (.env.deploy は Git に入りません)
+npx wrangler@4.166.0 login            # ブラウザ認証。API トークン方式なら .env.deploy に CLOUDFLARE_API_TOKEN を記入
+scripts/deploy.sh --dry-run           # 実行内容の確認だけ
+scripts/deploy.sh                     # テスト → ビルド → out/ を Pages へアップロード
+```
+
+`--skip-build` `--skip-test` も使えます。初回のみ Pages プロジェクトを作る必要があります (`npx wrangler@4.166.0 pages project create <名前> --production-branch main`)。
+トークンは「Cloudflare Pages: Edit」だけの権限で作成し、リポジトリ・チャット・Issue には貼らないでください。
+
 ## 容量
 
 `out/` 全体で約16MB (Pyodide 約14MB、教材 Python 約1.4MB)。初回アクセスで Pyodide を読み込み、以降はブラウザーにキャッシュされます。

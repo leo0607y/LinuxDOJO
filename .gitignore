@@ -133,6 +133,7 @@ Thumbs.db
 !/web/danganlog/package-lock.json
 !/web/danganlog/next.config.mjs
 !/web/danganlog/.node-version
+!/web/danganlog/.env.deploy.example
 !/web/danganlog/app/
 !/web/danganlog/components/
 !/web/danganlog/lib/
@@ -145,3 +146,16 @@ Thumbs.db
 node_modules/
 .next/
 out/
+
+# Deploy secrets and tool state (kept after allowlist so they always win).
+.env.deploy
+.dev.vars
+.wrangler/
+wrangler.toml.local
+*.token
+.npmrc
+.netrc
+.git-credentials
+.config/
+.cloudflared/
+cert.pem
