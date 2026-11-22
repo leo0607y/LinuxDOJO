@@ -416,7 +416,7 @@ BASIC.extend([
            "ssh ユーザー名@接続先 の順に指定します。learner@training-server は、接続先のlearnerとして入る指定です。\n"
            "この課題は接続をシミュレートします。実通信もパスワード入力もありません。\n"
            "初めての接続では相手の指紋を確認します。今回は確認表示までを1つの練習として区切ります。",
-           "訓練サーバーへの接続を開始しましょう。", "ssh learner@training-server",
+           "ユーザー名 learner、接続先 training-server で、SSH接続を開始しましょう。", "ssh learner@training-server",
            "指紋の確認待ちになりました。まだ接続相手を確認していないので、次は接続を断る練習をします。",
            ssh_known=False),
     lesson("basic-35", "知らない相手を無条件に信用しない",
@@ -431,14 +431,14 @@ BASIC.extend([
            "管理者から事前に別の経路で受け取った訓練サーバーの指紋を、ファイルに用意しました。\n"
            "cat で読んで、接続時に表示される文字列と一致するか比べます。\n"
            "指紋が急に変わった場合も、理由を確認するまで接続しません。警告を消すために記録を削除しないでください。",
-           "事前に受け取った訓練用の指紋を読みましょう。", "cat server-fingerprint.txt",
+           "事前に受け取った訓練用の指紋ファイル server-fingerprint.txt を表示して読みましょう。", "cat server-fingerprint.txt",
            "次の接続では、この訓練用の指紋と同じ値が表示されることを確認します。",
            files={"server-fingerprint.txt": _FINGERPRINT_NOTE}),
     lesson("basic-37", "確認する準備ができてから接続する",
            "もう一度SSH接続を開始し、表示される指紋を事前の情報と比べます。\n"
            "訓練サーバーの期待する値は " + _TRAINING_FINGERPRINT + " です。\n"
            "ここでは説明を1操作ずつ進めるため、接続コマンドと確認への回答を別々の課題にしています。",
-           "訓練サーバーへの接続をもう一度開始しましょう。", "ssh learner@training-server",
+           "もう一度、ユーザー名 learner、接続先 training-server でSSH接続を開始しましょう。", "ssh learner@training-server",
            "確認待ちになりました。値が一致していることを読んでから、次の課題で接続を承認します。",
            ssh_known=False),
     lesson("basic-38", "一致する指紋を確認して接続する",
@@ -481,7 +481,7 @@ BASIC.extend([
            "-i の後ろには、自分が使う秘密鍵ファイルのパスを書きます。今回は2222番を使う設定の練習です。\n"
            "公開鍵は接続先への登録用、秘密鍵は自分の手元で守るものです。秘密鍵を相手やチャットへ渡しません。\n"
            "ここで使う training_key は無効な教材用ダミーで、実際の秘密鍵は作成も使用もしません。",
-           "ポート2222と訓練用の鍵を指定して接続しましょう。",
+           "ポート 2222、鍵 .ssh/training_key、ユーザー名 learner、接続先 training-server を指定して接続しましょう。",
            "ssh -p 2222 -i .ssh/training_key learner@training-server",
            "指定した接続方法で入りました。-p は接続先のポート、-i は自分の秘密鍵の指定です。",
            ssh_known=True, files={".ssh/training_key": _TRAINING_KEY}, modes={".ssh/training_key": 0o600}),
@@ -496,7 +496,7 @@ BASIC.extend([
            "ユーザー名@接続先:パス と書いた側がリモートです。コロン : も含めて入力します。\n"
            "手元のnote.txtを相手側のupload.txtという名前で送るときも、元（手元）を先、先（リモート）を後に書きます。\n"
            "scp はコピー後も手元側にいます。実際の通信やファイル転送はせず、教材内で再現します。",
-           "手元側の note.txt を、接続先の upload.txt へコピーしましょう。",
+           "手元側の note.txt を、接続先 learner@training-server の upload.txt という名前へコピーしましょう。",
            "scp note.txt learner@training-server:upload.txt",
            "手元側から接続先へのコピーを練習できました。元と先のどちらがリモートかを読むことが大切です。",
            ssh_known=True, files={"note.txt": "手元側から送る練習用メモです。\n"}),
@@ -504,7 +504,7 @@ BASIC.extend([
            "受け取るときは、リモートの指定を先に書きます。元、先という順序は同じです。\n"
            "learner@training-server:download.txt がコピー元、received.txt が手元側の保存先です。\n"
            "ポート指定が必要な場合、ssh は小文字 -p、scp は大文字 -P を使う違いもあります。",
-           "接続先の download.txt を、手元側の received.txt として受け取りましょう。",
+           "接続先 learner@training-server の download.txt を、手元側の received.txt として受け取りましょう。",
            "scp learner@training-server:download.txt received.txt",
            "接続先から手元側へのコピーを練習できました。転送の向きを確認してから実行しましょう。",
            ssh_known=True, remote_files={"download.txt": "接続先から受け取る練習用メモです。\n"}, remove=["received.txt"]),
@@ -513,7 +513,7 @@ BASIC.extend([
            "接続先へのネットワークが不通なこととは別の種類のエラーです。\n"
            "今回は許可されていないguestで接続し、認証エラーを読むことが正解です。\n"
            "解決のために秘密鍵を公開したり、確認できない設定をそのまま変更したりしません。",
-           "guest で接続を試して、認証エラーを読みましょう。", "ssh guest@training-server",
+           "ユーザー名 guest、接続先 training-server で接続を試して、認証エラーを読みましょう。", "ssh guest@training-server",
            "認証が拒否されました。まずユーザー名・使用する鍵・接続先の許可を確認する場面だと分かりました。",
            ssh_known=True, expected_code=255),
     lesson("basic-48", "接続できないエラーを切り分ける",
@@ -521,7 +521,7 @@ BASIC.extend([
            "今回はSSHが動いていない9999番をあえて指定して、表示を読みます。認証エラーとは区別しましょう。\n"
            "本物では接続先名と指定ポート、サーバーのSSHサービスやファイアウォール設定を管理者と確認します。\n"
            "ここまでで調べ方とSSHの基本を練習しました。次は、サーバーでファイルを書き換えるときに使う vim を学びます。",
-           "9999番へ接続を試し、接続拒否の表示を読みましょう。", "ssh -p 9999 learner@training-server",
+           "ポート 9999、ユーザー名 learner、接続先 training-server で接続を試し、接続拒否の表示を読みましょう。", "ssh -p 9999 learner@training-server",
            "認証の問題と接続先・ポートの問題を分けて考えられました。忘れたら説明や手本を見直して大丈夫です。",
            ssh_known=True, expected_code=255),
 ])

@@ -799,7 +799,7 @@ class Terminal:
             else:
                 return Result("使い方: ssh [-p ポート] [-i 練習用の鍵] learner@training-server", 255)
         if target not in ("learner@training-server", "guest@training-server"):
-            return Result("この教材では training-server のみ模擬接続できます。実サーバーへの通信は行いません。", 255)
+            return Result(f"接続先 '{target}' には接続できません。この教材では learner@training-server（または guest@training-server）だけが模擬接続の相手です。綴りを確認しましょう。実サーバーへの通信は行いません。", 255)
         if port not in ("22", "2222"):
             return Result(f"ssh: connect to host training-server port {port}: Connection refused（模擬）", 255)
         if target.startswith("guest@"):
