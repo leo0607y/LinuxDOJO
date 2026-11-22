@@ -43,6 +43,8 @@ net-dumpxml default
 echo @@end
 PROBE
     } | (cd "$LV_DIR" && virsh -c test:///default 2>&1)) && LV_RC=0 || LV_RC=$?
+    # virsh echoes each command after a 'virsh # ' prompt when stdin is a pipe; drop those so sections hold only real output
+    LV_OUT=$(sed '/^virsh # /d' <<<"$LV_OUT")
     return "$LV_RC"
 }
 

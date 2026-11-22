@@ -115,11 +115,12 @@ CONF
 3. /etc/fail2ban/jail.d/dojo-sshd-lab.conf に jail [dojo-sshd-lab] を書く。
    enabled / filter / logpath(専用ログのみ) / backend = polling /
    action = dojo-lab-record（提供済み。banを $LAB_STATE の bans.txt に記録するだけ）
-   maxretry 2-5, findtime 10以上, bantime 60以上。ignoreipで 192.0.2.0/24 を除外してはならない。
+   maxretry 2-5, findtime 10-30, bantime 60以上。ignoreipで 192.0.2.0/24 を除外してはならない。
 4. sudo fail2ban-client reload  →  sudo fail2ban-client status dojo-sshd-lab
 5. sudo dojo-guard-fail 192.0.2.10 <maxretry回>  → statusで遮断を確認。
    sudo fail2ban-client set dojo-sshd-lab unbanip 192.0.2.10 で解除。
-6. maxretry未満では遮断されないこと、findtimeより古い失敗(第3引数AGE秒)は数えられないことを試す。
+6. maxretry未満では遮断されないこと、findtimeの2倍以上間をあけた失敗は合算されないこと（maxretry-1回→findtime*2+数秒待つ→1回。fail2banは区間内の失敗率で数えるため、ぎりぎりでは遮断される）を試す。
+   （稼働中のfail2banは過去の時刻の行を「今起きた」として扱うので、第3引数AGEでは確かめられない）
 
 [B] auditd
 7. /etc/audit/rules.d/dojo-guard.rules に /srv/dojo-audit/secret.txt の読取・書込・属性変更を
@@ -166,7 +167,7 @@ lab_check() {
     grep -Eq '^[[:space:]]*backend[[:space:]]*=[[:space:]]*polling' "$G_JAIL" || { echo 'backend = polling を指定します。'; return 1; }
     maxretry=$(_guard_get maxretry); findtime=$(_guard_get findtime); bantime=$(_guard_get bantime)
     [[ $maxretry =~ ^[0-9]+$ && $maxretry -ge 2 && $maxretry -le 5 ]] || { echo 'maxretryは2-5。'; return 1; }
-    [[ $findtime =~ ^[0-9]+$ && $findtime -ge 10 && $findtime -le 3600 ]] || { echo 'findtimeは10-3600秒。'; return 1; }
+    [[ $findtime =~ ^[0-9]+$ && $findtime -ge 10 && $findtime -le 30 ]] || { echo 'findtimeは10-30秒。'; return 1; }
     [[ $bantime =~ ^[0-9]+$ && $bantime -ge 60 ]] || { echo 'bantimeは60秒以上。'; return 1; }
     if _guard_get ignoreip | grep -Eq '192\.0\.2\.|192\.0\.0\.0|0\.0\.0\.0|/(0|8|16|24)\b'; then
         echo '文書用アドレスをignoreipに入れて回避してはいけません。'; return 1
@@ -190,10 +191,13 @@ lab_check() {
     sleep 1
     _guard_is_banned "$ip" && { echo '解除できていません。'; return 1; }
     grep -qxF "$ip" "$G_BANS" && { echo 'unbanがactionに反映されていません。'; return 1; }
-    # --- findtime: old failures must not count
-    "$G_HELPER" "$old" "$((maxretry + 2))" "$((findtime + 300))" || return 1
+    # --- findtime: failures spaced well beyond findtime (2x; fail2ban estimates by rate) must not add up.
+    # (A live fail2ban treats back-dated log lines as "just happened", so we really wait.)
+    "$G_HELPER" "$old" "$((maxretry - 1))" || return 1
+    sleep "$((findtime * 2 + 3))"
+    "$G_HELPER" "$old" 1 || return 1
     sleep 4
-    _guard_is_banned "$old" && { echo 'findtimeより古い失敗で遮断されています。'; fail2ban-client set "$G_JAILNAME" unbanip "$old" >/dev/null; return 1; }
+    _guard_is_banned "$old" && { echo 'findtimeより間をあけた失敗が合算されて遮断されています(findtimeの実効値を確認)。'; fail2ban-client set "$G_JAILNAME" unbanip "$old" >/dev/null; return 1; }
     # --- auditd: real events by a dedicated user
     _guard_audit_loaded || { echo '監査規則がカーネルに読み込まれていません(auditctl -l)。キーはdojo。'; return 1; }
     auditctl -l | grep -F -- "-w $G_TARGET" | grep -Eq -- '-p [rwxa]*r[rwxa]*w|-p [rwxa]*w[rwxa]*r' \
@@ -210,7 +214,7 @@ lab_check() {
     grep -Eq 'syscall=(open|openat)' <<<"$out" && grep -Eq 'syscall=(chmod|fchmodat|fchmodat2)' <<<"$out" \
         || { echo '読み書きと属性変更の両方を記録します。'; return 1; }
     aureport -k -i --summary -ts "$start" 2>/dev/null | grep -Eq '(^|[[:space:]])dojo$' || { echo 'aureportの鍵集計にdojoがありません。'; return 1; }
-    echo 'PASS: jailの実設定・filterの一致/非一致・実際の遮断と解除・findtime・専用ユーザー操作の監査記録を確認しました。'
+    echo 'PASS: jailの実設定・filterの一致/非一致・実際の遮断と解除・findtime(待機して実測)・専用ユーザー操作の監査記録を確認しました。'
 }
 
 lab_reset() {

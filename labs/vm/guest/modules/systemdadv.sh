@@ -278,9 +278,8 @@ _sa_check_template() {
 }
 
 _sa_check_deps() {
-    local out rc
-    out=$(cd "$SA_UNITDIR" && systemd-analyze verify dojo-adv-a.service dojo-adv-b.service dojo-adv-c.service dojo-adv-sock.socket dojo-adv-sock.service dojo-adv-cal.timer dojo-adv-cal.service dojo-adv-crash.service dojo-adv-data.service 2>&1)
-    rc=$?
+    local out rc=0
+    out=$(cd "$SA_UNITDIR" && systemd-analyze verify dojo-adv-a.service dojo-adv-b.service dojo-adv-c.service dojo-adv-sock.socket dojo-adv-sock.service dojo-adv-cal.timer dojo-adv-cal.service dojo-adv-crash.service dojo-adv-data.service 2>&1) || rc=$?
     if ((rc != 0)) || grep -qi 'cycle' <<<"$out"; then _sa_fail "systemd-analyze verify が警告します: $(head -3 <<<"$out" | tr '\n' ' ')"; return; fi
     systemctl stop dojo-adv-a.service dojo-adv-b.service dojo-adv-c.service 2>/dev/null
     systemctl start dojo-adv-a.service dojo-adv-c.service 2>/dev/null || { _sa_fail 'a/cを起動できません'; return; }
@@ -340,7 +339,7 @@ PY
 }
 
 _sa_check_crash() {
-    local u=dojo-adv-crash.service burst rs i result=
+    local u=dojo-adv-crash.service burst rs i result= mark limit
     [[ $(sha256sum "$SA_UNITDIR/$u" | cut -d ' ' -f 1) == $(cat "$LAB_STATE/crash.sha256") ]] || { _sa_fail '本体unitではなくdrop-inで設定してください'; return; }
     [[ -n $(_sa_prop $u DropInPaths) ]] || { _sa_fail 'drop-inがありません'; return; }
     [[ $(_sa_prop $u Restart) == on-failure ]] || { _sa_fail 'Restart=on-failure ではありません'; return; }
@@ -349,15 +348,19 @@ _sa_check_crash() {
     rs=$(_sa_secs "$(_sa_prop $u RestartUSec)")
     ((rs >= 1 && rs <= 3)) || { _sa_fail 'RestartSecは1〜3秒にします'; return; }
     systemctl reset-failed $u 2>/dev/null || true
+    mark=$(date '+%Y-%m-%d %H:%M:%S')
     systemctl start --no-block $u
     for i in $(seq 1 40); do
-        result=$(_sa_prop $u Result)
-        [[ $result == start-limit-hit ]] && break
+        [[ $(_sa_prop $u ActiveState) == failed ]] && break
         sleep 1
     done
+    # systemd 255 (Ubuntu 24.04) leaves Result=exit-code after the limit; older versions report start-limit-hit.
+    result=$(_sa_prop $u Result)
+    limit=no
+    if [[ $(_sa_prop $u ActiveState) == failed ]] && { [[ $result == start-limit-hit ]] || journalctl -u $u --since "$mark" --no-pager 2>/dev/null | grep -Eq 'repeated too quickly|start-limit-hit'; }; then limit=yes; fi
     systemctl stop $u 2>/dev/null || true
     systemctl reset-failed $u 2>/dev/null || true
-    [[ $result == start-limit-hit ]] || _sa_fail "再起動上限(start-limit-hit)で停止しませんでした: Result=$result"
+    [[ $limit == yes ]] || _sa_fail "再起動上限(start-limit-hit)で停止しませんでした: Result=$result"
 }
 
 _sa_check_sandbox() {

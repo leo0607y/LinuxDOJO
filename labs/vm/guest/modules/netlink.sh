@@ -66,9 +66,9 @@ PY
 
 _nl_bridge_ports() {
     _nl_a bridge link show > "$LAB_STATE/bridge-link.txt" 2>&1 || return 1
-    grep -Eq 'dojo-v0@.* master dojobr0 .*state forwarding' "$LAB_STATE/bridge-link.txt" \
-        && grep -Eq 'dojo-bp0@.* master dojobr1 ' "$LAB_STATE/bridge-link.txt" \
-        && grep -Eq 'dojo-bp1@.* master dojobr1 ' "$LAB_STATE/bridge-link.txt" \
+    grep -Eq 'dojo-v0(@[^:]*)?: .* master dojobr0 .*state forwarding' "$LAB_STATE/bridge-link.txt" \
+        && grep -Eq 'dojo-bp0(@[^:]*)?: .* master dojobr1 .*state forwarding' "$LAB_STATE/bridge-link.txt" \
+        && grep -Eq 'dojo-bp1(@[^:]*)?: .* master dojobr1 .*state forwarding' "$LAB_STATE/bridge-link.txt" \
         || { echo 'bridge link でdojo-v0がdojobr0、dojo-bp0/1がdojobr1のポートとして forwarding になっていません。'; return 1; }
 }
 

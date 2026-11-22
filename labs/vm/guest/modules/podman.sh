@@ -31,9 +31,12 @@ lab_setup() {
         echo '  sudo apt-get install -y podman'
         return 1
     fi
-    local bb='' c
+    local bb='' c lddout applets
     for c in /usr/bin/busybox /bin/busybox; do
-        if [[ -x $c ]] && ldd "$c" 2>&1 | grep -q 'not a dynamic' && "$c" --list | grep -qx httpd; then bb=$c; break; fi
+        # capture first: grep -q closing the pipe early would fail the pipeline under pipefail
+        [[ -x $c ]] || continue
+        lddout=$(ldd "$c" 2>&1 || true); applets=$("$c" --list 2>/dev/null || true)
+        if grep -q 'not a dynamic' <<<"$lddout" && grep -qx httpd <<<"$applets"; then bb=$c; break; fi
     done
     [[ -n $bb ]] || { echo '静的busybox(httpd付き)がありません: sudo apt-get install -y busybox-static'; return 1; }
     local need
@@ -78,7 +81,7 @@ APP
 2. ~/dojo-image/rootfs.tar からイメージを作る(importでCMDを指定。CMDは /bin/busybox sh /start.sh)。
    名前は localhost/dojo-app:1
 3. まず手で試す: podman run -d --name t -p 127.0.0.1:18080:8080 -v ~/dojo-data:/data localhost/dojo-app:1
-   curl 127.0.0.1:18080 / podman ps / logs / inspect / exec t cat /data/heartbeat
+   curl 127.0.0.1:18080 / podman ps / logs / inspect / exec t /bin/busybox cat /data/heartbeat (イメージにはbusybox以外のコマンドがありません)
    試し用コンテナは podman rm -f t で消す(system pruneは専用環境内でのみ使う)。
 4. Quadlet化: ~/.config/containers/systemd/dojo-app.container を作る
    ([Container] ContainerName=dojo-app / Image / PublishPort=127.0.0.1:18080:8080 / Volume=%h/dojo-data:/data、

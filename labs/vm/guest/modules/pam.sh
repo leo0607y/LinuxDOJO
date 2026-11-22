@@ -104,6 +104,7 @@ if not any(re.search(r'unlock_time=\d+', r[3]) for r in rules if 'pam_faillock.s
 if not any('pam_access.so' in r[2] for r in mods('account')): bad('account に pam_access.so が必要です(access.confで許可/拒否)。')
 if not any('pam_listfile.so' in r[2] for r in auth): bad('auth に pam_listfile.so (禁止ユーザー一覧)が必要です。')
 if not any('pam_pwquality.so' in r[2] for r in mods('password')): bad('password に pam_pwquality.so が必要です。')
+if not any('pam_unix.so' in r[2] and 'use_authtok' in r[3] for r in mods('password')): bad('password の pam_unix.so に use_authtok が必要です(pwqualityを通った新パスワードをそのまま使わせます)。')
 PY
 }
 
@@ -223,6 +224,7 @@ lab_reset() {
             if getent passwd "$u" | grep -q ':linuxdojo pam lab:'; then
                 command -v faillock >/dev/null && faillock --user "$u" --reset >/dev/null 2>&1 || true
                 userdel "$u" || return 1
+                rm -f -- "/var/run/faillock/$u"
             fi
         done
     fi

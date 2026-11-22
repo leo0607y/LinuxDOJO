@@ -59,8 +59,11 @@ include=throughput-performence
 vm.swappiness = 15
 net.core.somaxconn = lots
 CONF
-    tuned-adm profile "$TU_NAME" >"$LAB_STATE/break-apply.log" 2>&1 || true
-    if ! tuned-adm verify >>"$LAB_STATE/break-apply.log" 2>&1 || [[ $(sysctl -n net.core.somaxconn) != "$TU_SOMAX" ]]; then
+    local apply_rc=0
+    tuned-adm profile "$TU_NAME" >"$LAB_STATE/break-apply.log" 2>&1 || apply_rc=$?
+    # A profile that fails to parse makes "tuned-adm profile" fail and the daemon keeps the previous profile, so verify can
+    # still succeed (and the rollback is asynchronous); the real fault signals are: apply failed, dojo-lab not active, verify failing, or the values not applied.
+    if (( apply_rc != 0 )) || [[ $(_tu_active) != "$TU_NAME" ]] || ! tuned-adm verify >>"$LAB_STATE/break-apply.log" 2>&1 || [[ $(sysctl -n net.core.somaxconn) != "$TU_SOMAX" || $(sysctl -n vm.swappiness) != "$TU_SWAP" ]]; then
         touch "$LAB_STATE/fault"
         echo 'プロファイルを壊して適用し直しました。tuned-adm verify・active・journalctl -u tuned と sysctl -n で原因を調べて直してください。'
     else
@@ -76,6 +79,7 @@ lab_check() {
     local orig; orig=$(cat "$LAB_STATE/orig.profile")
     [[ $orig != "$TU_NAME" ]] || { echo '記録された元プロファイルが不正です。'; return 1; }
     [[ -f $TU_CONF && ! -L $TU_CONF ]] || { echo "$TU_CONF が必要です。"; return 1; }
+    grep -Eq '^[[:space:]]*include[[:space:]]*=[[:space:]]*([^#]*[, ])?throughput-performance([, ].*)?$' "$TU_CONF" || { echo "$TU_NAME は [main] で throughput-performance を include します。"; return 1; }
     tuned-adm list 2>/dev/null | grep -q -- "- $TU_NAME" || { echo "tuned-adm list に $TU_NAME が出ません(設定の構文を確認)。"; return 1; }
     # re-apply so the judged state comes from the current file, not a stale daemon state
     tuned-adm profile "$TU_NAME" >"$LAB_STATE/check-apply.log" 2>&1 || { echo "tuned-adm profile $TU_NAME が失敗します。"; tail -n 3 "$LAB_STATE/check-apply.log"; return 1; }
@@ -92,6 +96,12 @@ lab_reset() {
     local orig; orig=$(cat "$LAB_STATE/orig.profile" 2>/dev/null || true)
     if [[ -n $orig && $orig != "$TU_NAME" ]]; then tuned-adm profile "$orig" >/dev/null 2>&1 || echo "元プロファイル $orig へ戻せませんでした。手動で tuned-adm profile $orig してください。"
     elif [[ $(_tu_active) == "$TU_NAME" ]]; then tuned-adm off >/dev/null 2>&1 || true; fi
+    # tuned does not roll back sysctls the original profile never set (e.g. net.core.somaxconn), so restore the recorded values.
+    local k v
+    for k in swappiness:vm.swappiness somaxconn:net.core.somaxconn; do
+        v=$(cat "$LAB_STATE/orig.${k%%:*}" 2>/dev/null || true)
+        [[ $v =~ ^[0-9]+$ ]] && sysctl -w "${k#*:}=$v" >/dev/null 2>&1 || true
+    done
     rm -f -- "${TU_CONF:?}"; rmdir -- "${TU_DIR:?}" 2>/dev/null || true
     local f
     for f in setup-done fault TASKS.txt orig.profile orig.swappiness orig.somaxconn bak.tuned.conf break-apply.log check-apply.log check-verify.log; do rm -f -- "${LAB_STATE:?}/$f"; done

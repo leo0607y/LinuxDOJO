@@ -88,7 +88,7 @@ _pg_verify() {
     done
     if _pg_noauth_connect shop_app /var/run/postgresql; then echo 'shop_appがパスワード無しでソケット接続できます。'; return 1; fi
     # roles
-    v=$(_pg_sql postgres "select rolname || ':' || rolsuper || rolcreatedb || rolcreaterole || rolreplication || rolbypassrls || rolcanlogin || ':' || coalesce(left(rolpassword,14),'none') from pg_roles r left join pg_authid a using (rolname) where rolname in ('shop_app','shop_ro') order by 1") || return 1
+    v=$(_pg_sql postgres "select rolname || ':' || rolsuper || rolcreatedb || rolcreaterole || rolreplication || rolbypassrls || rolcanlogin || ':' || coalesce(left(rolpassword,14),'none') from pg_authid where rolname in ('shop_app','shop_ro') order by 1") || return 1
     [[ $(wc -l <<<"$v") == 2 ]] || { echo 'ロールshop_appとshop_roを作ります。'; return 1; }
     grep -qx 'shop_app:fffffft:SCRAM-SHA-256' <<<"$v" || { echo 'shop_appはログイン可・非superuser・パスワードはSCRAM保存にします。password_encryptionを直してから設定し直します。'; return 1; }
     grep -qx 'shop_ro:fffffft:SCRAM-SHA-256' <<<"$v" || { echo 'shop_roもログイン可・非superuser・SCRAM保存にします。'; return 1; }
@@ -137,7 +137,12 @@ lab_setup() {
     pg_lsclusters -h | awk -v n="$PG_NAME" -v ver="$PG_VER" '$1==ver && $2==n' | grep -q . && { echo "クラスタ $PG_VER/$PG_NAME が既にあります。"; return 1; }
     if (ss -Hltn 2>/dev/null || true) | grep -q ":$PG_PORT "; then echo "ポート$PG_PORTは使用中です。"; return 1; fi
     echo "$PG_VER $PG_NAME $PG_PORT" > "$LAB_STATE/owns-cluster"
-    pg_createcluster "$PG_VER" "$PG_NAME" --port "$PG_PORT" || return 1
+    # A learner shell may export an uninstalled locale (e.g. LC_ALL=ja_JP.UTF-8 forwarded over ssh), which makes
+    # pg_createcluster abort; the cluster is created with the always-present C.UTF-8 instead.
+    if ! LC_ALL=C.UTF-8 LANG=C.UTF-8 pg_createcluster "$PG_VER" "$PG_NAME" --port "$PG_PORT"; then
+        [[ -d $PG_DATA && -f $PG_DATA/dojo-lab-marker ]] || rm -f -- "$LAB_STATE/owns-cluster"
+        return 1
+    fi
     echo 'LinuxDOJO lab cluster' > "$PG_DATA/dojo-lab-marker"
     chown postgres:postgres "$PG_DATA/dojo-lab-marker"
     # deliberately weak starting configuration for the learner to fix
