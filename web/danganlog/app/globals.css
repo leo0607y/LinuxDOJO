@@ -203,3 +203,63 @@ dialog::backdrop { background: rgb(0 0 0 / 65%); }
 @media (max-width: 22rem) {
   .masthead-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 }
+
+/* ===== Visual refresh: dark terminal console, paper-like lesson panel ===== */
+:root { --radius: 10px; --brand: #ff8a5b; }
+.screen { background: #0d1117; }
+.motd {
+  --fg: light-dark(#1f2329, #e8e4dc);
+  --dim: light-dark(#5c6470, #9aa3ad);
+  --accent: light-dark(#b5441c, #ffa27a);
+  --line: light-dark(#e1d9cb, #2a323b);
+  background: light-dark(#f8f4ec, #161b22);
+  color: var(--fg);
+  border-right: 0;
+}
+.motd h1 { font-size: clamp(1.6rem, 2.3vw, 2.3rem); line-height: 1.35; letter-spacing: -.03em; }
+.motd-text { white-space: normal; max-width: 36rem; font-size: 1.02rem; line-height: 1.9; }
+.motd-text p { margin: 0 0 1em; }
+.motd-text p:first-child { font-size: 1.1rem; font-weight: 600; }
+.lesson-meta span { padding: .12rem .5rem; border-radius: 999px; background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.course-progress progress { height: 6px; border-radius: 999px; overflow: hidden; }
+.course-progress progress::-webkit-progress-bar { border-radius: 999px; }
+
+.console, .mission, .prompt, .actions {
+  --fg: #e6edf3; --dim: #8b98a5; --line: #252d36; --panel: #0d1117; --raise: #151b23;
+  --accent: #ffb184; --user: #7ee2a8; --path: #79b8ff; --err: #ff8b83; --hint: #f2cc6b; --focus: #79b8ff;
+  color: var(--fg);
+}
+.console { background: #0d1117; }
+.console-tools { margin: 0; padding: 0 var(--gutter); background: #151b23; min-height: 3rem; border-bottom: 1px solid var(--line); }
+.console-tools h2 { display: flex; align-items: center; gap: .9rem; font-size: .85rem; font-weight: 600; color: var(--dim); }
+.console-tools h2::before { content: ""; width: .7rem; height: .7rem; border-radius: 50%; background: #ff5f56; box-shadow: 1.1rem 0 #ffbd2e, 2.2rem 0 #27c93f; margin-right: 2.3rem; }
+.help-button, .foot button { text-decoration: none; padding: .35rem .8rem; border: 1px solid var(--line); border-radius: 999px; font-size: .8rem; }
+.foot button { border-color: var(--line); }
+.help-button:hover, .foot button:hover { border-color: var(--accent); }
+.starter-commands { background: #11161d; border-bottom: 1px solid var(--line); }
+.starter-commands button { padding: .35rem .6rem; margin-inline: -.6rem; border-radius: 6px; }
+.starter-commands button:hover { background: #1a222c; }
+.starter-commands button:hover span { text-decoration: none; }
+.term-out { padding-top: 1rem; }
+.mission { background: #151b23; border: 0; border-left: 3px solid var(--accent); padding-block: .8rem; }
+.prompt { background: #0d1117; padding-block: .8rem; border-top: 1px solid var(--line); }
+.field:focus-within { box-shadow: 0 2px 0 var(--accent); }
+.actions { background: #0d1117; border-top: 1px solid var(--line); }
+.kbtn, .lesson-nav button { border-radius: var(--radius); background: #151b23; border-color: var(--line); color: var(--fg); }
+.kbtn.enter { background: var(--accent); border-color: var(--accent); color: #1a1208; }
+.lesson-nav .nav-next { background: var(--brand); border-color: var(--brand); color: #1a1208; }
+.lesson-nav .nav-next:hover:not(:disabled) { background: #ffa27a; border-color: #ffa27a; color: #1a1208; }
+.lesson-nav .nav-next:disabled { background: #151b23; border-color: var(--line); color: var(--dim); }
+.lesson-nav .nav-list { background: transparent; }
+.masthead-nav a, .masthead-nav > * { text-decoration: none; }
+.masthead-nav { gap: clamp(1rem, 2.4vw, 2.2rem); }
+.shell-mark { border-radius: 6px; }
+dialog { border-radius: 14px; border-top-width: 1px; }
+@media (max-width: 55rem) {
+  .motd { border-bottom: 1px solid var(--line); }
+  .motd-text { font-size: 1rem; line-height: 1.8; }
+}
+.starter-commands { align-self: stretch; }
+.foot { background: light-dark(#eee9df, #0d1117); border-top: 1px solid light-dark(#d9d2c4, #252d36); }
+.lesson-meta span { color: light-dark(#7a2c0e, #ffb593); background: light-dark(#f1dfd0, #2c2420); }
+.lesson-meta span b { color: inherit; }

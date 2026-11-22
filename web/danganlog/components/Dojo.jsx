@@ -420,7 +420,7 @@ export default function Dojo() {
           <section className="motd" aria-labelledby="lesson-title" key={viewMode + lessonNo} tabIndex={0}>
             <p className="lesson-meta"><span>問題 <b>{lessonNo}</b>{course && ' / ' + pad2(course.total)}</span>{course?.name}</p>
             <h1 id="lesson-title">{lesson ? lesson.title : 'Linux 道場'}</h1>
-            <div className="motd-text">{lesson ? lesson.explanation : 'ブラウザー内の模擬環境です。実際のPCは変更しません。help で使い方、Tab で補完できます。'}</div>
+            <div className="motd-text">{(lesson ? lesson.explanation : 'ブラウザー内の模擬環境です。実際のPCは変更しません。help で使い方、Tab で補完できます。').split('\n').filter(Boolean).map((line, i) => <p key={i}>{line}</p>)}</div>
             {course && <div className="course-progress">
               <label htmlFor="lesson-progress">コースの達成数 <b>{course.done} / {course.total}</b></label>
               <progress id="lesson-progress" value={course.done} max={course.total} />
