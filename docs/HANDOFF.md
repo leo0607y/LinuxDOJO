@@ -2,16 +2,46 @@
 
 最終更新: 2026-11-22 / ブランチ: `learning-expansion` / 状態を変えたら必ずこの表も更新する。
 
-## 再開手順（別のAI／別セッションはまずここから）
-1. `git status` と `git log --oneline | head` を見る。作業は `learning-expansion` ブランチ。**未コミットの課題ファイルがディスク上に残っていることがある**（前セッションの中断で残存。現在は完了した小単位ごとに検証してコミットする）。
-2. `python3 tools/stage_status.py` を実行する。**この出力が正**で、下の表より優先する。
-   - `STUB`（1行だけ）= 未作成。作成を割り当て直す。サブエージェントが作成中の可能性もあるので、ファイルの更新時刻（`ls -l curriculum/`）が直近なら数分待つ。
-   - `WRITTEN` = 課題あり。ただし**検証済みとは限らない**。必ず `python3 tests/test_all_missions.py <ID...>` で確認。
-3. 課題ファイルを書くときの仕様は `docs/STAGE_BRIEF.md`（共通指示）。新Stageの配線は下の「配線の仕組み」。
-4. 統合が済んだら: `tests/test_progress.py` の総問数・ステージ別内訳・ランク境界を更新 → `python3 -m unittest discover -s tests` → README更新 → コミット。
-   - 注意: 課題が増えたら `test_progress.py` の件数を実態に合わせる。現在の期待値は501問。
-5. 常用コースは `docs/LINUX_DAILY_USE.md` と `docs/coverage.md` を読み、`python3 -m engine.toolbox audit` で参照を検査する。`python3 tools/audit_coverage.py --list` は名前の出現確認だけなので、未登場の数合わせでStageを増やさない。
-6. この文書の表を更新してコミットする。
+## 最短の再開手順（次の担当はここから）
+1. `git status --short` と `git log -12 --oneline`。ブランチは `learning-expansion`。完了単位で検証して細かくコミットする。**未コミットを一括で追加しない**（下の担当別ファイルを確認）。pushとデプロイはまだしない。
+2. この文書の「最新チェックポイント」を読む。前Claudeのバックグラウンド担当は終了しており、その完了待ちをしない。新セッションでCodex担当も消えていれば、ディスクとVMから続行する。
+3. 実VMの合格根拠は `docs/vm_verification/*.md` の実出力。`tools/vmtest/scenarios/*.sh` は再現手順。`python3 tools/vmtest/verify_scenario.py VM tools/vmtest/scenarios/MOD.sh /tmp/MOD.log`。setup→checkだけでは通常不合格で、学習者操作とbreak・修復を含める。
+4. `python3 -m engine.toolbox audit`。全体検証は `python3 -m unittest discover -s tests`。NodeがPATHになければ下のNodeパスを追加してからサイトのbuild/test/E2Eを実行する。未導入によるskipを合格に数えない。
+5. 機能単位の確認後、担当ファイルとこの文書だけを追加してコミット。検証前の作業保存は `WIP` と明記し、実VM未検証を維持する。
+
+## 最新チェックポイント（2026-11-22 / 利用上限に備えた保存）
+
+### 確定しているもの
+- 周辺機器の模擬31問: `2ce3477`。初期未達成・正解・罠拒否・ホスト操作禁止の11テスト成功。実機の証明ではない。
+- FTP/ACL: `a5bec87`。実VMで正常・故障/抜け道拒否・reset、2周目setup/reset成功。ACLのgetfacl誤判定を修正。
+- 講座の4区分対応: `623c379`。未検証を独立表示し、集計と目標行を照合。生成済みデータもbuildのたびに更新する。
+- firewall: `381b0bc`。実nft/netns、HTTP部分受信の誤判定を修正。通信・抜け道拒否・再読込・専用資源の撤去を確認。
+- localca: `045a20b`。実TLSテストのpipe未closeを修正。ResourceWarningをerrorにして4テスト成功。
+- 前担当の途中修正保存: `5e93b15`。guard/libvirt/netlink/pam/podman/postgres/systemdadv/tunedは、この時点では**実VM未検証**。その後の個別完了記録を優先する。
+- ターミナル起動: `b91a92f`。ペンギンと青/紫/シアン、瞬き・ウインク・笑顔。`LQ_NO_ANIMATION=1`で静止。NO_COLOR/非TTYでも静止。PTYで起動とEnter終了を確認。関連10テスト成功。
+- 常用の安全操作: `ffed7f8`。native `safe-cleanup`（40本目）、NUL区切り・特殊ファイル名・リンク非追跡・退避・隔離移動・復元。実ツール3テスト成功。toolbox関連42テスト成功/skip14。
+- users/lynis: `aabd59d`。最小sudo復旧、Lynis実監査59→60・対象警告消失・誤設定拒否・reset。実出力は `g1-users.md`, `g8-lynis.md`。
+- 全体テスト直近: 618件成功/skip48（192.6秒）、サイトbuild成功、npm7件、講座Node4件、E2E14件成功。**その後のUI・新課題は再実行が必要**。
+
+### いま進行中・取り込み待ち
+| 担当 | 所有ファイル | 再開地点 |
+|---|---|---|
+| site_ui (Astra) | web/danganlog/app と components | 端末/講座の直線的な2ペイン・多色アクセントUI。dev 3106、1280/375/320幅の確認済み。最終axeと親によるbuild/E2E、画像確認、コミットが残る |
+| vm_postgres (Sol) | postgres.sh / test_vm_postgres.py / scenarios/postgres.sh / g6-postgres.md | g6-appで正常/不正/backup/復元/resetの実検証。PostgreSQL16のbool連結とSCRAM接頭辞、manifestの版差を修正中。最終公式runner実行待ち |
+| vm_podman (Sol) | podman.sh / test_vm_podman.py / scenarios/podman.sh / g7-podman.md | g7-appでrootless Quadlet。UIDマッピング・生成unit・localhost公開・実bind mount検証、root所有.config親によるreset残骸を修正中。最終再実行待ち |
+
+### 次に着手する順
+1. 上の3担当の結果を確認して、実VMログ・単体テスト・UI実画面を親でも確認し、各担当ごとにコミットする。
+2. `docs/DAILY_USE_AUDIT.md` の常用時の抜けを実操作課題で補う（単なるコマンド名追加にしない）。
+3. 未完了VMモジュールの再検証。guard/libvirt/netlink/pam/systemdadv/tunedなどはWIP保存済みでも通過扱いにしない。RHEL3本はRHEL VM未用意。
+4. 変更が止まったら全Python、サイトbuild/npm/course/E2Eを1回通し、結果とskipを記録。見た目の利用者確認前にデプロイしない。
+
+### 環境とログの場所
+- Node 22: `<node-dir>/bin` をPATHへ追加。消えていれば別途用意する。
+- VM: `~/.cache/linuxdojo-vm/vms/`。g1-app/client、g3-app〜g8-appを保持。`up NAME` で停止済みを再開できる。g6/g7は担当作業中なので触らない。
+- `vmtest.py install` は共有 `bundle/` を書き換えるため並列実行しない。VM内の試験自体は別VMなら並列可。
+- 一時ログ: `/tmp/training-*.log`。**実VM通過ログはdocsへ保存するまで完了としない**。画像: `/tmp/dangan-{terminal,course,detail,coverage}-{1280,375,320}.png`。
+- サイトdev `http://127.0.0.1:3106` はUI担当用。既存3000は変更しない。開発サーバーは公開デプロイではない。
 
 ### サブエージェントの使い方（今回のやり方）
 - 1Stage = 1エージェント。担当ファイル以外は編集させない（配線は親が先に済ませる）。
