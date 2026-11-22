@@ -224,6 +224,36 @@ class Terminal:
         target.write_text(content, encoding="utf-8")
         self.set_mode(target, 0o644)
 
+    def complete(self, line):
+        """Tab 補完の候補。(置き換えを始める位置, 候補の一覧) を返す。状態は変えない。
+
+        最初の語は使えるコマンド名、2語目以降は「いまいる場所」のファイルとフォルダ。
+        引用符や記号を含む入力、オプション（-で始まる語）、エディター操作中は補完しない。
+        """
+        if self.progress.get("editor") or any(ch in line for ch in "'\"\\$|;&<>"):
+            return len(line), []
+        start = line.rfind(" ") + 1
+        word = line[start:]
+        if not line[:start].strip():
+            packages = self.progress.get("packages", [])
+            names = set(BUILTIN_COMMANDS) | set(packages) | {n for n in commands.names() if commands.available(n, packages)}
+            return start, sorted(n for n in names if n.startswith(word))
+        if word.startswith("-"):
+            return start, []
+        slash = word.rfind("/")
+        folder_part, base = (word[:slash + 1], word[slash + 1:]) if slash >= 0 else ("", word)
+        try:
+            entries = sorted(self.path(folder_part or ".").iterdir(), key=lambda p: p.name)
+        except (TrainingError, OSError):
+            return start, []
+        found = []
+        for entry in entries:
+            name = entry.name
+            if name == ".remote" or not name.startswith(base) or (name.startswith(".") and not base.startswith(".")):
+                continue
+            found.append(folder_part + name + ("/" if entry.is_dir() else ""))
+        return start, found
+
     def prompt_text(self):
         editor = self.progress.get("editor")
         if editor:

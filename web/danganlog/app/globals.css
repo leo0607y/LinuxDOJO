@@ -89,14 +89,6 @@ html.app-lock, html.app-lock body { height: 100%; overflow: hidden; overscroll-b
 .console-tools h2 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); margin: 0; font-size: .9rem; letter-spacing: .04em; }
 .help-button, .foot button { border: 0; border-radius: 0; padding: 0; background: transparent; color: var(--dim); text-decoration: none; font-size: .8rem; }
 .help-button:hover, .foot button:hover { color: var(--user); }
-.starter-commands { display: grid; gap: 0; align-self: start; padding: 0 0 .3rem; margin: .6em 0 0; border: 0; }
-.starter-commands > p { display: flex; flex-wrap: wrap; gap: .25rem .8rem; margin: 0; color: var(--dim); font-size: 1rem; font-weight: 700; }
-.starter-commands > p span { color: var(--dim); font-size: .78rem; font-weight: 400; }
-.starter-commands button { display: flex; align-items: baseline; gap: 1ch; padding: 0; margin: 0; border: 0; border-radius: 0; background: transparent; text-align: left; }
-.starter-commands button:hover { background: transparent; }
-.starter-commands code { min-width: 8ch; color: var(--user); font-weight: 700; }
-.starter-commands span { color: var(--dim); font-size: 1rem; }
-.starter-commands button:hover span { color: var(--fg); text-decoration: none; }
 .term-out { overflow: visible; padding: .3rem 0; overflow-wrap: anywhere; scrollbar-width: thin; }
 .term-out:focus-visible { outline-offset: -3px; }
 .term-out, .prompt { font: 1rem/1.25 var(--mono); }

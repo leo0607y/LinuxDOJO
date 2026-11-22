@@ -258,6 +258,12 @@ def browser_request(request_json):
         session['assisted'] = True
         output = '\n'.join(_web_step['solution']) if mode == 'festival' else '\n'.join(guided.answers(_web_step))
         return json.dumps(_web_view(output), ensure_ascii=False)
+    if kind == 'complete':
+        text = request.get('line', '')
+        if not isinstance(text, str) or len(text) > 4096:
+            raise ValueError('入力が長すぎます。')
+        start, candidates = _web_terminal.complete(text)
+        return json.dumps({'start': start, 'candidates': candidates[:200]}, ensure_ascii=False)
     if kind != 'execute':
         raise ValueError('対応していない操作です。')
     line = request.get('line', '')

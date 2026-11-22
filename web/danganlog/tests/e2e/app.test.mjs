@@ -138,10 +138,12 @@ test('キーボードだけで操作できる (Tab 移動・コマンド・Tab �
   assert.ok(reached, '入力欄へ Tab で到達できる');
   const ring = await page.evaluate(() => getComputedStyle(document.activeElement.parentElement).boxShadow);
   assert.notEqual(ring.trim(), 'none');
-  await page.keyboard.type('he'); await page.keyboard.press('Tab');
-  assert.equal((await page.inputValue('#terminal-input')).trim(), 'help');
+  await page.keyboard.type('completion on'); await page.keyboard.press('Enter');
+  await page.waitForFunction(() => document.querySelector('.term-out').textContent.includes('Tab 補完を入れました'));
+  await page.keyboard.type('hel'); await page.keyboard.press('Tab');
+  await page.waitForFunction(() => document.querySelector('#terminal-input').value.trim() === 'help');
   await page.keyboard.press('Enter');
-  await page.waitForFunction(() => document.querySelector('.term-out').textContent.includes('Tab で補完'));
+  await page.waitForFunction(() => document.querySelector('.term-out').textContent.includes('completion'));
   await page.keyboard.type('hint'); await page.keyboard.press('Enter');
   await page.waitForSelector('.tag-hint');
   await page.keyboard.type('modes'); await page.keyboard.press('Enter');
@@ -174,5 +176,36 @@ test('ls は本物のファイル一覧として動く (道場のメニューに
   const out = await page.textContent('.term-out');
   assert.ok(out.includes('welcome.txt'), 'ls の出力にファイル名が出る');
   assert.ok(!out.includes('[x]') && !out.includes('番号を入力すると開きます'), 'レッスン一覧は出ない');
+  await context.close();
+});
+
+test('Tab 補完は初期で切 (打つ練習のため)。切のあいだ Tab は補完せず、入力は変わらない', async () => {
+  const { context, page } = await openApp(env.browser, env.url);
+  await page.waitForFunction(() => document.querySelector('#lesson-title').textContent.includes('お願いする'));
+  await page.focus('#terminal-input');
+  await page.keyboard.type('cat wel'); await page.keyboard.press('Tab');
+  await page.waitForTimeout(500);
+  assert.equal(await page.inputValue('#terminal-input'), 'cat wel');
+  assert.equal(await page.locator('.kbtn', { hasText: /^Tab$/ }).count(), 0, '切のときは Tab ボタンを出さない');
+  await context.close();
+});
+
+test('Tab 補完を入れると、コマンド名・ファイル名・隠しファイルを補完し、設定は再読み込み後も残る', async () => {
+  const { context, page } = await openApp(env.browser, env.url);
+  await page.waitForFunction(() => document.querySelector('#lesson-title').textContent.includes('お願いする'));
+  await run(page, 'completion on');
+  await page.focus('#terminal-input');
+  await page.keyboard.type('ec'); await page.keyboard.press('Tab');
+  await page.waitForFunction(() => document.querySelector('#terminal-input').value === 'echo ');
+  await page.fill('#terminal-input', 'cat wel'); await page.keyboard.press('Tab');
+  await page.waitForFunction(() => document.querySelector('#terminal-input').value === 'cat welcome.txt ');
+  await page.fill('#terminal-input', 'cat .m'); await page.keyboard.press('Tab');
+  await page.waitForFunction(() => document.querySelector('#terminal-input').value === 'cat .memo ');
+  await page.fill('#terminal-input', 'c'); await page.keyboard.press('Tab');
+  await page.waitForFunction(() => /cat\s+cd/.test(document.querySelector('.term-out').textContent), null, { timeout: 5000 });
+  assert.equal(await page.inputValue('#terminal-input'), 'c');
+  await page.reload();
+  await page.waitForSelector('.rt.ready', { timeout: 120000 });
+  assert.equal(await page.locator('.foot button[aria-pressed="true"]', { hasText: 'Tab補完' }).count(), 1);
   await context.close();
 });

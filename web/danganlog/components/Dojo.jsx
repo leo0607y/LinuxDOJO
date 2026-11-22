@@ -10,8 +10,7 @@ import Masthead from './Masthead.jsx';
 import { applyTheme, readPrefs, savePrefs } from './preferences.js';
 
 const MAX_ENTRIES = 200;
-const STARTER_COMMANDS = [['hint', '課題のヒント'], ['answer', '入力例を見る'], ['menu', '問題一覧を開く']];
-const LOCAL_COMMANDS = ['help', 'hint', 'answer', 'next', 'prev', 'menu', 'modes', 'progress', 'goto', 'theme', 'simple', 'clear', 'data', 'course', 'reset', 'check'];
+const LOCAL_COMMANDS = ['help', 'hint', 'answer', 'next', 'prev', 'menu', 'modes', 'progress', 'goto', 'theme', 'simple', 'completion', 'clear', 'data', 'course', 'reset', 'check'];
 const HELP_TEXT = [
   'help           このヘルプ',
   'hint           ヒントを1つ (何度でも可。減点なし)',
@@ -24,11 +23,12 @@ const HELP_TEXT = [
   'reset          課題を初期状態に戻す',
   'theme          dark / light 切り替え (theme auto で端末の設定に従う)',
   'simple         シンプル表示 (大きな文字とボタン)',
+  'completion     Tab 補完の入/切 (打つ練習のため、初期は切。completion on で入る)',
   'data           学習データの書き出し・読み込み',
   'course         講座ページへ',
   'clear          画面を消す (Ctrl-L)',
   '',
-  'Tab で補完、上下キーで入力履歴。レッスンの答えは、ふつうのコマンドとして入力します。'
+  '上下キーで入力履歴 (補完を入れると Tab でコマンドやファイル名を補完)。レッスンの答えは、ふつうのコマンドとして入力します。'
 ].join('\n');
 
 function megabytes(n) { return (n / 1048576).toFixed(1); }
@@ -73,6 +73,7 @@ export default function Dojo() {
   const [loadInfo, setLoadInfo] = useState({ loaded: 0, total: 0 });
   const [theme, setThemeState] = useState('');
   const [simple, setSimpleState] = useState(false);
+  const [completionOn, setCompletionState] = useState(false);
   const [focused, setFocused] = useState(false);
 
   const clientRef = useRef(null);
@@ -187,6 +188,7 @@ export default function Dojo() {
   const setTheme = (t) => { setThemeState(t === 'auto' ? '' : t); applyTheme(t === 'auto' ? '' : t); savePrefs({ theme: t === 'auto' ? '' : t }); };
   const effectiveTheme = () => theme || (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
   const setSimple = (v) => { setSimpleState(v); savePrefs({ simple: v }); };
+  const setCompletion = (v) => { setCompletionState(v); savePrefs({ completion: v }); };
 
   const say = (kind, text) => addEntry('', null, '[' + kind + '] ' + text, '');
   const total = course ? course.total : 0;
@@ -228,6 +230,13 @@ export default function Dojo() {
         setTheme(next); say('OK', 'テーマ: ' + next); return true;
       }
       case 'simple': echo(); setSimple(!simple); say('OK', 'シンプル表示を' + (simple ? '切りました' : '入れました') + '。'); return true;
+      case 'completion': case 'tab': {
+        echo();
+        const want = args[0] === 'on' ? true : args[0] === 'off' ? false : !completionOn;
+        setCompletion(want);
+        say('OK', 'Tab 補完を' + (want ? '入れました。コマンドやファイル名の途中で Tab を押すと補完します。' : '切りました。打つ練習のため、初期は切です。'));
+        return true;
+      }
       case 'data': echo(); openDialog(dataRef); return true;
       case 'course': case 'courses': echo(); say('INFO', '講座ページへ移動します。'); window.location.href = '/course/'; return true;
       case 'modes': case 'mode': {
@@ -312,18 +321,23 @@ export default function Dojo() {
     if (inputRef.current) inputRef.current.focus();
   };
 
-  const complete = () => {
-    if (!line || /\s/.test(line)) return false;
-    const hits = LOCAL_COMMANDS.filter((c) => c.startsWith(line));
-    if (!hits.length) return false;
-    if (hits.length === 1) setLine(hits[0] + ' ');
-    else {
-      let p = hits[0];
-      hits.forEach((c) => { while (!c.startsWith(p)) p = p.slice(0, -1); });
-      setLine(p);
-      addEntry('', null, hits.join('  '), '');
-    }
-    return true;
+  const complete = async () => {
+    if (!completionOn || !ready || busy || !clientRef.current) return;
+    const typed = line;
+    let start = typed.lastIndexOf(' ') + 1;
+    let candidates = [];
+    try {
+      const r = await clientRef.current.request({ type: 'complete', line: typed });
+      start = r.start; candidates = r.candidates || [];
+    } catch (e) { return; }
+    if (start === 0) LOCAL_COMMANDS.filter((c) => c.startsWith(typed)).forEach((c) => { if (!candidates.includes(c)) candidates.push(c); });
+    if (!candidates.length) return;
+    const head = typed.slice(0, start);
+    if (candidates.length === 1) { setLine(head + candidates[0] + (candidates[0].endsWith('/') ? '' : ' ')); return; }
+    let common = candidates[0];
+    candidates.forEach((c) => { while (!c.startsWith(common)) common = common.slice(0, -1); });
+    if (common.length > typed.length - start) setLine(head + common);
+    addEntry('', null, candidates.join('  '), '');
   };
   const historyStep = (dir) => {
     const h = historyRef.current;
@@ -336,7 +350,7 @@ export default function Dojo() {
     if (event.key === 'ArrowUp') { if (historyStep(-1)) event.preventDefault(); }
     else if (event.key === 'ArrowDown') { if (historyStep(1)) event.preventDefault(); }
     else if (event.key === 'l' && event.ctrlKey) { event.preventDefault(); setEntries([]); }
-    else if (event.key === 'Tab' && !event.shiftKey) { if (complete()) event.preventDefault(); }
+    else if (event.key === 'Tab' && !event.shiftKey && completionOn) { event.preventDefault(); complete(); }
   };
 
   const exportData = async () => {
@@ -401,6 +415,7 @@ export default function Dojo() {
     const p = readPrefs();
     if (p.theme === 'dark' || p.theme === 'light') setThemeState(p.theme);
     if (p.simple) setSimpleState(true);
+    if (p.completion) setCompletionState(true);
   }, []);
 
   /* 実行中に無効化された入力欄は、有効に戻ったとき、操作中なら自動で戻す (キーボードだけでも続けて入力できる) */
@@ -424,7 +439,7 @@ export default function Dojo() {
           <section className="motd" aria-labelledby="lesson-title" key={viewMode + lessonNo} tabIndex={0}>
             <p className="lesson-meta"><span>問題 <b>{lessonNo}</b>{course && ' / ' + pad2(course.total)}</span>{course?.name}</p>
             <h1 id="lesson-title">{lesson ? lesson.title : 'Linux 道場'}</h1>
-            <div className="motd-text">{(lesson ? lesson.explanation : 'ブラウザー内の模擬環境です。実際のPCは変更しません。help で使い方、Tab で補完できます。').split('\n').filter(Boolean).map((line, i) => <p key={i}>{line}</p>)}</div>
+            <div className="motd-text">{(lesson ? lesson.explanation : 'ブラウザー内の模擬環境です。実際のPCは変更しません。help で使い方がわかります。').split('\n').filter(Boolean).map((line, i) => <p key={i}>{line}</p>)}</div>
             {course && <div className="course-progress">
               <label htmlFor="lesson-progress">コースの達成数 <b>{course.done} / {course.total}</b></label>
               <progress id="lesson-progress" value={course.done} max={course.total} />
@@ -435,14 +450,6 @@ export default function Dojo() {
               <h2 id="console-title">Linux コマンドを試す</h2>
               {!simple && <button className="help-button" type="button" disabled={off} onClick={act('help')}>操作ヘルプ</button>}
             </div>
-            {!simple && ready && lesson && !entries.length && <div className="starter-commands">
-              <p>困ったときの操作 <span>Linux コマンドではなく、道場の機能です</span></p>
-              {STARTER_COMMANDS.map(([command, label]) => (
-                <button key={command} type="button" disabled={off} onClick={() => { inputRef.current?.focus(); runLocal(command); }}>
-                  <code>{command}</code><span>{label}</span>
-                </button>
-              ))}
-            </div>}
             <div className="term-out" ref={outRef} role="log" aria-live="polite" aria-relevant="additions" aria-label="ターミナルの出力" tabIndex={0}>
           {status === 'loading' ? (
             <div className="boot">
@@ -481,7 +488,7 @@ export default function Dojo() {
               aria-label="コマンド" placeholder={status === 'error' ? '(実行環境なし)' : ready ? '' : '(準備中)'} />
           </span>
           <div className="keys" role="group" aria-label="入力キー">
-            <button type="button" className="kbtn" disabled={off} onClick={() => { complete(); if (inputRef.current) inputRef.current.focus(); }}>Tab</button>
+            {completionOn && <button type="button" className="kbtn" disabled={off} onClick={() => { complete(); if (inputRef.current) inputRef.current.focus(); }}>Tab</button>}
             <button type="button" className="kbtn" disabled={off} aria-label="前の入力" onClick={() => historyStep(-1)}>&uarr;</button>
             <button type="button" className="kbtn" disabled={off} aria-label="次の入力" onClick={() => historyStep(1)}>&darr;</button>
             <button type="submit" className="kbtn enter" disabled={off}>Enter</button>
@@ -508,9 +515,10 @@ export default function Dojo() {
         </div>
       </main>
       <footer className="foot">
-        <span className="foot-keys">help / Tab 補完 / ↑↓ 履歴</span>
+        <span className="foot-keys">help / {completionOn ? 'Tab 補完 / ' : ''}↑↓ 履歴</span>
         <span className="foot-r">
           <button type="button" aria-pressed={simple} onClick={() => setSimple(!simple)}>シンプル表示</button>
+          <button type="button" aria-pressed={completionOn} onClick={() => setCompletion(!completionOn)}>Tab補完</button>
           <button type="button" onClick={() => setTheme(effectiveTheme() === 'dark' ? 'light' : 'dark')}>テーマ</button>
           <span className={'rt ' + status}>{status === 'ready' ? 'ready' : status === 'error' ? 'error' : 'loading ' + pct + '%'}</span>
         </span>
