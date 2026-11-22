@@ -241,16 +241,19 @@ VM の作成、スナップショット、復元の具体的な手順は [labs/v
 | packages | deb の導入、更新、故障復旧、remove、purge | 実施済み |
 | software | systemd の service と timer、ログ、撤去 | 実施済み |
 | ssh | 鍵認証、ホスト鍵照合、scp と rsync、権限障害 | 実施済み |
-| users | ユーザー、グループ、sudo 最小権限と事故復旧 | 未実施(最近追加) |
+| users | ユーザー、グループ、sudo 最小権限と事故復旧 | 実施済み（個別の未検証範囲は docs/vm_verification/） |
 | netconfig | NIC、固定 IP、静的経路、DNS クライアント、IPv6 | 未実施(最近追加) |
-| firewall | nftables の適用と、接続を保った復旧 | 未実施(最近追加) |
+| firewall | nftables の適用と、接続を保った復旧 | 実施済み（個別の未検証範囲は docs/vm_verification/） |
 | restore | バックアップから別 VM へのサービス全体の復元 | 未実施(最近追加) |
 | osupdate | 署名エラーと依存不整合からの復旧 | 未実施(最近追加) |
-| sshd | 専用 sshd の堅牢化(鍵のみ、root 禁止、ProxyJump) | 未実施(最近追加) |
-| mounts | fstab 誤記、swap、LVM の拡張(ループバック上) | 未実施(最近追加) |
-| journald | journald の永続化と保存量、時間・優先度での絞り込み | 未実施(最近追加) |
-| sysctl | sysctl の永続化、カーネルモジュールの blacklist | 未実施(最近追加) |
-| limits | MemoryMax と LimitNOFILE の故障調査(OOM kill) | 未実施(最近追加) |
+| sshd | 専用 sshd の堅牢化(鍵のみ、root 禁止、ProxyJump) | 実施済み（個別の未検証範囲は docs/vm_verification/） |
+| mounts | fstab 誤記、swap、LVM の拡張(ループバック上) | 実施済み（個別の未検証範囲は docs/vm_verification/） |
+| journald | journald の永続化と保存量、時間・優先度での絞り込み | 実施済み（個別の未検証範囲は docs/vm_verification/） |
+| sysctl | sysctl の永続化、カーネルモジュールの blacklist | 実施済み（個別の未検証範囲は docs/vm_verification/） |
+| limits | MemoryMax と LimitNOFILE の故障調査(OOM kill) | 実施済み（個別の未検証範囲は docs/vm_verification/） |
+| ftp | vsftpd 認証・chroot・PASV・往復転送と拒否 | 実施済み |
+| lynis | 自動更新・バナー・umaskと監査指標改善 | 実施済み |
+| postgres | SCRAM・最小権限・論理復元・物理backup | 実施済み（物理復元起動は未検証） |
 | timesync | タイムゾーン、NTP、ロケール | 未実施(最近追加) |
 | guard | fail2ban の自動 ban と auditd の監査ルール | 未実施(最近追加) |
 | dnsserver | BIND の権威ゾーンと AXFR 制限 | 未実施(最近追加) |
@@ -259,7 +262,7 @@ VM の作成、スナップショット、復元の具体的な手順は [labs/v
 | apache | Apache の仮想ホスト、.htaccess、Basic 認証 | 未実施(最近追加) |
 | netlink | ブリッジ、VLAN、bond、ポリシールーティング(namespace 内) | 未実施(最近追加) |
 | pam | PAM スタックと faillock、pwquality | 未実施(最近追加) |
-| podman | rootless Podman と Quadlet | 未実施(最近追加) |
+| podman | rootless Podman と Quadlet | 実施済み（個別の未検証範囲は docs/vm_verification/） |
 | ldap | 専用 slapd と ACL | 未実施(最近追加) |
 | samba | 専用 smbd の共有と権限 | 未実施(最近追加) |
 | libvirt | libvirt のテスト用ドライバーで domain・snapshot・network | 未実施(最近追加) |

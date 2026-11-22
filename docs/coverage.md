@@ -10,6 +10,8 @@
 | ftp | 認証・chroot・PASV・往復転送・不正状態拒否・reset・再setup/reset | docs/vm_verification/g8-ftp.md |
 | users | 最小sudo・ユーザー/グループ修復・過剰権限拒否・reset | docs/vm_verification/g1-users.md |
 | lynis | 実監査59→60・対象警告解消・実効値・不正状態拒否・reset | docs/vm_verification/g8-lynis.md |
+| postgres | TCP SCRAM・最小権限・論理復元・物理backup検証・2周reset | docs/vm_verification/g6-postgres.md |
+| podman | rootless Quadlet・UID/GID・user manager再起動・2周reset | docs/vm_verification/g7-podman.md |
 | permissions（再確認） | 既存/新規ファイルのACL・不正状態拒否・reset・再setup/reset | docs/vm_verification/permissions-recheck.md |
 | firewall | 実nft/netns通信・確立済み接続・再読込/重複拒否・reset | docs/vm_verification/g1-firewall.md |
 
@@ -36,13 +38,13 @@
 
 ## 再監査で見つかった不足と対応状況
 
-2026-11-21の再監査で、27分野への案内があることと、その全到達目標を実操作で検証できることは一致していないと判明しました。見つかった6件に、次の実習を追加しました。**追加したVM実習5件は、この開発機に qemu も sudo が無いため、構文検査・誤った文脈での拒否・静的な安全確認までしか行っていません。実VMでの実行は未実施です。** 実VMで初回に確認する項目は `labs/vm/README.md` に記載しています。
+2026-11-21の再監査で、27分野への案内があることと、その全到達目標を実操作で検証できることは一致していないと判明しました。見つかった6件に、次の実習を追加しました。追加5件のうちusers/firewallはrootless KVMの土台で実VM確認済み。netconfig/restore/osupdateは初回通過記録がまだなく、静的検査までです。 実VMで初回に確認する項目は `labs/vm/README.md` に記載しています。
 
 | 不足していた実操作 | 追加した実習 | 検証状況 |
 |---|---|---|
-| ユーザー・グループ・sudoの作成→反映→許可/拒否→撤去 | VM `users` | 静的のみ。`sudo -n -l` で許可/拒否を判定し、拒否側のコマンドは実行しない |
+| ユーザー・グループ・sudoの作成→反映→許可/拒否→撤去 | VM `users` | 実VM確認済み（g1-users）。`sudo -n -l` で許可/拒否を判定し、拒否側のコマンドは実行しない |
 | NIC・固定IP・経路・DNSクライアント・IPv6の適用と永続化 | VM `netconfig` | 静的のみ。dummy NIC `dojo0` だけを操作し、既定経路と本線は変更しない |
-| 基本ファイアウォールの実適用・許可/拒否・接続を保った復旧 | VM `firewall` | 静的のみ。専用nftテーブルと netns+veth で判定し、自動ロールバック付き適用スクリプトを用意 |
+| 基本ファイアウォールの実適用・許可/拒否・接続を保った復旧 | VM `firewall` | 実VM確認済み（g1-firewall）。専用nftテーブルと netns+veth で判定し、自動ロールバック付き適用スクリプトを用意 |
 | バックアップから別VMへサービス全体を復元 | VM `restore`（app と client の2台） | 静的のみ。UIDがVM間で異なる状況を固定して再現 |
 | OS更新・リポジトリ署名・依存不整合からの復旧 | VM `osupdate` | 静的のみ。ローカルの署名付きaptリポジトリを使い、署名回避は不合格 |
 | ログ保存量・実ローテーション・書込み継続の確認 | native `logrotate` | ホストの実 logrotate/gzip で実行し、単体テストが通過（logrotate が無い環境ではskip） |
@@ -51,14 +53,14 @@
 
 ## 追加監査の結果と第2弾の実装状況
 
-`objectives_matrix.md`（LPIC-1/2、LFCS、RHCSA の試験範囲178行との突き合わせ）の結果、第1弾の時点では COVERED 55、PARTIAL 112、MISSING 11 でした。その後、次を追加しました。いずれも作成直後で、**実VMでの実行は未実施**です（ネイティブ実習は実機で実行済み）。
+`objectives_matrix.md`（LPIC-1/2、LFCS、RHCSA の試験範囲178行との突き合わせ）の結果、第1弾の時点では COVERED 55、PARTIAL 112、MISSING 11 でした。その後、次を追加しました。検証状態は下表と先頭の実出力記録を参照。nativeも依存不足によるskipがあり、全件を実行済みとは扱いません。
 
 | 領域 | 追加した実習 | 検証状況 |
 |---|---|---|
 | 実cron、bash堅牢化、tcpdump、deb自作 | native `cron`、`trap`、`tcpdump`、`debbuild` | ホストの実ツールで実行しテスト通過。実cronデーモンと実キャプチャ（権限不足のためpcap再生で代替）は未検証 |
-| sshd堅牢化、fstab/swap/LVM、journald、sysctl、cgroup/OOM、時刻/ロケール、fail2ban/auditd | VM `sshd`、`mounts`、`journald`、`sysctl`、`limits`、`timesync`、`guard` | 静的のみ、実VM未実施 |
+| sshd堅牢化、fstab/swap/LVM、journald、sysctl、cgroup/OOM、時刻/ロケール、fail2ban/auditd | VM `sshd`、`mounts`、`journald`、`sysctl`、`limits`、`timesync`、`guard` | sshd/mounts/journald/sysctl/limitsはg2実VM確認済み。timesync/guardは未検証 |
 | DNS/メール/NFS/Apache/Samba/LDAP | VM `dnsserver`、`mailserver`、`fileshare`、`apache`、`samba`、`ldap` | 静的のみ、実VM未実施。サーバー系パッケージは setup が導入コマンドを案内 |
-| bridge/VLAN/bond、PAM、podman、libvirt、tuned | VM `netlink`、`pam`、`podman`、`libvirt`、`tuned` | 静的のみ、実VM未実施 |
+| bridge/VLAN/bond、PAM、podman、libvirt、tuned | VM `netlink`、`pam`、`podman`、`libvirt`、`tuned` | podmanはg7実VM確認済み。他は静的検査まで |
 | カーネル、GRUB | VM `kbuild`、`grubrescue` | 静的のみ、実VM未実施。カーネル全体のビルドと実機のレスキュー起動は自動判定しない |
 | RHEL系（SELinux、dnf/rpm、firewalld） | VM `selinux`、`dnf`、`firewalld` | 静的のみ、RHEL系VMでは未実施。現行の書き出しはUbuntu専用で、手動手順は `labs/vm/RHEL.md` |
 
@@ -98,7 +100,7 @@ native欄のIDは `python3 -m engine.toolbox start ID` で開始します。VM�
 | [同期・世代管理・別の場所への復元](LINUX_DAILY_USE.md#backup) | dry-run、差分、除外、別の場所へ復元 | 6-8、9-7、11-6、13-8、17-10、23-3、23-4 | `rsync`, `archive` | 実ツール、計画課題は記録 |
 | [OSを識別して導入・更新・削除・提供元を確認](LINUX_DAILY_USE.md#packages) | 実deb導入→設定→更新→修復→remove/purge | 12-5、17-8、24-12、29-11、29-12、29-13、29-14 | —（VM/手動） | 既存は記録/設定、VM packages |
 | [所有者・グループ・権限・ACLを直す](LINUX_DAILY_USE.md#permissions) | 許可と拒否の両方を別利用者で確認 | 3-1、3-2、9-2、9-4、12-7、16-4、16-6、16-10 | —（VM/手動） | 通常modeは実ツール、ACL/利用者はVM permissions |
-| [ユーザー・グループ・ログインとsudo](LINUX_DAILY_USE.md#users) | 専用利用者・グループ・sudoを管理 | 7-4、16-10、16-11、28-1、28-2、28-3、28-4 | —（VM） | 7-4は模擬、他は記録/設定。VM `users`（静的検証のみ、実VM未実施）がuseradd/visudo/sudo許可拒否を扱う |
+| [ユーザー・グループ・ログインとsudo](LINUX_DAILY_USE.md#users) | 専用利用者・グループ・sudoを管理 | 7-4、16-10、16-11、28-1、28-2、28-3、28-4 | —（VM） | 7-4は模擬、他は記録/設定。VM `users`（g1実VM確認済み）がuseradd/visudo/sudo許可拒否を扱う |
 | [プロセス・ジョブ・資源・シグナル](LINUX_DAILY_USE.md#process) | 対象PID、通常終了、資源、失敗を区別 | 3-5、3-6、3-7、12-1、12-2、12-3、12-4、27-1、27-9、27-10 | `incident` | 実ツール+記録、VM performance |
 | [IP・経路・DNS・待受を順に調べる](LINUX_DAILY_USE.md#network) | IP・経路・DNS・待受・応答を切り分け | 4-5、4-6、13-1、13-2、13-6、17-1、29-7、32-15 | `curl` | localhost実ツール+記録、VM networkはDNS/HTTP、VM `netconfig` がNIC・固定IP・経路・IPv6（静的検証のみ、実VM未実施） |
 | [curlで取得・API・HTTPエラーを確認](LINUX_DAILY_USE.md#http) | 正常/失敗応答、本文、終了コードを分ける | 4-3、4-4、8-2、32-5、32-6、32-7、32-8 | `curl` | localhost実ツール |

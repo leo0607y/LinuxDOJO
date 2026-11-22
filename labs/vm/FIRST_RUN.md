@@ -10,6 +10,8 @@
 | ftp | 認証・chroot・PASV・往復転送・不正状態拒否・reset・再setup/reset | docs/vm_verification/g8-ftp.md |
 | users | 最小sudo・ユーザー/グループ修復・過剰権限拒否・reset | docs/vm_verification/g1-users.md |
 | lynis | 実監査59→60・対象警告解消・実効値・不正状態拒否・reset | docs/vm_verification/g8-lynis.md |
+| postgres | TCP SCRAM・最小権限・論理復元・物理backup検証・2周reset | docs/vm_verification/g6-postgres.md |
+| podman | rootless Quadlet・UID/GID・user manager再起動・2周reset | docs/vm_verification/g7-podman.md |
 | permissions（再確認） | 既存/新規ファイルのACL・不正状態拒否・reset・再setup/reset | docs/vm_verification/permissions-recheck.md |
 | firewall | 実nft/netns通信・確立済み接続・再読込/重複拒否・reset | docs/vm_verification/g1-firewall.md |
 

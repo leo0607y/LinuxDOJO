@@ -19,11 +19,11 @@
 - localca: `045a20b`。実TLSテストのpipe未closeを修正。ResourceWarningをerrorにして4テスト成功。
 - 前担当の途中修正保存: `5e93b15`。guard/libvirt/netlink/pam/podman/postgres/systemdadv/tunedは、この時点では**実VM未検証**。その後の個別完了記録を優先する。
 - ターミナル起動: `b91a92f`。ペンギンと青/紫/シアン、瞬き・ウインク・笑顔。`LQ_NO_ANIMATION=1`で静止。NO_COLOR/非TTYでも静止。PTYで起動とEnter終了を確認。関連10テスト成功。
-- Podman: rootless Quadlet、公開範囲・実bind mount/heartbeat、UID/GID対応・起動失敗修復・user manager再起動・2周の専用資源撤去を確認。実出力 `g7-podman.md`。
-- PostgreSQL: 実VM検証と修正を取り込み。ロール属性・SCRAM・実効HBA/再起動設定・最小権限・論理復元・物理backupの由来を確認。`g6-postgres.md`に公式runner実出力。
+- Podman: `170ae81`。rootless Quadlet、公開範囲・実bind mount/heartbeat、UID/GID対応・起動失敗修復・user manager再起動・2周の専用資源撤去を確認。実出力 `g7-podman.md`。
+- PostgreSQL: `1b1704c`。実VM検証と修正を取り込み。ロール属性・SCRAM・実効HBA/再起動設定・最小権限・論理復元・物理backupの由来を確認。`g6-postgres.md`に公式runner実出力。
 - 常用の安全操作: `ffed7f8`。native `safe-cleanup`（40本目）、NUL区切り・特殊ファイル名・リンク非追跡・退避・隔離移動・復元。実ツール3テスト成功。toolbox関連42テスト成功/skip14。
 - users/lynis: `aabd59d`。最小sudo復旧、Lynis実監査59→60・対象警告消失・誤設定拒否・reset。実出力は `g1-users.md`, `g8-lynis.md`。
-- サイトUI: `docs/UI_REVIEW.md`に設計と実画面確認を記録。単調な配色・角丸カード・偽ウィンドウ操作を廃し、説明/端末の2ペインと索引へ。デプロイは未実行。
+- サイトUI: `4497b0f`。`docs/UI_REVIEW.md`に設計と実画面確認を記録。単調な配色・角丸カード・偽ウィンドウ操作を廃し、説明/端末の2ペインと索引へ。デプロイは未実行。
 - 全体テスト直近: 618件成功/skip48（192.6秒）、サイトbuild成功、npm7件、講座Node4件、E2E14件成功。**その後のUI・新課題は再実行が必要**。
 
 ### いま進行中・取り込み待ち

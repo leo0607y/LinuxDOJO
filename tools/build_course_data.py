@@ -28,7 +28,7 @@ NATIVE_REAL = {"shell", "find", "archive", "rsync", "git", "vim", "jq", "rg", "c
 
 # VM 実習の検証状況。追加分の実出力は docs/vm_verification/ を参照。
 VM_REAL = {"boot", "storage", "packages", "permissions", "software", "ssh", "network", "performance", "webstack",
-           "sshd", "mounts", "journald", "sysctl", "limits", "ftp", "firewall", "users", "lynis"}
+           "sshd", "mounts", "journald", "sysctl", "limits", "ftp", "firewall", "users", "lynis", "postgres", "podman"}
 VM_STATIC = { "netconfig", "restore", "osupdate"}
 VM_NEW = {"timesync", "guard"}
 VM_LABEL = {"real": "VM: 実VMで検証済み",
@@ -39,8 +39,9 @@ VM_LABEL = {"real": "VM: 実VMで検証済み",
 VM_FOR = {
     "packages": ["packages", "osupdate"], "permissions": ["permissions"], "users": ["users"],
     "network": ["network", "netconfig"], "ssh": ["ssh", "sshd"], "services": ["software", "boot"],
-    "web": ["webstack"], "tls": ["webstack"], "database": ["webstack"], "storage": ["storage", "mounts"],
+    "web": ["webstack"], "tls": ["webstack"], "database": ["webstack", "postgres"], "storage": ["storage", "mounts"],
     "logging": ["journald", "timesync"], "process": ["performance", "limits"],
+    "containers": ["podman"],
     "recovery": ["restore", "boot"], "backup": ["restore"], "automation": ["software"],
     "security": ["firewall", "guard", "sshd"], "infrastructure": ["netconfig", "firewall", "sysctl"],
 }
