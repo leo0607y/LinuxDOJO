@@ -1204,16 +1204,18 @@ def play(mode, start=None):
         progress["cursor"] = step["id"]
         prepare_step(terminal, step)
         remember(mode, progress)
-        title = f"{MODE_NAMES[mode]}  {index + 1}/{len(course)}  {step['title']}"
-        header = [title, *([f"ユニット: {step['unit']}"] if step.get("unit") else []), "",
-                  *step["explanation"].splitlines(), "", "やってみよう: " + step["task"]]
-        with ui.QuestionScreen(header, summary=[title, "やってみよう: " + step["task"]]) as screen:
+        where = ui.c(f"{MODE_NAMES[mode]}  {index + 1} / {len(course)}"
+                     + (f"   {step['unit']}" if step.get("unit") else ""), "dim")
+        title = ui.c(step["title"], "bold", "accent")
+        task = ui.c("やってみよう", "bold", "accent") + ": " + step["task"]
+        header = [where, title, "", *step["explanation"].splitlines(), "", task]
+        with ui.QuestionScreen(header, summary=[where, title, task]) as screen:
             if mode == "intro" and index < INTRO_SHOWN_ANSWERS:
-                print("\n  入力するコマンド: " + ui.c(step["command"], "bcyan"))
+                print("\n  入力するコマンド: " + ui.c(step["command"], "bold", "accent"))
             elif mode == "intro":
                 print("\n  答えは書いてありません。まず自分で考えて入力してみましょう。")
-            print("\n  訓練用の模擬ターミナルです。実際の sudo・apt・シェルは実行しません。")
-            print("  hint: ヒントを1段階ずつ表示 / answer: 答えを見る / lesson: 説明を再表示 / reset: この課題を復元 / menu: 保存して戻る")
+            print(ui.c("\n  訓練用の模擬ターミナルです。実際の sudo・apt・シェルは実行しません。", "dim"))
+            print(ui.footer(("hint", "ヒント"), ("answer", "答え"), ("lesson", "説明"), ("reset", "復元"), ("menu", "保存して戻る")))
             hint_level = 0
             if terminal.progress.get("editor"):
                 print("\n" + vim_sim.render(terminal.progress["editor"]))
@@ -1231,7 +1233,7 @@ def play(mode, start=None):
                     return
                 if line == "hint" or (not in_editor and line == "help"):
                     text, last = hint_text(step, hint_level)
-                    print(f"  {ui.HINT} {hint_level + 1}: {text}")
+                    print(f"  {ui.c(ui.HINT, 'bold', 'accent')} {hint_level + 1}: {text}")
                     print("  （もう一度 hint で次のヒント）" if not last else "  （これが最後のヒントです）")
                     hint_level += 1
                     continue
@@ -1255,7 +1257,7 @@ def play(mode, start=None):
                     if result.code == 0 and not in_editor:
                         print("  実行できました。今回の課題も試しましょう。hint で入力例を見られます。")
                     continue
-                print(ui.c(f"\n  {ui.OK} できました！ " + step["success"], "bgreen"))
+                print("\n" + ui.status_line("ok", "できました！", step["success"]))
                 others = [answer for answer in answers(step) if not matches(line, {"command": answer})]
                 if others:
                     print("  ほかの書き方でも正解です: " + " / ".join(others))
@@ -1271,18 +1273,19 @@ def play(mode, start=None):
                 reward = save.record_activity(d, mode + ":" + step["id"])
                 save.store(d)
                 if reward["earned"]:
-                    print(ui.c(f"  +{reward['earned']} XP！", "byellow"))
-                print("  " + save.activity_line(d))
+                    print(ui.c(f"  +{reward['earned']} XP", "bold", "accent"))
+                print(ui.c("  " + save.activity_line(d), "dim"))
                 try:
                     nxt = "次の練習へ" if index < len(course) else "学習の締めくくりへ"
-                    choice = input(f"\n  Enter: {nxt} / menu: 保存してメニューへ > ").strip().lower()
+                    print("\n" + ui.footer(("Enter", nxt), ("menu", "保存してメニューへ")))
+                    choice = input(ui.c("\n  > ", "bold", "accent")).strip().lower()
                 except (EOFError, KeyboardInterrupt):
                     return
                 if choice in ("menu", "q", "exit"):
                     return
                 break
     print(ui.box([f"{MODE_NAMES[mode]}を最後まで学習しました！", "何度でもレッスン選択から復習できます。",
-                  "はじめて → 基礎練習 → 応用練習 → 達人 → 実践 の順に進めます。", "総合復習の「課題まつり」で、手本なしの力試しもできます。", "メインメニューの [7] モード選択で切り替えましょう。"], color="green"))
+                  "はじめて → 基礎練習 → 応用練習 → 達人 → 実践 の順に進めます。", "総合復習の「課題まつり」で、手本なしの力試しもできます。", "メインメニューの [7] モード選択で切り替えましょう。"], title="COMPLETE", color="ok"))
     try:
         input("Enter でメインメニューへ戻る > ")
     except (EOFError, KeyboardInterrupt):
@@ -1290,27 +1293,48 @@ def play(mode, start=None):
 
 
 def lesson_select(mode):
+    page = 0
     while True:
         ui.clear()
         progress = progress_for(mode)
         course = lessons(mode)
-        print(f"\n  {MODE_NAMES[mode]} — レッスン選択（復習に減点はありません）\n")
-        unit = None
+        completed = set(progress.get("completed", []))
+        nxt = next((s["id"] for s in course if s["id"] not in completed), None)
+        print(ui.header([MODE_NAMES[mode], "レッスン選択"],
+                        f"{ui.progress_bar(len(completed & {s['id'] for s in course}) / len(course), 8)} "
+                        f"{len(completed & {s['id'] for s in course})}/{len(course)} レッスン"))
+        print("\n  " + ui.c("復習に減点はありません。", "dim"))
+        rows, unit = [], None
         for index, step in enumerate(course, 1):
             if step.get("unit") and step["unit"] != unit:
                 unit = step["unit"]
                 members = [s["id"] for s in course if s.get("unit") == unit]
-                done = len(set(members) & set(progress.get("completed", [])))
-                print(ui.c(f"\n  ■ {unit}  {done}/{len(members)}", "bold", "bcyan"))
-            mark = ui.DONE if step["id"] in progress.get("completed", []) else ui.TODO
-            print(f"  [{index}] {mark} {step['title']}")
+                done = len(set(members) & completed)
+                rows.append(ui.rule(f"{unit}  {done}/{len(members)}"))
+            mark = (ui.c(ui.DONE, "green", "bold") if step["id"] in completed
+                    else ui.c(ui.NEXT, "bold", "accent") if step["id"] == nxt else ui.c(ui.TODO, "dim"))
+            rows.append(f" {mark} {ui.pad(ui.c(f'[{index}]', 'bold', 'accent'), 5)}{ui.clip(step['title'], ui.term_width() - 14)}")
+        size = max(6, ui.term_rows() - 9)
+        pages = -(-len(rows) // size)
+        page = max(0, min(page, pages - 1))
+        print()
+        for row in rows[page * size:(page + 1) * size]:
+            print(row)
+        print()
+        keys = [("番号", "復習"), ("Enter", "続きから"), ("b", "戻る")]
+        if pages > 1:
+            keys.insert(2, (f"n / p", f"ページ送り ({page + 1}/{pages})"))
+        print(ui.footer(*keys))
         print(ui.take_flash(), end="")
         try:
-            value = input("\n  番号 / Enter: 続きから / b: 戻る（メインメニューへ） > ").strip()
+            value = input(ui.c("\n  > ", "bold", "accent")).strip()
         except (EOFError, KeyboardInterrupt):
             return
         if value in ("b", "q"):
             return
+        if value in ("n", "p") and pages > 1:
+            page = (page + (1 if value == "n" else -1)) % pages
+            continue
         if value == "":
             play(mode)
         elif value.isdigit() and 1 <= int(value) <= len(course):

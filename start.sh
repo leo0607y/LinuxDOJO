@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================
-#  LinuxQuest 起動ランチャー
+#  LinuxDOJO 起動ランチャー
 #    start               初回登録後、どこからでも起動
 #    bash install-start.sh  start コマンドを登録（sudo 不要）
 #    ./start.sh          ゲームを起動
@@ -37,7 +37,7 @@ chmod +x bin/mock/* bin/sim/* 2>/dev/null
 mkdir -p "${LQ_WORKSPACE:-workspace}"
 
 check_env() {
-  echo "動作環境チェック（足りない道具があっても、一部の問題以外は遊べます）"
+  echo "LinuxDOJO 動作環境チェック（足りない道具があっても、一部の問題以外は遊べます）"
   for c in bash "$PY" grep sed awk find tar gzip curl ss ping dig rsync zip unzip lsof ssh watch jq vim; do
     if command -v "$c" >/dev/null 2>&1; then printf "  [OK] %s\n" "$c"; else printf "  [NG] %s （一部の問題で必要です。Ubuntu/Debian なら sudo apt install で導入。パッケージ名は異なる場合があります）\n" "$c"; fi
   done

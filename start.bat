@@ -14,7 +14,7 @@ where wsl.exe >nul 2>nul
 if errorlevel 1 goto native
 wsl.exe -e python3 -c "import sys; sys.exit(0 if sys.version_info >= (3, 8) else 1)" >nul 2>nul
 if errorlevel 1 goto wsl_not_ready
-echo WSL で起動します。全モードを使えます。
+echo LinuxDOJO  WSL で起動します。全モードを使えます。
 wsl.exe --cd "%~dp0." -e bash ./start.sh %*
 exit /b %errorlevel%
 
@@ -39,7 +39,7 @@ pause
 exit /b 1
 
 :run_native
-echo Windows 版で起動します。はじめて・基礎練習モードを使えます。
+echo LinuxDOJO  Windows 版で起動します。はじめて・基礎練習モードを使えます。
 %PY% engine\main.py
 set "CODE=%errorlevel%"
 if not "%CODE%"=="0" pause

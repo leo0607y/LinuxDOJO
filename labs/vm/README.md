@@ -177,6 +177,27 @@ TASK.txtの順に操作し、終了後は `sudo dojo-vm-lab ssh reset` で専用
 | firewall | 専用nftablesテーブルの適用、許可/拒否、タイマー付きの安全な適用と自動ロールバック | 組織のFW設計、`flush ruleset` を伴う全体入替、ufw/firewalld |
 | restore | app と client の2台で、tar+SQLiteのバックアップからサービス全体を復元（UID差・権限・unit・データを判定） | 本番規模のDR、レプリケーション |
 | osupdate | ローカルの署名付きaptリポジトリ、keyring欠落とholdからの復旧（署名検証を無効化する回避は不合格） | 外部ミラー運用、ディストリビューション全体のアップグレード、RPM |
+| sshd | 専用sshdの堅牢化（鍵のみ・root禁止・AllowUsers・MaxAuthTries）と ProxyJump | 組織の鍵管理 |
+| mounts | ループバック上のfstab誤記修復・swapfile・LVM拡張 | 実ディスク、ルートFS、RAID、LUKS |
+| journald | journaldの永続化と保存量、journalctlでの絞り込み | リモートログ集約 |
+| sysctl | sysctl.dの永続化、読込順序、modprobe blacklist | カーネルのチューニング全般 |
+| limits | MemoryMax・LimitNOFILEの故障調査（OOM kill） | CPU/IO全体の性能設計 |
+| timesync | タイムゾーン、timesyncd、ロケール | chrony・PTP |
+| guard | fail2banの自動banとauditdの監査ルール（専用jail・専用ログ） | 本番のsshd保護 |
+| dnsserver | 専用BINDの権威ゾーン、逆引き、AXFR制限 | 再帰DNS、DNSSEC |
+| mailserver | 専用Postfixのリレー拒否・エイリアス・キュー | 外部配送、SPF/DKIM |
+| fileshare | NFSのexportとマウント（app と client の2台） | Kerberos NFS、autofsの判定 |
+| apache | 専用Apacheの仮想ホスト・.htaccess・Basic認証・rewrite | 本番TLS運用 |
+| netlink | namespace内のブリッジ・VLAN・bond・ポリシールート | 実NICのbond/VLAN変更 |
+| pam | 専用PAMサービスのfaillock・pwquality・access | login/sshdのPAM変更 |
+| podman | rootless PodmanとQuadlet（イメージ取得なし） | レジストリ運用、Kubernetes |
+| ldap | 専用slapdのDIT・ACL・bind | SSSD連携、StartTLS |
+| samba | 専用smbdの共有・認証・ファイル権限 | ADドメイン参加 |
+| libvirt | テスト用ドライバーでのdomain/snapshot/network操作 | 実ハイパーバイザー、nested virt |
+| tuned | tunedのカスタムプロファイル | ハードウェア固有の調整 |
+| kbuild | カーネルモジュールのビルド・ロード・modprobe | カーネル全体のビルド、モジュール署名 |
+| grubrescue | ループバック上のgrub-install・grub.cfg生成と修復 | 実機のブート修復（コンソール手動） |
+| selinux / dnf / firewalld | RHEL系VM専用（SELinuxラベル、dnf/rpm、firewalld）。`RHEL.md` を参照 | Ubuntu VMでは常に拒否 |
 
 不足部分は、次の成果物を作る手動実習として続けます。これらは現時点で自動の故障投入・修了判定を実装していません。
 
@@ -205,13 +226,7 @@ multipass start linuxdojo-app linuxdojo-client
 
 2026-11-21には専用Ubuntu 24.04.5 KVM VMで既存9モジュールを実行しました（上記の新規5モジュールは含みません）。boot・storage・webstack・softwareの故障復旧と再起動後、SSHの実認証・転送と再起動後、実aptの更新・撤去、permissions・performanceを確認しました。networkは2台のVMでDNS故障前後と修復後を検証済みです。詳細は教材本体の `docs/coverage.md` の「実装と検証記録」を参照します。これは教材の特定環境での検証で、全ホスト・全Multipassドライバーの動作確認ではありません。
 
-**追加した `users`・`netconfig`・`firewall`・`restore`・`osupdate` の5モジュールは、開発環境にqemuもsudoも無かったため、構文検査・誤った文脈での全actionの拒否・静的な安全確認までしか行っておらず、実VMでは一度も実行していません。** 初回の実VM実行では、各モジュールのヘッダーと次の点を確認してください。
-
-- users: `runuser -u dojo-alice -- sudo -n -l <cmd>` の終了コードが許可で0、拒否で非0になるか。
-- netconfig: `networkctl reconfigure dojo0` が作成直後に効くか、`resolvectl` の出力形式、IPv6のDADの待ち時間。
-- firewall: `ip netns list` の出力判定、`systemd-run` の90秒ロールバックが発火するか、ufw有効時の挙動。
-- restore: UID 981/967 が空いているか、`systemctl show -p EnvironmentFiles` の出力形式。
-- osupdate: `-o Dir::Etc::sourceparts` が効くか、`_apt` がfile:リポジトリを読めるか、`gpg --dearmor` したkeyringで警告が出ないか。
+**既存9モジュール以外の、後から追加した28モジュール（`users`、`netconfig`、`firewall`、`restore`、`osupdate`、`sshd`、`mounts`、`journald`、`sysctl`、`limits`、`timesync`、`guard`、`dnsserver`、`mailserver`、`fileshare`、`apache`、`netlink`、`pam`、`podman`、`ldap`、`samba`、`libvirt`、`tuned`、`kbuild`、`grubrescue`、`selinux`、`dnf`、`firewalld`）は、開発環境にqemuもsudoも無かったため、構文検査・誤った文脈での全actionの拒否・静的な安全確認・非特権部分の単体テストまでしか行っておらず、実VMでは一度も実行していません。** モジュールごとの初回確認項目と必要パッケージは [FIRST_RUN.md](FIRST_RUN.md) にまとめています。RHEL系の3モジュールは [RHEL.md](RHEL.md) の手順で別のVMが必要です。
 
 エクスポート、生成内容の整合性、ゲストスクリプトの構文、VM外で動作を拒否するガードは自動テストします。
 開発環境でMultipassが使えない場合、ゲストのパッケージ導入・デバイス作成・再起動・実際の復旧成功までは検証済みとはしません。

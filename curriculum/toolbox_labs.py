@@ -15,6 +15,7 @@ import re
 import subprocess
 import tempfile
 import tarfile
+import time
 
 LABS = {}
 
@@ -90,6 +91,8 @@ def check_tar(root, archive, expected):
 
 
 def add(id, title, tools, packages, task, setup, check, solution, wrong):
+    if id in LABS:
+        raise ValueError("実習IDが重複しています: " + id)
     LABS[id] = dict(title=title, tools=tools.split(), packages=packages.split(),
                     task=task, setup=setup, check=check,
                     solution="set -euo pipefail\n" + solution.strip() + "\n", wrong=wrong)
@@ -771,3 +774,730 @@ done
 ./writer.sh 5''',
     ["printf '\"app.log\" {\\n daily\\n rotate 3\\n compress\\n delaycompress\\n missingok\\n notifempty\\n create\\n}\\n' > rotate.conf; logrotate -d -s state rotate.conf > dry-run.txt 2>&1; for i in 1 2 3 4 5; do ./writer.sh 20; logrotate -s state -f rotate.conf; done",
      "printf '\"app.log\" {\\n daily\\n rotate 3\\n compress\\n delaycompress\\n missingok\\n notifempty\\n copytruncate\\n}\\n' > rotate.conf; logrotate -d -s state rotate.conf > dry-run.txt 2>&1; for i in 1 2; do ./writer.sh 20; logrotate -s state -f rotate.conf; done"])
+
+
+# ---------------------------------------------------------------------------
+# cron: 実cronデーモンは使わず、スケジュールを自前の解析器で検証し、登録行の
+# コマンドを cron と同じ最小環境(env -i, PATH=/usr/bin:/bin, % の改行化)で実行する。
+# ---------------------------------------------------------------------------
+import datetime
+
+CRON_JOB = """#!/bin/sh
+# cron から呼ばれるジョブ。report-tool は tools/ にあり、cron の既定PATHには無い。
+report-tool begin
+sleep 1
+echo "tick"
+echo "warn" >&2
+report-tool end
+"""
+CRON_TOOL = """#!/bin/sh
+printf '%s %s\\n' "$1" "$$" >> "$(dirname "$0")/../work/runs.txt"
+"""
+CRON_NAMES = {"sun": 0, "mon": 1, "tue": 2, "wed": 3, "thu": 4, "fri": 5, "sat": 6,
+              "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6, "jul": 7,
+              "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12}
+CRON_REFERENCE = datetime.datetime(2026, 3, 6, 12, 0)  # 金曜の昼
+
+
+def cron_field(text, lo, hi, names=False):
+    values = set()
+    for part in text.split(","):
+        step = 1
+        if "/" in part:
+            part, raw = part.split("/", 1)
+            require(raw.isdigit() and int(raw) > 0, "刻み幅が不正です: " + text)
+            step = int(raw)
+
+        def number(token):
+            if names and token.lower() in CRON_NAMES:
+                return CRON_NAMES[token.lower()]
+            require(token.isdigit(), "数値でない値: " + token)
+            return int(token)
+        if part == "*":
+            first, last = lo, hi
+        elif "-" in part:
+            first, last = (number(x) for x in part.split("-", 1))
+        else:
+            first = last = number(part)
+        require(lo <= first <= last <= hi, "範囲外の値: " + text)
+        values.update(range(first, last + 1, step))
+    return values
+
+
+def cron_parse(fields):
+    require(len(fields) == 5, "スケジュールは5フィールドです。")
+    minute = cron_field(fields[0], 0, 59)
+    hour = cron_field(fields[1], 0, 23)
+    dom = cron_field(fields[2], 1, 31)
+    month = cron_field(fields[3], 1, 12, True)
+    dow = {v % 7 for v in cron_field(fields[4], 0, 7, True)}
+    return dict(minute=minute, hour=hour, dom=dom, month=month, dow=dow,
+                dom_star=fields[2].startswith("*"), dow_star=fields[4].startswith("*"))
+
+
+def cron_fires(spec, start, count):
+    fires = []
+    for offset in range(800):
+        day = start.date() + datetime.timedelta(days=offset)
+        weekday = (day.weekday() + 1) % 7
+        in_dom, in_dow = day.day in spec["dom"], weekday in spec["dow"]
+        if spec["dom_star"] or spec["dow_star"]:
+            ok = in_dom and in_dow
+        else:
+            ok = in_dom or in_dow
+        if not ok or day.month not in spec["month"]:
+            continue
+        for hour in sorted(spec["hour"]):
+            for minute in sorted(spec["minute"]):
+                moment = datetime.datetime(day.year, day.month, day.day, hour, minute)
+                if moment > start:
+                    fires.append(moment)
+                    if len(fires) == count:
+                        return fires
+    return fires
+
+
+def cron_split_percent(command):
+    """cron は最初のエスケープされていない % でコマンドを切り、以降を標準入力にする。"""
+    body, stdin, seen = "", "", False
+    index = 0
+    while index < len(command):
+        char = command[index]
+        if char == "\\" and command[index + 1:index + 2] == "%":
+            if seen:
+                stdin += "%"
+            else:
+                body += "%"
+            index += 2
+            continue
+        if char == "%":
+            if seen:
+                stdin += "\n"
+            seen = True
+        elif seen:
+            stdin += char
+        else:
+            body += char
+        index += 1
+    return body, (stdin if seen else None)
+
+
+def cron_setup(root):
+    minute, first = secrets.randbelow(50) + 5, secrets.randbelow(3) + 1
+    last = first + secrets.randbelow(3) + 2
+    put(root, "job.sh", CRON_JOB, 0o755)
+    put(root, "tools/report-tool", CRON_TOOL, 0o755)
+    put(root, "requirements.env", f"MINUTE={minute}\nHOUR_FROM={first}\nHOUR_TO={last}\n")
+    (root / "work").mkdir()
+    (root / "logs").mkdir()
+    (root / "home").mkdir()
+    remember(root, {"minute": minute, "first": first, "last": last},
+             ["job.sh", "tools/report-tool", "requirements.env"])
+
+
+def cron_entry(root):
+    env, entries = {}, []
+    for line in read(root, "crontab.txt").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        match = re.match(r"^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$", stripped)
+        if match:
+            value = match.group(2).strip()
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
+                value = value[1:-1]
+            env[match.group(1)] = value
+        else:
+            entries.append(stripped)
+    require(len(entries) == 1, "crontab.txt のジョブ行はちょうど1行にします。")
+    parts = entries[0].split(None, 5)
+    require(len(parts) == 6, "5フィールドの後にコマンドが必要です。")
+    return env, parts[:5], parts[5]
+
+
+def cron_launch(root, env, command):
+    body, stdin = cron_split_percent(command)
+    shell = env.get("SHELL", "/bin/sh")
+    require(os.path.isfile(shell), "SHELL が存在しません: " + shell)
+    cron_env = {"PATH": "/usr/bin:/bin", "SHELL": "/bin/sh", "HOME": str(root / "home"),
+                "LOGNAME": "dojo", "LC_ALL": "C"}
+    cron_env.update(env)
+    argv = ["env", "-i"] + [k + "=" + v for k, v in cron_env.items()] + [shell, "-c", body]
+    return subprocess.Popen(argv, cwd=root / "home", stdin=subprocess.PIPE,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True), stdin
+
+
+def cron_finish(proc, stdin):
+    try:
+        proc.communicate(stdin or "", timeout=12)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.communicate()
+        raise ValueError("cron 実行がタイムアウトしました。")
+    return proc.returncode
+
+
+def cron_events(root):
+    path = root / "work/runs.txt"
+    words = [line.split()[0] for line in path.read_text().splitlines() if line.strip()] if path.exists() else []
+    return words.count("begin"), words.count("end")
+
+
+def cron_check(root):
+    data = fixture(root)
+    env, fields, command = cron_entry(root)
+    spec = cron_parse(fields)
+    expected = []
+    moment = CRON_REFERENCE
+    while len(expected) < 6:
+        moment += datetime.timedelta(minutes=1)
+        if (moment.minute == data["minute"] and data["first"] <= moment.hour <= data["last"]
+                and moment.weekday() < 5):
+            expected.append(moment)
+    require(cron_fires(spec, CRON_REFERENCE, 6) == expected,
+            f"次回実行が要件(平日 {data['first']}-{data['last']} 時の {data['minute']} 分)と一致しません。")
+    for name in ("runs.txt",):
+        (root / "work" / name).unlink(missing_ok=True)
+    for old in (root / "logs").glob("*"):
+        old.unlink()
+    # 1回目: cron の最小環境で実行して成功し、標準出力と標準エラーがログへ入ること。
+    proc, stdin = cron_launch(root, env, command)
+    status = cron_finish(proc, stdin)
+    require(status == 0, "最小環境(PATH=/usr/bin:/bin)でコマンドが失敗しました。PATH や % の扱いを確認します。")
+    require(cron_events(root) == (1, 1), "ジョブが1回だけ完走していません(PATH不足や % の切断の疑い)。")
+    today = datetime.date.today().isoformat()
+    logs = list((root / "logs").glob("*"))
+    require(len(logs) == 1 and re.fullmatch(r"job-\d{4}-\d{2}-\d{2}\.log", logs[0].name),
+            "logs/job-YYYY-MM-DD.log へ出力します(date の % は \\% にする)。")
+    require(logs[0].name == f"job-{today}.log", "ログ名の日付が今日ではありません。")
+    text = logs[0].read_text()
+    require("tick" in text and "warn" in text, "標準出力と標準エラーの両方をログへ(>> file 2>&1)。")
+    # 2回目: 重なる2起動。flock -n により片方だけが実行される。
+    (root / "work/runs.txt").unlink()
+    first, first_in = cron_launch(root, env, command)
+    time.sleep(0.4)
+    second, second_in = cron_launch(root, env, command)
+    cron_finish(first, first_in)
+    cron_finish(second, second_in)
+    require(cron_events(root) == (1, 1), "重複起動を防げていません。flock -n でロックを取れなければ即終了します。")
+
+
+add("cron", "cron: 最小環境・%・多重起動を考えて定期実行を書く", "bash flock env sleep date", "bash util-linux coreutils",
+    "requirements.env の MINUTE / HOUR_FROM / HOUR_TO を使い、平日(月-金)の HOUR_FROM-HOUR_TO 時の MINUTE 分に ./job.sh を実行する\n"
+    "crontab.txt を書く(ジョブ行は1行、cron デーモンは使わない)。cron の環境は PATH=/usr/bin:/bin で非常に小さい: job.sh が使う tools/report-tool に\n"
+    "届くよう crontab 先頭で PATH= を設定。コマンドは絶対パス(現在のフォルダ)で書き、flock -n で重複起動を防ぎ、\n"
+    "出力は logs/job-YYYY-MM-DD.log へ標準出力・標準エラーとも追記(date の % は \\% と書く)。\n"
+    "判定は自前の cron 解析器で次回実行を計算し、env -i の最小環境でコマンドを実際に実行し、重なる2起動で二重実行が無いか確認する。",
+    cron_setup, cron_check,
+    '''. ./requirements.env
+R="$PWD"
+cat > crontab.txt <<EOF
+PATH=$R/tools:/usr/bin:/bin
+$MINUTE $HOUR_FROM-$HOUR_TO * * 1-5 flock -n $R/job.lock $R/job.sh >> $R/logs/job-\\$(date +\\%F).log 2>&1
+EOF''',
+    ['. ./requirements.env\nR="$PWD"\nprintf \'%s %s-%s * * 1-5 %s/job.sh >> %s/logs/job-$(date +%%F).log 2>&1\\n\' "$MINUTE" "$HOUR_FROM" "$HOUR_TO" "$R" "$R" > crontab.txt',
+     '. ./requirements.env\nR="$PWD"\nprintf \'PATH=%s/tools:/usr/bin:/bin\\n* * * * * flock -n %s/job.lock %s/job.sh >> %s/logs/job-$(date +\\\\%%F).log 2>&1\\n\' "$R" "$R" "$R" "$R" > crontab.txt',
+     '. ./requirements.env\nR="$PWD"\nprintf \'PATH=%s/tools:/usr/bin:/bin\\n%s %s-%s * * 1-5 flock %s/job.lock %s/job.sh >> %s/logs/job-$(date +\\\\%%F).log 2>&1\\n\' "$R" "$MINUTE" "$HOUR_FROM" "$HOUR_TO" "$R" "$R" "$R" > crontab.txt'])
+
+
+# ---------------------------------------------------------------------------
+# trap: 危険な bash スクリプトを、失敗注入(途中失敗・SIGINT/SIGTERM・入力欠落・
+# 多重起動)の下で実際に走らせて判定する。
+# ---------------------------------------------------------------------------
+import signal
+
+TRAP_UNSAFE = """#!/bin/bash
+# usage: deploy.sh INPUT OUTPUT   (環境変数: WORK_ROOT 作業場所, STEP_CMD 変換コマンド)
+WORK_ROOT=${WORK_ROOT:-/tmp}
+STEP_CMD=${STEP_CMD:-cat}
+tmp=$(mktemp -d $WORK_ROOT/build.XXXXXX)
+touch $WORK_ROOT/deploy.lock
+cat $1 | sort -u > $tmp/sorted
+bash -c "$STEP_CMD" < $tmp/sorted > $2
+rm -rf $tmp
+rm -f $WORK_ROOT/deploy.lock
+echo done
+"""
+
+
+def trap_setup(root):
+    words = [secrets.token_hex(3) for _ in range(5)]
+    lines = words + words[:2] + [secrets.token_hex(3)]
+    secrets.SystemRandom().shuffle(lines)
+    put(root, "input.txt", "".join(line + "\n" for line in lines))
+    put(root, "deploy.sh", TRAP_UNSAFE, 0o755)
+    put(root, "deploy.orig.sh", TRAP_UNSAFE, 0o644)
+    remember(root, {"expected": "".join(w + "\n" for w in sorted(set(lines))).upper()},
+             ["deploy.orig.sh", "input.txt"])
+
+
+def trap_check(root):
+    import tempfile as tf
+    data = fixture(root)
+    script = root / "deploy.sh"
+    require(script.is_file() and os.access(script, os.X_OK), "deploy.sh は実行可能にします。")
+    require(script.read_bytes() != (root / "deploy.orig.sh").read_bytes(), "deploy.sh を修正していません。")
+    run(root, "bash", "-n", "deploy.sh")
+    with tf.TemporaryDirectory(prefix="dojo-trap-") as scratch:
+        base = Path(scratch)
+        work, tmpdir = base / "work dir", base / "tmp dir"
+        work.mkdir()
+        tmpdir.mkdir()
+        source, out, marker = base / "in put.txt", base / "out put.txt", base / "started"
+        source.write_text((root / "input.txt").read_text())
+
+        def start(step, args=None, group=False):
+            env = {"PATH": os.environ["PATH"], "LC_ALL": "C", "WORK_ROOT": str(work),
+                   "TMPDIR": str(tmpdir), "STEP_CMD": step}
+            argv = ["bash", str(script)] + (args if args is not None else [str(source), str(out)])
+            return subprocess.Popen(argv, cwd=base, env=env, stdin=subprocess.DEVNULL,
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                                    start_new_session=group)
+
+        def finish(proc):
+            try:
+                o, e = proc.communicate(timeout=12)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.communicate()
+                raise ValueError("スクリプトが終了しません(シグナルでも中断できない)。")
+            return proc.returncode, o, e
+
+        def clean(label, allow=()):
+            leftover = sorted(p.name for p in work.iterdir() if p.name not in allow)
+            require(not leftover, label + ": 作業領域に残骸があります: " + ", ".join(leftover))
+            require(not list(tmpdir.iterdir()), label + ": TMPDIR に残骸があります。")
+
+        # 1) 正常系: 空白入りパスでも動き、出力は正しく、一時物は消える。
+        code, o, e = finish(start("tr a-z A-Z"))
+        require(code == 0, "正常系が失敗しました: " + e[-200:])
+        require(out.read_text() == data["expected"], "正常系の出力が違います(空白入りパスは引用符で守る)。")
+        clean("正常系")
+        out.unlink()
+        # 2) 入力欠落: 終了コード2・診断を標準エラーへ・何も作らない。
+        code, o, e = finish(start("cat", [str(base / "missing.txt"), str(out)]))
+        require(code == 2 and e.strip() and not out.exists(), "入力欠落は終了コード2・標準エラーに診断・出力なし。")
+        clean("入力欠落")
+        # 3) 入力がディレクトリ: pipefail が無いと cat の失敗が見逃される。
+        code, o, e = finish(start("cat", [str(base), str(out)]))
+        require(code != 0 and not out.exists(), "入力が読めないのに成功扱いです(set -o pipefail)。")
+        clean("読めない入力")
+        # 4) 途中失敗: 終了コードを保ち、部分出力を残さず、既存の出力は壊さない。
+        out.write_text("OLD\n")
+        code, o, e = finish(start("echo partial; exit 7"))
+        require(code == 7, f"途中失敗の終了コードは 7 のはず(実際 {code})。")
+        require(out.read_text() == "OLD\n", "失敗時に出力ファイルを壊しています(一時領域へ作って最後に mv)。")
+        clean("途中失敗")
+        out.unlink()
+        code, o, e = finish(start("echo partial; exit 9"))
+        require(code == 9 and not out.exists(), "失敗時に部分出力が残っています。")
+        clean("途中失敗(新規)")
+        # 5) 多重起動: 既存ロックがあれば終了コード75、他者のロックは消さない。
+        (work / "deploy.lock").write_text("")
+        code, o, e = finish(start("cat"))
+        require(code == 75 and not out.exists(), "ロック保持中は終了コード75で何もしません。")
+        require((work / "deploy.lock").exists(), "他者のロックを消してはいけません。")
+        clean("ロック保持", allow=("deploy.lock",))
+        (work / "deploy.lock").unlink()
+        # 6) SIGINT / SIGTERM: 実行中に中断しても一時物・ロックを残さず、出力も無い。
+        for sig, codes in ((signal.SIGTERM, (143, -15)), (signal.SIGINT, (130, -2))):
+            marker.unlink(missing_ok=True)
+            proc = start(f"touch '{marker}'; sleep 30", group=True)
+            for _ in range(100):
+                if marker.exists():
+                    break
+                time.sleep(0.05)
+            require(marker.exists(), "処理が開始しませんでした。")
+            os.killpg(proc.pid, sig)
+            code, o, e = finish(proc)
+            require(code in codes, f"{sig.name} での終了コードは {codes[0]}(実際 {code})。")
+            require(not out.exists(), sig.name + " 後に出力が残っています。")
+            clean(sig.name)
+
+
+add("trap", "trap と set -euo pipefail で安全に後始末するスクリプトにする", "bash mktemp sort python3", "bash coreutils python3",
+    "deploy.sh(INPUT OUTPUT を受け取り、WORK_ROOT 配下に一時ディレクトリとロック deploy.lock を作る)は危険な書き方です。修正して次を満たす: \n"
+    "set -euo pipefail、trap cleanup EXIT で一時ディレクトリとロックを必ず削除(ただし他者のロックは消さない)、変数の引用符、\n"
+    "引数/入力不足は終了コード2(標準エラーに診断)、ロック既存は終了コード75、STEP_CMD 失敗時はその終了コードを保つ、\n"
+    "SIGTERM は143・SIGINT は130、出力は一時領域に作って最後に mv(失敗時に部分出力や既存出力の破壊なし)。\n"
+    "判定は deploy.sh を失敗注入(途中失敗・SIGINT/SIGTERM・入力欠落・ディレクトリ入力・ロック保持・空白入りパス)の下で実際に実行する。deploy.orig.sh は原本。",
+    trap_setup, trap_check,
+    '''cat > deploy.sh <<'SCRIPT'
+#!/bin/bash
+set -euo pipefail
+WORK_ROOT=${WORK_ROOT:-/tmp}
+STEP_CMD=${STEP_CMD:-cat}
+if [ "$#" -ne 2 ] || [ ! -r "$1" ]; then
+  echo "usage: deploy.sh INPUT OUTPUT (INPUT must be readable)" >&2
+  exit 2
+fi
+in=$1
+out=$2
+lock="$WORK_ROOT/deploy.lock"
+tmp=""
+have_lock=0
+cleanup() {
+  rc=$?
+  trap - EXIT
+  [ -z "$tmp" ] || rm -rf -- "$tmp"
+  [ "$have_lock" -eq 0 ] || rm -f -- "$lock"
+  exit "$rc"
+}
+trap cleanup EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
+if ! ( set -o noclobber; : > "$lock" ) 2>/dev/null; then
+  echo "another run holds $lock" >&2
+  exit 75
+fi
+have_lock=1
+tmp=$(mktemp -d "$WORK_ROOT/build.XXXXXX")
+cat -- "$in" | sort -u > "$tmp/sorted"
+bash -c "$STEP_CMD" < "$tmp/sorted" > "$tmp/out"
+mv -- "$tmp/out" "$out"
+echo done
+SCRIPT
+chmod +x deploy.sh''',
+    ['sed -i \'s/^WORK_ROOT=/set -e\\nWORK_ROOT=/; s#\\$WORK_ROOT#"$WORK_ROOT"#g; s#\\$1#"$1"#; s#\\$2#"$2"#; s#\\$tmp#"$tmp"#g\' deploy.sh',
+     'cat > deploy.sh <<\'S\'\n#!/bin/bash\nset -euo pipefail\nWORK_ROOT=${WORK_ROOT:-/tmp}\nSTEP_CMD=${STEP_CMD:-cat}\n[ -r "$1" ] || { echo bad >&2; exit 2; }\ntmp=$(mktemp -d "$WORK_ROOT/build.XXXXXX")\ntrap \'rm -rf "$tmp"\' EXIT\ncat -- "$1" | sort -u > "$tmp/sorted"\nbash -c "$STEP_CMD" < "$tmp/sorted" > "$2"\necho done\nS']
+    )
+
+
+# ---------------------------------------------------------------------------
+# tcpdump: ループバックの実キャプチャは CAP_NET_RAW が必要で、非特権の検証環境では
+# 不可能(Operation not permitted)。そのため setup が決定的な pcap を生成し、
+# 利用者は tcpdump -r で BPF フィルタ・-nn・-A・-c・-w を練習する。実キャプチャ
+# (tcpdump -i lo -w)そのものは判定しない。
+# ---------------------------------------------------------------------------
+import struct
+
+
+def _inet_checksum(data):
+    if len(data) % 2:
+        data += b"\0"
+    total = sum(struct.unpack("!%dH" % (len(data) // 2), data))
+    while total >> 16:
+        total = (total & 0xFFFF) + (total >> 16)
+    return (~total) & 0xFFFF
+
+
+def _ip_packet(src, dst, proto, payload, ident):
+    s, d = bytes(map(int, src.split("."))), bytes(map(int, dst.split(".")))
+    head = struct.pack("!BBHHHBBH4s4s", 0x45, 0, 20 + len(payload), ident, 0x4000, 64, proto, 0, s, d)
+    head = head[:10] + struct.pack("!H", _inet_checksum(head)) + head[12:]
+    pseudo = s + d + struct.pack("!BBH", 0, proto, len(payload))
+    return head, pseudo
+
+
+def _tcp(src, sport, dst, dport, seq, ack, flags, payload, ident):
+    header = struct.pack("!HHIIBBHHH", sport, dport, seq, ack, 5 << 4, flags, 65535, 0, 0)
+    ip, pseudo = _ip_packet(src, dst, 6, header + payload, ident)
+    check = _inet_checksum(pseudo + header + payload)
+    header = header[:16] + struct.pack("!H", check) + header[18:]
+    return ip + header + payload
+
+
+def _udp(src, sport, dst, dport, payload, ident):
+    header = struct.pack("!HHHH", sport, dport, 8 + len(payload), 0)
+    ip, pseudo = _ip_packet(src, dst, 17, header + payload, ident)
+    check = _inet_checksum(pseudo + header + payload) or 0xFFFF
+    return ip + header[:6] + struct.pack("!H", check) + payload
+
+
+def _dns(name, response):
+    labels = b"".join(bytes([len(x)]) + x.encode() for x in name.split(".")) + b"\0"
+    body = struct.pack("!HHHHHH", 0x1234, 0x8180 if response else 0x0100, 1, 1 if response else 0, 0, 0)
+    body += labels + struct.pack("!HH", 1, 1)
+    if response:
+        body += b"\xc0\x0c" + struct.pack("!HHIH", 1, 1, 60, 4) + bytes([93, 184, 216, 34])
+    return body
+
+
+def make_pcap(port, client, tokens, others):
+    """決定的な pcap バイト列と、期待値(接続数・各フローの件数)を返す。"""
+    server = "10.0.0.1"
+    packets, ident, ports = [], [100], [40000]
+
+    def add_packet(frame):
+        ident[0] += 1
+        packets.append(b"\0\0\0\0\0\2" + b"\0\0\0\0\0\1" + b"\x08\x00" + frame)
+
+    def flow(host, dport, request, response):
+        sport = ports[0] = ports[0] + 1
+        seq, sack = 1000, 5000
+        steps = [(host, sport, server, dport, seq, 0, 0x02, b""),
+                 (server, dport, host, sport, sack, seq + 1, 0x12, b""),
+                 (host, sport, server, dport, seq + 1, sack + 1, 0x10, b""),
+                 (host, sport, server, dport, seq + 1, sack + 1, 0x18, request),
+                 (server, dport, host, sport, sack + 1, seq + 1 + len(request), 0x10, b""),
+                 (server, dport, host, sport, sack + 1, seq + 1 + len(request), 0x18, response),
+                 (host, sport, server, dport, seq + 1 + len(request), sack + 1 + len(response), 0x10, b""),
+                 (host, sport, server, dport, seq + 1 + len(request), sack + 1 + len(response), 0x11, b""),
+                 (server, dport, host, sport, sack + 1 + len(response), seq + 2 + len(request), 0x11, b""),
+                 (host, sport, server, dport, seq + 2 + len(request), sack + 2 + len(response), 0x10, b"")]
+        for step in steps:
+            ident[0] += 1
+            add_packet(_tcp(*step, ident[0]))
+
+    def get(path):
+        return f"GET {path} HTTP/1.1\r\nHost: dojo.local\r\nUser-Agent: curl/8\r\n\r\n".encode()
+    ok = b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok"
+    others = list(others)
+    flow(client, port, get("/r/" + tokens[0]), ok)
+    flow(client, 9000, get("/health"), ok)
+    for index, token in enumerate(others):
+        flow("10.0.0.%d" % (20 + index), port, get("/other/" + token), ok)
+    for name in ("example.org", "dojo.local"):
+        ident[0] += 1
+        add_packet(_udp(client, 53000 + ident[0], "10.0.0.53", 53, _dns(name, False), ident[0]))
+        ident[0] += 1
+        add_packet(_udp("10.0.0.53", 53, client, 53000 + ident[0] - 1, _dns(name, True), ident[0]))
+    for _ in range(3):
+        ident[0] += 1
+        add_packet(_tcp(client, 50022, server, 22, 1, 1, 0x10, b"SSH-2.0-OpenSSH_9\r\n", ident[0]))
+    out = struct.pack("<IHHiIII", 0xA1B2C3D4, 2, 4, 0, 0, 65535, 1)
+    for number, frame in enumerate(packets):
+        stamp = 1700000000 + number // 100
+        out += struct.pack("<IIII", stamp, (number % 100) * 10000, len(frame), len(frame)) + frame
+    return out, {"connections": 1 + len(others), "request": "GET /r/" + tokens[0] + " HTTP/1.1"}
+
+
+def tcpdump_setup(root):
+    port = secrets.choice([8080, 8000, 3000, 5000])
+    client = "10.0.0.5"
+    token = secrets.token_hex(4)
+    others = [secrets.token_hex(3) for _ in range(secrets.randbelow(3) + 2)]
+    data, expected = make_pcap(port, client, [token], others)
+    (root / "traffic.pcap").write_bytes(data)
+    put(root, "params.env", f"PORT={port}\nCLIENT={client}\n")
+    remember(root, {"port": port, "client": client, **expected}, ["traffic.pcap", "params.env"])
+
+
+def tcpdump_lines(root, path, *filter_args, strip_time=False, count=None):
+    argv = ["tcpdump", "-nn", "-tt", "-r", path] + (["-c", str(count)] if count else []) + list(filter_args)
+    result = subprocess.run(argv, cwd=root, capture_output=True, text=True, timeout=15,
+                            env={"PATH": os.environ["PATH"], "LC_ALL": "C", "TZ": "UTC"})
+    require(result.returncode == 0, path + " を tcpdump -r で読めません: " + result.stderr[-200:])
+    lines = [line for line in result.stdout.splitlines() if line.strip()]
+    return [line.split(None, 1)[1] for line in lines] if strip_time else lines
+
+
+def tcpdump_check(root):
+    data = fixture(root)
+    port = data["port"]
+    web = root / "web.pcap"
+    require(web.is_file() and web.read_bytes()[:4] in (b"\xd4\xc3\xb2\xa1", b"\xa1\xb2\xc3\xd4"),
+            "web.pcap は tcpdump -w で書いた pcap にします。")
+    expected = tcpdump_lines(root, "traffic.pcap", f"tcp port {port}")
+    require(len(expected) == (data["connections"]) * 10, "フィクスチャ検証: 想定パケット数と実tcpdumpの結果が違います。")
+    require(tcpdump_lines(root, "web.pcap") == expected,
+            f"web.pcap は traffic.pcap から tcp port {port} だけを抜き出した内容(全パケット・順序)にします。")
+    require(read(root, "request-line.txt").strip() == data["request"],
+            f"{data['client']} から {port} への HTTP リクエスト行だけを request-line.txt に(tcpdump -nn -A -r と BPF)。")
+    require(read(root, "new-conns.txt").strip() == str(data["connections"]),
+            f"ポート {port} への新規接続数(SYN のみ)を new-conns.txt に。BPF の tcpflags で SYN-ACK を除外する。")
+    first = [line.split(None, 1)[1] for line in read(root, "first3.txt").splitlines() if line.strip()]
+    require(first == tcpdump_lines(root, "traffic.pcap", strip_time=True, count=3),
+            "先頭3パケットを -nn -c 3 -r で first3.txt に保存します(名前解決なし)。")
+
+
+add("tcpdump", "tcpdump: pcap を BPF で絞り、-nn -A -c -w -r で読む", "bash tcpdump grep wc", "bash tcpdump grep coreutils",
+    "注意: ループバックの実キャプチャ(tcpdump -i lo -w)は CAP_NET_RAW が必要で、非特権環境では使えないため、"
+    "この実習は setup が作った traffic.pcap(Ethernet/IPv4、HTTP・DNS・SSH 混在)を tcpdump -r で読む形式です(実キャプチャは判定しません)。\n"
+    "params.env の PORT と CLIENT を使い、traffic.pcap は変更せず: (1) tcp port PORT のパケットだけを -w で web.pcap に保存。\n"
+    "(2) CLIENT から PORT への HTTP リクエスト行(GET ... HTTP/1.1 の1行。tcpdump は 8080 等で要約行にも同じ文字列を出すので重複は除く)を -nn -A -r と BPF で取り出し request-line.txt に。\n"
+    "(3) PORT への新規接続数(SYN だけ、SYN-ACK は除く。BPF の tcp[tcpflags] を使う)を数字だけで new-conns.txt に。\n"
+    "(4) 先頭3パケットを -nn -c 3 -r で first3.txt に保存。判定は実 tcpdump で web.pcap を読み戻して内容を比較する。",
+    tcpdump_setup, tcpdump_check,
+    '''. ./params.env
+tcpdump -nn -r traffic.pcap -w web.pcap "tcp port $PORT"
+tcpdump -nn -A -r traffic.pcap "src host $CLIENT and dst port $PORT" | grep -a -o 'GET [^ ]* HTTP/1.1' | sort -u > request-line.txt
+tcpdump -nn -r traffic.pcap "tcp dst port $PORT and tcp[tcpflags] & (tcp-syn|tcp-ack) == tcp-syn" | wc -l > new-conns.txt
+tcpdump -nn -c 3 -r traffic.pcap > first3.txt''',
+    ['. ./params.env\ncp traffic.pcap web.pcap\ntcpdump -nn -A -r traffic.pcap "dst port $PORT" | grep -a -o "GET [^ ]* HTTP/1.1" | head -1 > request-line.txt\ntcpdump -nn -r traffic.pcap "dst port $PORT" | wc -l > new-conns.txt\ntcpdump -c 3 -r traffic.pcap > first3.txt',
+     '. ./params.env\ntcpdump -nn -r traffic.pcap -w web.pcap "tcp port $PORT"\ntcpdump -nn -A -r traffic.pcap "dst port $PORT" | grep -a -o "GET [^ ]* HTTP/1.1" | tail -1 > request-line.txt\ntcpdump -nn -r traffic.pcap "tcp port $PORT" | wc -l > new-conns.txt\ntcpdump -nn -c 3 -r traffic.pcap > first3.txt'])
+
+
+# ---------------------------------------------------------------------------
+# debbuild: 実 .deb を dpkg-deb --build で作り、非特権の私的 dpkg ルート
+# (--root + --force-not-root + --force-script-chrootless)で導入・更新・削除・purge の
+# conffile 挙動を実際に確かめる。ホストの dpkg 状態には触れない。
+# ---------------------------------------------------------------------------
+DEB_BIN = "#!/bin/sh\n. /etc/dojo-hello.conf 2>/dev/null || true\necho \"${greeting:-hello} (%s)\"\n"
+DEB_ADMIN_MARK = "# admin-local-edit"
+
+
+def deb_setup(root):
+    for number, version in ((1, "1.0"), (2, "1.1")):
+        put(root, f"payload-v{number}/usr/bin/dojo-hello", DEB_BIN % version, 0o755)
+        put(root, f"payload-v{number}/etc/dojo-hello.conf", f"greeting=hello-{secrets.token_hex(3)}\n")
+    remember(root, {}, [f"payload-v{n}/{p}" for n in (1, 2) for p in ("usr/bin/dojo-hello", "etc/dojo-hello.conf")])
+
+
+def deb_env():
+    return {"PATH": os.environ["PATH"] + ":/usr/sbin:/sbin", "LC_ALL": "C", "LANG": "C"}
+
+
+def deb_cmd(*argv, check=True):
+    result = subprocess.run(argv, capture_output=True, text=True, timeout=30, env=deb_env())
+    if check:
+        require(result.returncode == 0, " ".join(argv[:3]) + " が失敗: " + (result.stderr or result.stdout)[-300:])
+    return result
+
+
+def deb_dpkg(base, *args, check=True):
+    return deb_cmd("dpkg", "--root=" + str(base / "root"), "--log=" + str(base / "dpkg.log"),
+                   "--force-not-root", "--force-bad-path", "--force-depends",
+                   "--force-script-chrootless", *args, check=check)
+
+
+def deb_status(base):
+    result = deb_cmd("dpkg-query", "--admindir=" + str(base / "root/var/lib/dpkg"),
+                     "-W", "-f=${Status}|${Version}", "dojo-hello", check=False)
+    return result.stdout.strip() if result.returncode == 0 else "absent"
+
+
+def deb_inspect(root, deb, number, version):
+    require((root / deb).is_file(), deb + " がありません(dpkg-deb --build)。")
+    fields = {name: deb_cmd("dpkg-deb", "-f", str(root / deb), name, check=False).stdout.strip()
+              for name in ("Package", "Version", "Architecture", "Maintainer", "Description")}
+    require(fields["Package"] == "dojo-hello" and fields["Version"] == version and fields["Architecture"] == "all",
+            f"{deb}: Package: dojo-hello / Version: {version} / Architecture: all にします。")
+    require(re.fullmatch(r".+ <[^<>@\s]+@[^<>\s]+>", fields["Maintainer"]), deb + ": Maintainer は 名前 <メール> 形式。")
+    require(fields["Description"], deb + ": Description が必要です。")
+    listing = deb_cmd("dpkg-deb", "-c", str(root / deb)).stdout
+    for line in listing.splitlines():
+        require(" root/root " in line, deb + ": 所有者が root/root ではありません(--root-owner-group)。")
+    with tempfile.TemporaryDirectory(prefix="dojo-deb-") as scratch:
+        tree, control = Path(scratch) / "tree", Path(scratch) / "control"
+        deb_cmd("dpkg-deb", "-x", str(root / deb), str(tree))
+        deb_cmd("dpkg-deb", "-e", str(root / deb), str(control))
+        for name in ("usr/bin/dojo-hello", "etc/dojo-hello.conf"):
+            src = root / f"payload-v{number}" / name
+            require((tree / name).is_file() and (tree / name).read_bytes() == src.read_bytes(),
+                    f"{deb}: {name} の内容が payload-v{number} と違います。")
+        require(os.access(tree / "usr/bin/dojo-hello", os.X_OK), deb + ": 実行ファイルの権限が失われています。")
+        require((control / "conffiles").is_file() and
+                (control / "conffiles").read_text().split() == ["/etc/dojo-hello.conf"],
+                deb + ": DEBIAN/conffiles に /etc/dojo-hello.conf だけを書きます。")
+        require(os.access(control / "postinst", os.X_OK), deb + ": postinst が実行可能ではありません。")
+
+
+def deb_lifecycle(root, v1, v2, number_conf):
+    conf1, conf2 = number_conf
+    with tempfile.TemporaryDirectory(prefix="dojo-deb-root-") as scratch:
+        base = Path(scratch)
+        admin = base / "root/var/lib/dpkg"
+        admin.mkdir(parents=True)
+        (admin / "status").touch()
+        marker = base / "root/var/lib/dojo-hello/configured"
+        conf = base / "root/etc/dojo-hello.conf"
+        # 無改変の conffile は更新で新しい既定値に置き換わる。
+        deb_dpkg(base, "--install", str(root / v1))
+        require(deb_status(base) == "install ok installed|1.0-1", "1.0-1 が導入状態になりません。")
+        require(conf.read_text() == conf1 and marker.read_text().startswith("configure"),
+                "導入後の conffile または postinst の結果(${DPKG_ROOT} 配下の configured)が違います。")
+        deb_dpkg(base, "--install", str(root / v2))
+        require(conf.read_text() == conf2, "無改変の conffile は更新で新しい内容になるはずです。")
+        # 管理者が編集した conffile は --force-confold で保たれ、新既定は .dpkg-dist へ。
+        deb_dpkg(base, "--purge", "dojo-hello")
+        require(deb_status(base) == "absent" or "not-installed" in deb_status(base), "purge できません。")
+        require(not conf.exists(), "purge 後に conffile が残っています。")
+        deb_dpkg(base, "--install", str(root / v1))
+        conf.write_text(conf1 + DEB_ADMIN_MARK + "\n")
+        deb_dpkg(base, "--force-confold", "--install", str(root / v2))
+        require(conf.read_text() == conf1 + DEB_ADMIN_MARK + "\n", "管理者の編集が更新で失われています(conffiles の宣言を確認)。")
+        require((base / "root/etc/dojo-hello.conf.dpkg-dist").read_text() == conf2, "新しい既定値が .dpkg-dist に残るはずです。")
+        # remove は conffile を残し、purge で消える。
+        deb_dpkg(base, "--remove", "dojo-hello")
+        require(deb_status(base).startswith("deinstall ok config-files"), "remove 後は config-files 状態のはずです。")
+        require(conf.exists() and not (base / "root/usr/bin/dojo-hello").exists(),
+                "remove は実行ファイルを消し、conffile は残します。")
+        deb_dpkg(base, "--purge", "dojo-hello")
+        require(not conf.exists(), "purge は conffile も消します。")
+
+
+def deb_check(root):
+    fixture(root)
+    deb_inspect(root, "dojo-hello_1.0-1_all.deb", 1, "1.0-1")
+    deb_inspect(root, "dojo-hello_1.1-1_all.deb", 2, "1.1-1")
+    for name, flag in (("info.txt", "-I"), ("contents.txt", "-c")):
+        deb = str(root / "dojo-hello_1.0-1_all.deb")
+        accepted = {deb_cmd("dpkg-deb", flag, deb).stdout,
+                    subprocess.run(["dpkg-deb", flag, deb], capture_output=True, text=True).stdout}
+        require(read(root, name) in accepted, f"{name} は dpkg-deb {flag} dojo-hello_1.0-1_all.deb の出力にします。")
+    confs = ((root / "payload-v1/etc/dojo-hello.conf").read_text(), (root / "payload-v2/etc/dojo-hello.conf").read_text())
+    deb_lifecycle(root, "dojo-hello_1.0-1_all.deb", "dojo-hello_1.1-1_all.deb", confs)
+    # 利用者自身の私的ルート sysroot/: 1.0 導入 -> 管理者編集 -> --force-confold で 1.1 へ更新した結末。
+    admindir = root / "sysroot/var/lib/dpkg"
+    status = deb_cmd("dpkg-query", "--admindir=" + str(admindir), "-W", "-f=${Status}|${Version}", "dojo-hello", check=False)
+    require(status.stdout.strip() == "install ok installed|1.1-1", "sysroot に 1.1-1 が導入された状態にします(--root=./sysroot)。")
+    conf = root / "sysroot/etc/dojo-hello.conf"
+    require(conf.is_file() and DEB_ADMIN_MARK in conf.read_text() and conf.read_text().startswith(confs[0]),
+            f"sysroot の conffile に管理者の編集行 {DEB_ADMIN_MARK!r} が残っていません。")
+    require((root / "sysroot/etc/dojo-hello.conf.dpkg-dist").read_text() == confs[1],
+            "更新で届いた新既定値が .dpkg-dist にありません(--force-confold)。")
+    require((root / "sysroot/var/lib/dojo-hello/configured").is_file(), "postinst の実行結果が sysroot にありません。")
+
+
+DEB_SOLUTION = '''mkpkg() { # dir version
+  mkdir -p "$1/DEBIAN"
+  cat > "$1/DEBIAN/control" <<EOF
+Package: dojo-hello
+Version: $2
+Section: misc
+Priority: optional
+Architecture: all
+Maintainer: Dojo Learner <learner@example.invalid>
+Description: LinuxDOJO practice package
+ Built by hand with dpkg-deb.
+EOF
+  echo /etc/dojo-hello.conf > "$1/DEBIAN/conffiles"
+  cat > "$1/DEBIAN/postinst" <<'EOF'
+#!/bin/sh
+set -e
+if [ "$1" = configure ]; then
+  mkdir -p "${DPKG_ROOT:-}/var/lib/dojo-hello"
+  echo "configure $2" > "${DPKG_ROOT:-}/var/lib/dojo-hello/configured"
+fi
+exit 0
+EOF
+  chmod 755 "$1/DEBIAN/postinst"
+}
+cp -a payload-v1 pkg1; mkpkg pkg1 1.0-1
+cp -a payload-v2 pkg2; mkpkg pkg2 1.1-1
+dpkg-deb --build --root-owner-group pkg1 dojo-hello_1.0-1_all.deb
+dpkg-deb --build --root-owner-group pkg2 dojo-hello_1.1-1_all.deb
+dpkg-deb -I dojo-hello_1.0-1_all.deb > info.txt
+dpkg-deb -c dojo-hello_1.0-1_all.deb > contents.txt
+mkdir -p sysroot/var/lib/dpkg; touch sysroot/var/lib/dpkg/status
+d() { dpkg --root="$PWD/sysroot" --log="$PWD/dpkg.log" --force-not-root --force-bad-path --force-depends --force-script-chrootless "$@"; }
+d -i dojo-hello_1.0-1_all.deb
+echo '# admin-local-edit' >> sysroot/etc/dojo-hello.conf
+d --force-confold -i dojo-hello_1.1-1_all.deb'''
+
+add("debbuild", "debパッケージを自作し、私的ルートで更新・削除・purge を確かめる",
+    "bash dpkg dpkg-deb dpkg-query", "bash dpkg",
+    "payload-v1 / payload-v2 は配布物の中身(usr/bin/dojo-hello と設定 etc/dojo-hello.conf)。各コピーに DEBIAN/ を足して\n"
+    "dojo-hello_1.0-1_all.deb と dojo-hello_1.1-1_all.deb を dpkg-deb --build --root-owner-group で作る。\n"
+    "DEBIAN/control(Package/Version/Architecture: all/Maintainer 名前 <メール>/Description)、DEBIAN/conffiles(/etc/dojo-hello.conf)、\n"
+    "実行可能な DEBIAN/postinst(configure 時に ${DPKG_ROOT:-}/var/lib/dojo-hello/configured へ記録)を用意。\n"
+    "dpkg-deb -I の出力を info.txt、dpkg-deb -c を contents.txt(いずれも 1.0-1)へ。\n"
+    "さらに私的ルート ./sysroot(var/lib/dpkg/status は空ファイル)へ dpkg --root=./sysroot --force-not-root --force-bad-path --force-depends --force-script-chrootless で\n"
+    "1.0-1 を導入し、/etc/dojo-hello.conf の末尾に『# admin-local-edit』を追記してから --force-confold で 1.1-1 へ更新(編集が残り、新既定値は .dpkg-dist)。\n"
+    "判定は作った .deb を別の使い捨てルートで実際に導入・更新・remove・purge して conffile の挙動を確認する。ホストの dpkg は変更しない。",
+    deb_setup, deb_check, DEB_SOLUTION,
+    ['cp -a payload-v1 pkg1; cp -a payload-v2 pkg2\n'
+     'for p in pkg1:1.0-1 pkg2:1.1-1; do d=${p%%:*}; v=${p##*:}; mkdir -p $d/DEBIAN; '
+     'printf "Package: dojo-hello\\nVersion: %s\\nArchitecture: all\\nMaintainer: A <a@b.example>\\nDescription: x\\n" $v > $d/DEBIAN/control; '
+     'printf "#!/bin/sh\\nexit 0\\n" > $d/DEBIAN/postinst; chmod 755 $d/DEBIAN/postinst; '
+     'dpkg-deb --build $d dojo-hello_${v}_all.deb; done\n'
+     'dpkg-deb -I dojo-hello_1.0-1_all.deb > info.txt; dpkg-deb -c dojo-hello_1.0-1_all.deb > contents.txt',
+     DEB_SOLUTION.replace('  echo /etc/dojo-hello.conf > "$1/DEBIAN/conffiles"\n', '')])
+
+
+# 追加のネイティブ実習(別ファイルに分けて登録する)
+import curriculum.toolbox_labs2  # noqa: E402,F401
+import curriculum.toolbox_labs3  # noqa: E402,F401
+import curriculum.toolbox_labs4  # noqa: E402,F401
+import curriculum.toolbox_labs5  # noqa: E402,F401

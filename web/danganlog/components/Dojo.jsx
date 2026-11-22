@@ -7,6 +7,58 @@ import {
 } from '../lib/core.js';
 
 const MAX_ENTRIES = 200;
+const PREFS_KEY = 'dangan-log:prefs:v1';
+const LOCAL_COMMANDS = ['help', 'hint', 'answer', 'next', 'prev', 'menu', 'modes', 'progress', 'goto', 'theme', 'simple', 'clear', 'data', 'course', 'reset', 'check'];
+const HELP_TEXT = [
+  'help           このヘルプ',
+  'hint           ヒントを1つ (何度でも可。減点なし)',
+  'answer         入力例を表示',
+  'next / prev    次 / 前のレッスン (next は達成後)',
+  'menu [語]      レッスンの一覧。番号を入力すると開く',
+  'modes          コースの一覧。番号を入力すると開く',
+  'goto N         このコースの N 番へ',
+  'progress       進み具合',
+  'reset          課題を初期状態に戻す',
+  'theme          dark / light 切り替え (theme auto で端末の設定に従う)',
+  'simple         シンプル表示 (大きな文字とボタン)',
+  'data           学習データの書き出し・読み込み',
+  'course         講座ページへ',
+  'clear          画面を消す (Ctrl-L)',
+  '',
+  'Tab で補完、上下キーで入力履歴。レッスンの答えは、ふつうのコマンドとして入力します。'
+].join('\n');
+
+function readPrefs() {
+  try { return JSON.parse(window.localStorage.getItem(PREFS_KEY) || '{}') || {}; } catch (e) { return {}; }
+}
+function savePrefs(patch) {
+  try { window.localStorage.setItem(PREFS_KEY, JSON.stringify(Object.assign(readPrefs(), patch))); } catch (e) { /* 保存できない環境 */ }
+}
+function applyTheme(t) {
+  const el = document.documentElement;
+  if (t === 'dark' || t === 'light') el.setAttribute('data-theme', t); else el.removeAttribute('data-theme');
+}
+function megabytes(n) { return (n / 1048576).toFixed(1); }
+function bar(ratio, width) {
+  const n = Math.max(0, Math.min(width, Math.round(ratio * width)));
+  return '\u2588'.repeat(n) + '\u2591'.repeat(width - n);
+}
+
+/* bash の既定 PS1 と同じ配色: 緑の太字 user@host、青の太字 パス、白い $。engine のプロンプト ('練習 learner@dojo-local /home/learner $') を分解する */
+function Ps({ prompt }) {
+  const m = /^(?:\S+\s+)?(\S+@\S+)\s+(\S+)\s*\$?\s*$/.exec(prompt || '');
+  if (!m) return <span className="ps-user">{prompt}</span>;
+  const path = m[2] === '/home/learner' ? '~' : m[2].replace(/^\/home\/learner\//, '~/');
+  return <span className="ps"><b className="ps-user">{m[1]}</b>:<b className="ps-path">{path}</b>$</span>;
+}
+
+/* 出力の行頭にある [OK] [NG] [ヒント] などを色付きのタグにする */
+function Lines({ text }) {
+  return text.split('\n').map((ln, i) => {
+    const m = /^\[(OK|NG|ヒント|ERROR|INFO)\]\s?/.exec(ln);
+    return <div className="ln" key={i}>{m ? <span className={'tag tag-' + (m[1] === 'ヒント' ? 'hint' : m[1].toLowerCase())}>[{m[1]}]</span> : null}{m ? ' ' + ln.slice(m[0].length) : ln || '\u00a0'}</div>;
+  });
+}
 let entrySeq = 0;
 
 function friendly(error) {
@@ -18,24 +70,24 @@ export default function Dojo() {
   const [progress, setProgress] = useState(null);
   const [view, setView] = useState(null);
   const [viewMode, setViewMode] = useState('intro');
-  const [unit, setUnit] = useState('');
-  const [query, setQuery] = useState('');
   const [status, setStatus] = useState('loading');
   const [errorText, setErrorText] = useState('');
   const [busy, setBusy] = useState(false);
   const [entries, setEntries] = useState([]);
-  const [feedback, setFeedback] = useState({ kind: '', text: '' });
-  const [menuOpen, setMenuOpen] = useState(false);
   const [dataMessage, setDataMessage] = useState('');
   const [line, setLine] = useState('');
   const [attempt, setAttempt] = useState(0);
+  const [loadInfo, setLoadInfo] = useState({ loaded: 0, total: 0 });
+  const [theme, setThemeState] = useState('');
+  const [simple, setSimpleState] = useState(false);
+  const [focused, setFocused] = useState(false);
 
   const clientRef = useRef(null);
   const storageRef = useRef(null);
   const historyRef = useRef(null);
   const inputRef = useRef(null);
   const outRef = useRef(null);
-  const helpRef = useRef(null);
+  const pendingRef = useRef(null);
   const dataRef = useRef(null);
   const viewRef = useRef(null);
   const catalogRef = useRef(null);
@@ -75,13 +127,14 @@ export default function Dojo() {
   const selectLesson = useCallback(async (mode, index) => {
     try {
       const v = await call({ type: 'select', mode, index });
-      setEntries(v.output ? [{ id: ++entrySeq, prompt: '', command: null, output: v.output }] : []);
-      setFeedback({ kind: '', text: v.lesson && v.lesson.shownAnswer ? '入力例: ' + v.lesson.shownAnswer : '' });
+      const first = [];
+      if (v.output) first.push({ id: ++entrySeq, prompt: '', command: null, output: v.output });
+      if (v.lesson && v.lesson.shownAnswer) first.push({ id: ++entrySeq, prompt: '', command: null, output: '[ヒント] 入力例: ' + v.lesson.shownAnswer });
+      setEntries(first);
       applyView(v);
-      setMenuOpen(false);
       if (inputRef.current) inputRef.current.focus();
     } catch (error) {
-      setFeedback({ kind: 'ng', text: friendly(error) });
+      addEntry('', null, '[NG] ' + friendly(error), '');
     }
   }, [call, applyView]);
 
@@ -92,10 +145,12 @@ export default function Dojo() {
     let initial = [];
     try { initial = JSON.parse(storage.get(HISTORY_KEY) || '[]'); } catch (e) { initial = []; }
     historyRef.current = createHistory(initial);
-    const client = createClient(() => new Worker('/worker.js'));
+    const client = createClient(() => new Worker('/worker.js'), 0, (p) => { if (!cancelled) setLoadInfo(p); });
     clientRef.current = client;
     let cancelled = false;
     setStatus('loading');
+    setLoadInfo({ loaded: 0, total: 0 });
+    setErrorText('');
     (async () => {
       try {
         const first = await client.request({ type: 'init' });
@@ -108,7 +163,7 @@ export default function Dojo() {
         if (saved) {
           try { restored = await client.request({ type: 'import', state: saved }); } catch (e) {
             storage.remove(STORAGE_KEY);
-            setFeedback({ kind: 'ng', text: '保存データを読み込めなかったため、最初から始めます。' });
+            setEntries([{ id: ++entrySeq, prompt: '', command: null, output: '[NG] 保存データを読み込めなかったため、最初から始めます。' }]);
           }
         }
         if (cancelled) return;
@@ -132,15 +187,105 @@ export default function Dojo() {
     return () => { cancelled = true; client.terminate && client.terminate(); };
   }, [attempt, applyView, persist]);
 
-  const chooseCourse = (c) => {
-    setUnit(''); setQuery(''); setMenuOpen(false);
-    if (view && view.mode === c.id) { setViewMode(c.id); return; }
-    setViewMode(c.id);
-    selectLesson(c.id, firstOpenIndex(c));
+  const setTheme = (t) => { setThemeState(t === 'auto' ? '' : t); applyTheme(t === 'auto' ? '' : t); savePrefs({ theme: t === 'auto' ? '' : t }); };
+  const effectiveTheme = () => theme || (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+  const setSimple = (v) => { setSimpleState(v); savePrefs({ simple: v }); };
+
+  const say = (kind, text) => addEntry('', null, '[' + kind + '] ' + text, '');
+  const total = course ? course.total : 0;
+
+  /* 画面側のコマンド。処理したら true。lesson の答えそのものは engine (worker) に渡す */
+  const runLocal = async (raw) => {
+    const text = raw.trim();
+    const [name, ...args] = text.split(/\s+/);
+    const promptShown = (view && view.prompt) || '$';
+    const echo = () => addEntry(promptShown, raw, '', '');
+    const v0 = viewRef.current;
+    const pending = pendingRef.current;
+    pendingRef.current = null;
+    if (pending && /^\d+$/.test(text)) {
+      echo();
+      const n = parseInt(text, 10);
+      if (pending.kind === 'mode') {
+        const c = courses[n - 1];
+        if (!c) { say('NG', '1 から ' + courses.length + ' の番号を入力します。'); return true; }
+        await selectLesson(c.id, firstOpenIndex(c));
+      } else {
+        const c = courses.find((x) => x.id === pending.mode);
+        if (!c || !(n >= 1 && n <= c.total)) { say('NG', '1 から ' + (c ? c.total : 0) + ' の番号を入力します。'); return true; }
+        await selectLesson(c.id, n - 1);
+      }
+      return true;
+    }
+    const goto = async (n) => {
+      if (!course || !(n >= 1 && n <= total)) { say('NG', '1 から ' + total + ' までの番号を指定します。'); return; }
+      await selectLesson(course.id, n - 1);
+    };
+    switch (name) {
+      case 'help': echo(); addEntry('', null, HELP_TEXT, ''); return true;
+      case 'clear': setEntries([]); return true;
+      case 'theme': {
+        echo();
+        const a = args[0];
+        const next = a === 'dark' || a === 'light' || a === 'auto' ? a : (effectiveTheme() === 'dark' ? 'light' : 'dark');
+        setTheme(next); say('OK', 'テーマ: ' + next); return true;
+      }
+      case 'simple': echo(); setSimple(!simple); say('OK', 'シンプル表示を' + (simple ? '切りました' : '入れました') + '。'); return true;
+      case 'data': echo(); openDialog(dataRef); return true;
+      case 'course': case 'courses': echo(); say('INFO', '講座ページへ移動します。'); window.location.href = '/course/'; return true;
+      case 'modes': case 'mode': {
+        echo();
+        if (args[0] && /^\d+$/.test(args[0])) {
+          const c = courses[parseInt(args[0], 10) - 1];
+          if (!c) { say('NG', '1 から ' + courses.length + ' の番号を指定します。'); return true; }
+          await selectLesson(c.id, firstOpenIndex(c)); return true;
+        }
+        addEntry('', null, courses.map((c, i) => pad2(i + 1) + '  ' + (c.id === (course && course.id) ? '>' : ' ') + ' ' + c.name + '  (' + c.done + '/' + c.total + ')').join('\n') + '\n番号を入力すると開きます。', '');
+        pendingRef.current = { kind: 'mode' }; return true;
+      }
+      case 'progress': {
+        echo();
+        addEntry('', null, courses.map((c) => bar(c.total ? c.done / c.total : 0, 20) + ' ' + String(c.done).padStart(3) + '/' + String(c.total).padEnd(3) + ' ' + c.name).join('\n') + '\n合計 ' + totalDone + ' 達成 (このブラウザーに保存)', '');
+        return true;
+      }
+      case 'menu': case 'ls': case 'lessons': {
+        echo();
+        if (!course) return true;
+        const q = args.join(' ').toLowerCase();
+        const rows = course.items.filter((i) => !q || (i.title + ' ' + i.unit).toLowerCase().includes(q));
+        if (!rows.length) { say('NG', '該当するレッスンがありません。'); return true; }
+        const cur = v0 && v0.mode === course.id ? v0.index : -1;
+        addEntry('', null, course.name + ' (' + course.done + '/' + course.total + ')\n' + rows.map((i) => pad2(i.index + 1) + ' ' + (i.index === cur ? '>' : ' ') + (i.done ? '[x] ' : '[ ] ') + i.title + (i.unit ? '  (' + i.unit + ')' : '')).join('\n') + '\n番号を入力すると開きます。menu 語 で絞り込み、modes で別のコース。', '');
+        pendingRef.current = { kind: 'lesson', mode: course.id };
+        return true;
+      }
+      case 'goto': case 'open': echo(); await goto(parseInt(args[0], 10)); return true;
+      case 'next':
+        echo();
+        if (v0 && v0.completed && course && v0.index + 1 < total) await selectLesson(v0.mode, v0.index + 1);
+        else say('NG', v0 && v0.completed ? 'このコースの最後です。modes で別のコースを選べます。' : 'まだ達成していません。課題を達成すると進めます。(menu で好きなレッスンを開けます)');
+        return true;
+      case 'prev':
+        echo();
+        if (v0 && v0.index > 0) await selectLesson(v0.mode, v0.index - 1); else say('NG', 'これが最初のレッスンです。');
+        return true;
+      case 'hint':
+      case 'answer': {
+        echo();
+        if (!ready || busy) return true;
+        try {
+          const v = await call({ type: name });
+          addEntry('', null, (v.output && /^\[/.test(v.output) ? '' : '[ヒント] ') + (v.output || (name === 'hint' ? 'ヒントはありません。' : '入力例はありません。')), '');
+          applyView(v);
+        } catch (error) { say('NG', friendly(error)); }
+        return true;
+      }
+      default: return false;
+    }
   };
 
   const submit = async (event) => {
-    event.preventDefault();
+    if (event && event.preventDefault) event.preventDefault();
     const text = line;
     if (!text.trim() || !ready || busy) return;
     setLine('');
@@ -148,12 +293,17 @@ export default function Dojo() {
     const wasDone = !!(view && view.completed);
     historyRef.current.push(text);
     storageRef.current.set(HISTORY_KEY, JSON.stringify(historyRef.current.items()));
+    const first = text.trim().split(/\s+/)[0];
+    if (text.trim() !== 'reset' && first !== 'check' && await runLocal(text)) { if (inputRef.current) inputRef.current.focus(); return; }
+    pendingRef.current = null;
     try {
       const v = await call({ type: 'execute', line: text });
       const fb = feedbackFor(v, wasDone);
       if (text.trim() === 'reset') setEntries(v.output ? [{ id: ++entrySeq, prompt: '', command: null, output: v.output }] : []);
-      else addEntry(promptShown, text, (v.output || '').replace(/\n+$/, ''), v.code ? 'error' : (v.completed && !wasDone ? 'success' : ''));
-      setFeedback(fb);
+      else {
+        addEntry(promptShown, text, (v.output || '').replace(/\n+$/, ''), v.code ? 'error' : (v.completed && !wasDone ? 'success' : ''));
+        if (fb.text && !(v.output || '').includes('[OK]')) addEntry('', null, '[' + (fb.kind === 'ok' ? 'OK' : fb.kind === 'ng' ? 'NG' : 'INFO') + '] ' + fb.text, '');
+      }
       applyView(v);
     } catch (error) {
       addEntry(promptShown, text, friendly(error), 'error');
@@ -161,30 +311,31 @@ export default function Dojo() {
     if (inputRef.current) inputRef.current.focus();
   };
 
-  const onKey = (event) => {
-    const h = historyRef.current;
-    if (event.key === 'ArrowUp') {
-      const v = h.up(line);
-      if (v !== null) { event.preventDefault(); setLine(v); }
-    } else if (event.key === 'ArrowDown') {
-      const v = h.down();
-      if (v !== null) { event.preventDefault(); setLine(v); }
-    } else if (event.key === 'l' && event.ctrlKey) {
-      event.preventDefault(); setEntries([]);
+  const complete = () => {
+    if (!line || /\s/.test(line)) return false;
+    const hits = LOCAL_COMMANDS.filter((c) => c.startsWith(line));
+    if (!hits.length) return false;
+    if (hits.length === 1) setLine(hits[0] + ' ');
+    else {
+      let p = hits[0];
+      hits.forEach((c) => { while (!c.startsWith(p)) p = p.slice(0, -1); });
+      setLine(p);
+      addEntry('', null, hits.join('  '), '');
     }
+    return true;
+  };
+  const historyStep = (dir) => {
+    const h = historyRef.current;
+    const v = dir < 0 ? h.up(line) : h.down();
+    if (v !== null) setLine(v);
+    return v !== null;
   };
 
-  const tool = async (type, fallback) => {
-    if (!ready || busy) return;
-    try {
-      const v = await call({ type });
-      if (type === 'reset') setEntries([]);
-      setFeedback({ kind: 'info', text: v.output || fallback });
-      applyView(v);
-    } catch (error) {
-      setFeedback({ kind: 'ng', text: friendly(error) });
-    }
-    if (inputRef.current) inputRef.current.focus();
+  const onKey = (event) => {
+    if (event.key === 'ArrowUp') { if (historyStep(-1)) event.preventDefault(); }
+    else if (event.key === 'ArrowDown') { if (historyStep(1)) event.preventDefault(); }
+    else if (event.key === 'l' && event.ctrlKey) { event.preventDefault(); setEntries([]); }
+    else if (event.key === 'Tab' && !event.shiftKey) { if (complete()) event.preventDefault(); }
   };
 
   const exportData = async () => {
@@ -210,8 +361,7 @@ export default function Dojo() {
     try {
       const data = JSON.parse(await file.text());
       const v = await call({ type: 'import', state: data.state || data });
-      setEntries([{ id: ++entrySeq, prompt: '', command: null, output: '保存データを読み込みました。' }]);
-      setFeedback({ kind: '', text: '' });
+      setEntries([{ id: ++entrySeq, prompt: '', command: null, output: '[OK] 保存データを読み込みました。' }]);
       applyView(v);
       setDataMessage('読み込みました。');
       if (!v.lesson && catalogRef.current) {
@@ -227,150 +377,128 @@ export default function Dojo() {
   const openDialog = (ref) => { const d = ref.current; if (d) { if (d.showModal) d.showModal(); else d.setAttribute('open', ''); } };
   const closeDialog = (ref) => { const d = ref.current; if (d) { if (d.close) d.close(); else d.removeAttribute('open'); } };
 
+  /* 画面固定: この画面だけ body のスクロールを止め、高さは visualViewport (ソフトキーボードを除いた高さ) に合わせる */
   useEffect(() => {
-    const onEsc = (e) => { if (e.key === 'Escape') setMenuOpen(false); };
-    document.addEventListener('keydown', onEsc);
-    return () => document.removeEventListener('keydown', onEsc);
+    const root = document.documentElement;
+    root.classList.add('app-lock');
+    const vv = window.visualViewport;
+    const fit = () => {
+      root.style.setProperty('--app-h', (vv ? vv.height : window.innerHeight) + 'px');
+      if (vv && vv.offsetTop) window.scrollTo(0, 0);
+    };
+    fit();
+    if (vv) { vv.addEventListener('resize', fit); vv.addEventListener('scroll', fit); }
+    window.addEventListener('resize', fit);
+    return () => {
+      root.classList.remove('app-lock'); root.style.removeProperty('--app-h');
+      if (vv) { vv.removeEventListener('resize', fit); vv.removeEventListener('scroll', fit); }
+      window.removeEventListener('resize', fit);
+    };
   }, []);
 
-  const lesson = view && view.lesson;
-  const hasNext = !!(view && view.completed && course && view.index + 1 < course.total);
-  const units = course ? [...new Set(course.items.map((i) => i.unit).filter(Boolean))] : [];
-  const shown = course ? filterItems(course.items, query, unit) : [];
-  const current = view && course && view.mode === course.id ? view.index : -1;
+  useEffect(() => {
+    const p = readPrefs();
+    if (p.theme === 'dark' || p.theme === 'light') { setThemeState(p.theme); applyTheme(p.theme); }
+    if (p.simple) setSimpleState(true);
+  }, []);
+
+  /* 実行中に無効化された入力欄は、有効に戻ったとき、操作中なら自動で戻す (キーボードだけでも続けて入力できる) */
   const off = busy || !ready;
-  const statusLabel = status === 'ready' ? '準備完了' : status === 'error' ? '読み込み失敗' : '準備中';
-  const courseIndex = course ? courses.indexOf(course) : 0;
+  useEffect(() => {
+    if (!off && inputRef.current && (document.activeElement === document.body || document.activeElement === null || document.activeElement === inputRef.current)) inputRef.current.focus();
+  }, [off]);
+
+  const lesson = view && view.lesson;
+  const pct = loadInfo.total ? Math.min(99, Math.floor(loadInfo.loaded * 100 / loadInfo.total)) : 0;
+  const lessonNo = view ? pad2(view.index + 1) : '--';
+  const hasNext = !!(view && view.completed && course && view.index + 1 < total);
+  const act = (cmd) => () => runLocal(cmd);
 
   return (
-    <div className="app-shell">
-      <aside className={'sidebar' + (menuOpen ? ' open' : '')} id="sidebar" aria-label="学習ナビゲーション">
-        <a className="brand" href="/" aria-label="DANGAN LOG ホーム"><span className="brand-mark">&gt;_</span><span>DANGAN LOG<small>LINUX TRAINING GROUND</small></span></a>
-        <div className="side-label">YOUR WORKSPACE <span>01</span></div>
-        <button type="button" className="nav-home active" onClick={() => { setMenuOpen(false); window.scrollTo(0, 0); if (inputRef.current) inputRef.current.focus(); }}><span aria-hidden="true">&#9672;</span> 学習ワークスペース</button>
-        <div className="side-label course-label">LEARNING PATH</div>
-        <nav aria-label="コース選択">
-          {courses.map((c, i) => (
-            <button type="button" key={c.id} className={'course-nav-item' + (c.id === (course && course.id) ? ' selected' : '')}
-              aria-current={c.id === (course && course.id) ? 'true' : undefined} onClick={() => chooseCourse(c)}>
-              <span className="nav-number">{pad2(i + 1)}</span><span>{c.name}</span><span className="nav-arrow" aria-hidden="true">&rsaquo;</span>
-            </button>
-          ))}
-        </nav>
-        <div className="sidebar-bottom">
-          <div className="small-terminal">$ keep learning<span className="cursor">_</span></div>
-          <p>小さな一歩を、確かな力に。</p>
-          <button type="button" className="text-button" onClick={() => openDialog(dataRef)}>学習データの管理 <span aria-hidden="true">&#8599;</span></button>
-          <div className="local-note"><i></i> 進捗はこのブラウザーに保存</div>
-        </div>
-      </aside>
-      <main>
-        <header className="topbar">
-          <button type="button" className="mobile-menu icon-button" aria-label="メニューを開閉" aria-expanded={menuOpen} aria-controls="sidebar" onClick={() => setMenuOpen(!menuOpen)}>&#9776;</button>
-          <div className="breadcrumb">WORKSPACE <span>/</span> <strong>Linux道場</strong></div>
-          <div className="top-actions">
-            <span className={'runtime-status ' + status} role="status"><i></i> {statusLabel}</span>
-            <button type="button" className="icon-button" aria-label="使い方" onClick={() => openDialog(helpRef)}>?</button>
-          </div>
-        </header>
-        <div className="main-content">
-          <section className="welcome">
-            <div>
-              <div className="eyebrow"><span></span> LEARN BY DOING</div>
-              <h1>Linuxを、<br className="mobile-break" />自分の道具に。</h1>
-              <p>読む。試す。わかる。<br className="mobile-break" />その積み重ねで、できることを増やそう。</p>
+    <div className={'tw' + (simple ? ' simple' : '')}>
+      <header className="gbar">
+        <span className="gb-side"></span>
+        <div className="gb-title">learner@danganlog: ~</div>
+        <span className="gb-side gb-ctl" aria-hidden="true"><span>&#8211;</span><span>&#9633;</span><span>&times;</span></span>
+      </header>
+      <div className="screen">
+        <div className="term-out" ref={outRef} role="log" aria-live="polite" aria-relevant="additions" aria-label="ターミナルの出力" tabIndex={0}>
+          <section className="motd" aria-labelledby="lesson-title">
+            <div className="dim">{course ? course.name : 'Linux DOJO'} -- LESSON {lessonNo}{course ? '/' + pad2(course.total) : ''}</div>
+            <h1 id="lesson-title">{lesson ? lesson.title : 'Linux DOJO'}</h1>
+            {lesson ? <div className="motd-text">{lesson.explanation}</div> : <div className="motd-text dim">ブラウザー内の模擬環境です。実際のPCは変更しません。help で使い方、Tab で補完できます。</div>}
+          </section>
+          {status === 'loading' ? (
+            <div className="boot">
+              <div><Ps prompt="learner@danganlog ~" /> boot pyodide --self-hosted</div>
+              <div role="progressbar" aria-label="実行環境の読み込み" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
+                [{bar(pct / 100, 24)}] {pct}%{loadInfo.total ? '  ' + megabytes(loadInfo.loaded) + ' / ' + megabytes(loadInfo.total) + ' MB' : ''}
+              </div>
+              <div className="dim">初回だけ約15MBを読み込みます。2回目以降はブラウザーに残ります。</div>
             </div>
-            <div className="progress-summary"><span className="summary-icon" aria-hidden="true">&#10022;</span><div><small>このブラウザーでの学習</small><strong><span>{totalDone}</span> <em>lessons completed</em></strong></div></div>
-          </section>
-          <section className="course-heading">
-            <div><span className="section-kicker">COURSE {pad2(courseIndex + 1)}</span><h2>{course ? course.name : 'はじめてのLinux'}</h2><p>{course ? course.description : 'ターミナルへの最初の一文字から、ひとつずつ。'}</p></div>
-            <div className="course-count"><strong>{course ? course.done : 0}</strong><span>/ {course ? course.total : 0} lessons</span></div>
-          </section>
-          <div className="course-progress" role="progressbar" aria-valuemin={0} aria-valuemax={course ? course.total : 0} aria-valuenow={course ? course.done : 0} aria-label="コースの進み具合">
-            <div style={{ width: course && course.total ? Math.round(course.done * 100 / course.total) + '%' : '0%' }}></div>
-          </div>
-          <div className="study-grid">
-            <section className="lesson-panel" aria-labelledby="lesson-title">
-              <div className="panel-top"><span className="lesson-number">LESSON {pad2((view ? view.index : 0) + 1)}</span><span className="mode-badge">{course ? course.name : ''}</span></div>
-              <h2 id="lesson-title">{lesson ? lesson.title : '教材を読み込んでいます'}</h2>
-              <div className="lesson-explanation">{lesson ? lesson.explanation : 'ターミナルは、文字でコンピューターに指示を出す場所です。準備ができると、ここに説明が表示されます。'}</div>
-              <div className="task-box"><span>YOUR MISSION</span><p>{lesson ? lesson.task : '教材を読み込んでいます。準備ができたら、ここに今回の課題が表示されます。'}</p></div>
-              <div className="lesson-tools">
-                <button type="button" disabled={off} onClick={() => tool('hint', 'ヒントはありません。')}><span aria-hidden="true">&#9676;</span> ヒント</button>
-                <button type="button" disabled={off} onClick={() => tool('answer', '入力例はありません。')}><span aria-hidden="true">&#8984;</span> 入力例</button>
-                <button type="button" disabled={off} onClick={() => tool('reset', '課題を初期状態に戻しました。')}><span aria-hidden="true">&#8635;</span> やり直す</button>
-              </div>
-              <div className={'lesson-feedback' + (feedback.kind ? ' ' + feedback.kind : '')} role="status" aria-live="polite">{feedback.text}</div>
-              {hasNext ? <button type="button" className="next-button" onClick={() => selectLesson(view.mode, view.index + 1)}>次のレッスンへ <span aria-hidden="true">&rarr;</span></button> : null}
-              <div className="lesson-footer"><span aria-hidden="true">&#10003;</span> 何度間違えても大丈夫。ヒントを見ても減点なし。</div>
-            </section>
-            <section className="terminal-panel" aria-label="練習用ターミナル">
-              <div className="terminal-bar"><div className="traffic-lights" aria-hidden="true"><i></i><i></i><i></i></div><span>dojo — training terminal</span><span className="terminal-mode">SIMULATED</span></div>
-              <div className="terminal-output" ref={outRef} role="log" aria-live="polite" aria-relevant="additions" tabIndex={0}>
-                {entries.length === 0 && !(view && view.editor) ? (
-                  <div className="terminal-welcome"><span className="terminal-ascii">&gt;_</span><p>Welcome to Linux DOJO.</p><small>ここは、安心して試せる練習の場所です。<br />コマンドを入力して Enter を押してください。</small><div className="terminal-divider"></div><small className="terminal-note">ブラウザー内の模擬環境です。<br />実際のPCの設定やファイルは変更しません。</small></div>
-                ) : null}
-                {entries.map((e) => (
-                  <div className="terminal-entry" key={e.id}>
-                    {e.command !== null ? <div className="terminal-command"><span>{e.prompt}</span>{e.command}</div> : null}
-                    {e.output ? <div className={'terminal-result' + (e.kind ? ' ' + e.kind : '')}>{e.output}</div> : null}
-                  </div>
-                ))}
-                {view && view.editor ? <pre className="terminal-result" aria-label="エディターの表示" style={{ margin: 0 }}>{view.editor}</pre> : null}
-              </div>
-              <form className="terminal-form" onSubmit={submit} autoComplete="off" aria-busy={busy}>
-                <label htmlFor="terminal-input">{(view && view.prompt) || '$'}</label>
-                <input id="terminal-input" ref={inputRef} name="command" aria-label="Linuxコマンドを入力" value={line}
-                  onChange={(e) => setLine(e.target.value)} onKeyDown={onKey} spellCheck={false} autoCapitalize="none" autoComplete="off"
-                  placeholder={status === 'error' ? '実行環境を読み込めませんでした' : ready ? 'コマンドを入力して Enter' : '教材の実行環境を準備しています…'} disabled={off} />
-                <button type="submit" aria-label="コマンドを実行" disabled={off}>&crarr;</button>
-              </form>
-              <div className={'terminal-bottom' + (ready ? ' ready' : '')}><span><i></i> <span>{ready ? 'Python runtime is ready' : status === 'error' ? 'Python runtime unavailable' : 'Python runtime is loading'}</span></span><span>Enter to run / Up Down history</span></div>
-            </section>
-          </div>
-          {status === 'error' ? (
-            <div className="runtime-notice" role="alert"><span>Python実行環境を読み込めませんでした。ネットワーク接続を確認し、「再読み込み」を押してください。詳細: {errorText}</span><button type="button" onClick={() => setAttempt(attempt + 1)}>再読み込み</button></div>
           ) : null}
-          <section className="lesson-library">
-            <div className="library-heading"><div><span className="section-kicker">YOUR NEXT STEPS</span><h2>レッスン一覧</h2></div>
-              <label className="search-box"><span aria-hidden="true">&#8981;</span><input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="レッスンを検索" aria-label="レッスンを検索" /></label></div>
-            <div className="unit-filter">
-              {units.length > 1 ? [''].concat(units).map((u) => (
-                <button type="button" key={u || 'all'} className={u === unit ? 'selected' : ''} aria-pressed={u === unit} onClick={() => setUnit(u)}>{u || 'すべて'}</button>
-              )) : null}
+          {status === 'error' ? (
+            <div className="runtime-notice" role="alert">
+              <div><span className="tag tag-ng">[NG]</span> 実行環境を読み込めませんでした。ネットワークを確認して再試行してください。</div>
+              <div className="dim">詳細: {errorText}</div>
+              <button type="button" className="kbtn" onClick={() => setAttempt(attempt + 1)}>再試行</button>
             </div>
-            <div className="lesson-list">
-              {course && shown.length === 0 ? <div className="empty-list">該当するレッスンがありません。</div> : null}
-              {!course ? <div className="empty-list">教材を読み込んでいます。</div> : null}
-              {shown.map((item) => (
-                <button type="button" key={item.id} className={'lesson-card' + (item.done ? ' done' : '') + (item.index === current ? ' current' : '')}
-                  aria-current={item.index === current ? 'true' : undefined} disabled={off} onClick={() => selectLesson(course.id, item.index)}>
-                  <span className="lesson-step">{item.done ? 'OK' : pad2(item.index + 1)}</span>
-                  <div><strong>{item.title}</strong>{item.unit ? <small>{item.unit}</small> : null}</div>
-                  <span className="card-arrow" aria-hidden="true">&rarr;</span>
-                </button>
-              ))}
+          ) : null}
+          {entries.map((e) => (
+            <div className={'entry' + (e.kind ? ' ' + e.kind : '')} key={e.id}>
+              {e.command !== null ? <div className="cmdline"><Ps prompt={e.prompt} /> {e.command}</div> : null}
+              {e.output ? <div className="out"><Lines text={e.output} /></div> : null}
             </div>
-          </section>
-          <section className="beyond-browser"><div className="beyond-icon" aria-hidden="true">&#8599;</div><div><span className="section-kicker">BEYOND THE BROWSER</span><h3>本物のLinuxでも、確かめよう。</h3><p>この画面は模擬ターミナルで学ぶコースです。本物のbashを使う実践や、構築・故障調査・復旧のVM実習は、教材をダウンロードして進められます。</p></div><a className="outline-link" href="https://github.com/leo0607y/LinuxDOJO" target="_blank" rel="noopener noreferrer">教材・実習ガイド <span aria-hidden="true">&#8599;</span></a></section>
-          <footer className="page-footer"><span>DANGAN LOG <b>/</b> Linux道場</span><span>ひとつずつ、使いこなせるように。</span></footer>
+          ))}
+          {view && view.editor ? <pre className="out editor" aria-label="エディターの表示">{view.editor}</pre> : null}
         </div>
-      </main>
+        <div className="mission"><span className="tag tag-hint">[課題 {lessonNo}]</span> <span id="mission-text">{lesson ? lesson.task : '準備ができると課題が表示されます。'}</span></div>
+        <form className="prompt" onSubmit={submit} autoComplete="off" aria-busy={busy}>
+          <label htmlFor="terminal-input" className="ps"><Ps prompt={(view && view.prompt) || 'learner@danganlog ~'} /></label>
+          <span className="field">
+            {ready && !busy && !line && focused ? <span className="caret" aria-hidden="true"></span> : null}
+            <input id="terminal-input" ref={inputRef} name="command" value={line} onChange={(e) => setLine(e.target.value)} onKeyDown={onKey}
+              onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+              spellCheck={false} autoCapitalize="none" autoCorrect="off" autoComplete="off" enterKeyHint="send" disabled={off}
+              aria-label="コマンド" placeholder={status === 'error' ? '(実行環境なし)' : ready ? '' : '(準備中)'} />
+          </span>
+          <div className="keys" role="group" aria-label="入力キー">
+            <button type="button" className="kbtn" disabled={off} onClick={() => { complete(); if (inputRef.current) inputRef.current.focus(); }}>Tab</button>
+            <button type="button" className="kbtn" disabled={off} aria-label="前の入力" onClick={() => historyStep(-1)}>&uarr;</button>
+            <button type="button" className="kbtn" disabled={off} aria-label="次の入力" onClick={() => historyStep(1)}>&darr;</button>
+            <button type="submit" className="kbtn enter" disabled={off}>Enter</button>
+          </div>
+        </form>
+        {simple ? (
+          <div className="actions" role="group" aria-label="操作ボタン">
+            <button type="button" className="kbtn" disabled={off} onClick={act('hint')}>ヒント</button>
+            <button type="button" className="kbtn" disabled={off} onClick={act('answer')}>入力例</button>
+            <button type="button" className="kbtn" disabled={off} onClick={act('prev')}>前へ</button>
+            <button type="button" className={'kbtn' + (hasNext ? ' enter' : '')} disabled={off} onClick={act('next')}>次へ</button>
+            <button type="button" className="kbtn" disabled={off} onClick={act('menu')}>一覧</button>
+            <button type="button" className="kbtn" disabled={off} onClick={act('modes')}>コース</button>
+            <button type="button" className="kbtn" disabled={off} onClick={() => runLocal('help')}>ヘルプ</button>
+          </div>
+        ) : null}
+      </div>
+      <footer className="foot">
+        <span className="foot-keys">help / Tab 補完 / ↑↓ 履歴</span>
+        <span className="foot-r">
+          <a href="/course/">講座</a>
+          <button type="button" aria-pressed={simple} onClick={() => setSimple(!simple)}>シンプル表示</button>
+          <button type="button" onClick={() => setTheme(effectiveTheme() === 'dark' ? 'light' : 'dark')}>テーマ</button>
+          <span className={'rt ' + status}>{status === 'ready' ? 'ready' : status === 'error' ? 'error' : 'loading ' + pct + '%'}</span>
+        </span>
+      </footer>
       <dialog ref={dataRef}>
-        <div className="dialog-heading"><h2>学習データ</h2><button type="button" className="icon-button" aria-label="閉じる" onClick={() => closeDialog(dataRef)}>&times;</button></div>
+        <div className="dialog-heading"><h2>学習データ</h2><button type="button" className="kbtn" aria-label="閉じる" onClick={() => closeDialog(dataRef)}>[x]</button></div>
         <p>学習の進み具合と練習ファイルは、このブラウザーに保存されます。別の端末へ移すときは、JSONファイルで書き出してください。</p>
         <div className="data-actions">
-          <button type="button" className="primary-button" onClick={exportData}>学習データを書き出す &darr;</button>
-          <label className="import-button">保存データを読み込む &uarr;<input type="file" accept="application/json,.json" onChange={importData} /></label>
+          <button type="button" className="kbtn enter" onClick={exportData}>学習データを書き出す</button>
+          <label className="kbtn import-button">保存データを読み込む<input type="file" accept="application/json,.json" onChange={importData} /></label>
         </div>
-        <p className="dialog-note">読み込むと、現在の練習状態が保存データに置き換わります。共有の端末では、自分のデータを手元にも保存してください。</p>
+        <p className="dim">読み込むと、現在の練習状態が保存データに置き換わります。保存データはサーバーへ送信されません。</p>
         <div id="data-message" role="status">{dataMessage}</div>
-      </dialog>
-      <dialog ref={helpRef}>
-        <div className="dialog-heading"><h2>Linux道場の使い方</h2><button type="button" className="icon-button" aria-label="閉じる" onClick={() => closeDialog(helpRef)}>&times;</button></div>
-        <ol><li>説明と「YOUR MISSION」を読みます。</li><li>右のターミナルにコマンドを入力し、Enterで実行します。上下キーで過去の入力を呼び出せます。</li><li>結果を確かめて、できたら次のレッスンへ進みます。</li></ol>
-        <p>分からないときは「ヒント」を1回ずつ。「入力例」で答えを確認することもできます。総合復習では、作業したあとに <code>check</code> で判定します。</p>
-        <p className="dialog-note">初回はPython実行環境の読み込みに時間がかかります。読み込めない場合も、レッスンの説明は読めます。保存データはサーバーへ送信されません。</p>
       </dialog>
     </div>
   );

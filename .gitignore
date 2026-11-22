@@ -96,9 +96,15 @@ Thumbs.db
 !/docs/
 /docs/*
 !/docs/*.md
+!/docs/vm_verification/
+/docs/vm_verification/*
+!/docs/vm_verification/*.md
 !/tools/
 /tools/*
 !/tools/*.py
+!/tools/vmtest/
+/tools/vmtest/*
+!/tools/vmtest/*.py
 
 # Disposable-VM course sources are teaching material, not generated VM images.
 !/labs/

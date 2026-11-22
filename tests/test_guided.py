@@ -15,6 +15,11 @@ sys.path.insert(0, str(ROOT))
 from engine import guided, runner, save
 
 
+def ui_strip(text):
+    from engine import ui
+    return ui.strip_ansi(text)
+
+
 class GuidedTerminalTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix="linuxdojo-guided-test-")
@@ -393,7 +398,7 @@ class GuidedMenuTests(unittest.TestCase):
         choose.assert_called_once_with()
         play.assert_not_called()
         review.assert_called_once_with("intro")
-        self.assertIn("次のモードを選ぶ", capture.getvalue())
+        self.assertIn("次のモードを選べます", capture.getvalue())
         self.assertEqual(len(save.load()["learning"]["intro"]["completed"]), len(LESSONS["intro"]))
 
     def test_completed_course_can_resume_a_partially_finished_review(self):
@@ -543,7 +548,7 @@ class GuidedMenuTests(unittest.TestCase):
         d["learning"]["intro"]["completed"] = [first["id"]]
         d["learning"]["intro"]["cursor"] = LESSONS["intro"][1]["id"]
         save.store(d)
-        text = main.header()
+        text = ui_strip(main.header() + "\n" + "\n".join(main.summary_lines()))
         self.assertIn("はじめてモード", text)
         self.assertIn(f'1/{len(LESSONS["intro"])}', text)
         self.assertIn("減点なし", text)

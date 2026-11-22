@@ -179,7 +179,7 @@ Git の課題はローカルの使い捨てリポジトリで実行します。�
 
 ## ネイティブ実習 (engine.toolbox)
 
-リポジトリのルートで実行します。実習は 21 種類(コード上の登録とツール確認の一覧から数えた値)です。
+リポジトリのルートで実行します。実習は 23 種類(コード上の登録とツール確認の一覧から数えた値)です。
 未導入のツールは自動では入れず、その実習は合格扱いになりません。
 
 | コマンド | 内容 |
@@ -244,8 +244,31 @@ VM の作成、スナップショット、復元の具体的な手順は [labs/v
 | firewall | nftables の適用と、接続を保った復旧 | 未実施(最近追加) |
 | restore | バックアップから別 VM へのサービス全体の復元 | 未実施(最近追加) |
 | osupdate | 署名エラーと依存不整合からの復旧 | 未実施(最近追加) |
+| sshd | 専用 sshd の堅牢化(鍵のみ、root 禁止、ProxyJump) | 未実施(最近追加) |
+| mounts | fstab 誤記、swap、LVM の拡張(ループバック上) | 未実施(最近追加) |
+| journald | journald の永続化と保存量、時間・優先度での絞り込み | 未実施(最近追加) |
+| sysctl | sysctl の永続化、カーネルモジュールの blacklist | 未実施(最近追加) |
+| limits | MemoryMax と LimitNOFILE の故障調査(OOM kill) | 未実施(最近追加) |
+| timesync | タイムゾーン、NTP、ロケール | 未実施(最近追加) |
+| guard | fail2ban の自動 ban と auditd の監査ルール | 未実施(最近追加) |
+| dnsserver | BIND の権威ゾーンと AXFR 制限 | 未実施(最近追加) |
+| mailserver | Postfix の専用インスタンスとリレー拒否 | 未実施(最近追加) |
+| fileshare | NFS の export とマウント(2 台) | 未実施(最近追加) |
+| apache | Apache の仮想ホスト、.htaccess、Basic 認証 | 未実施(最近追加) |
+| netlink | ブリッジ、VLAN、bond、ポリシールーティング(namespace 内) | 未実施(最近追加) |
+| pam | PAM スタックと faillock、pwquality | 未実施(最近追加) |
+| podman | rootless Podman と Quadlet | 未実施(最近追加) |
+| ldap | 専用 slapd と ACL | 未実施(最近追加) |
+| samba | 専用 smbd の共有と権限 | 未実施(最近追加) |
+| libvirt | libvirt のテスト用ドライバーで domain・snapshot・network | 未実施(最近追加) |
+| tuned | tuned のカスタムプロファイル | 未実施(最近追加) |
+| kbuild | カーネルモジュールのビルドとロード | 未実施(最近追加) |
+| grubrescue | ループバック上の GRUB 導入と設定修復 | 未実施(最近追加) |
+| selinux | SELinux の fcontext と boolean(RHEL 系 VM 専用) | 未実施(最近追加) |
+| dnf | dnf と rpm、署名付きローカルリポジトリ(RHEL 系 VM 専用) | 未実施(最近追加) |
+| firewalld | firewalld の zone と rich rule(RHEL 系 VM 専用) | 未実施(最近追加) |
 
-注意: users、netconfig、firewall、restore、osupdate は最近追加したモジュールで、静的なテスト(生成物と構文、ガードの検査)だけを行っています。実際の VM ではまだ動かしていません。実行すると失敗する可能性があります。
+注意: 表の「未実施(最近追加)」のモジュール 28 件は、静的なテスト(生成物と構文、ガードの検査、非特権部分の単体テスト)だけを行っています。実際の VM ではまだ動かしていません。実行すると失敗する可能性があります。初回に確認する項目は [labs/vm/FIRST_RUN.md](labs/vm/FIRST_RUN.md) にまとめています。selinux、dnf、firewalld は RHEL 系 VM が必要で、Ubuntu の VM では常に拒否されます([labs/vm/RHEL.md](labs/vm/RHEL.md))。
 実施済みのモジュールも、検証したのは特定の環境(専用の Ubuntu 24.04 KVM VM)です。詳細は [docs/coverage.md](docs/coverage.md) にあります。
 
 ## 補足

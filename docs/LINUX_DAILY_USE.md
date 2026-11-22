@@ -90,6 +90,34 @@ VM内の `sudo dojo-vm-lab list` で利用できるモジュールを確認し�
 | `storage` | 専用ext4のinode枯渇と再起動後のマウント | [VM手順](../labs/vm/README.md) |
 | `boot` | 専用systemdサービスの故障と復旧 | [VM手順](../labs/vm/README.md) |
 | `webstack` | Nginx・TLS・SQLite・502の復旧 | [VM手順](../labs/vm/README.md) |
+| `users` | ユーザー・グループ・sudoの作成と事故復旧（静的検証のみ、実VM未実施） | [初回確認](../labs/vm/FIRST_RUN.md) |
+| `netconfig` | 固定IP・静的経路・DNSクライアント・IPv6（静的検証のみ、実VM未実施） | [初回確認](../labs/vm/FIRST_RUN.md) |
+| `firewall` | nftablesの適用と接続を保った復旧（静的検証のみ、実VM未実施） | [初回確認](../labs/vm/FIRST_RUN.md) |
+| `restore` | 別VMへのサービス全体の復元（静的検証のみ、実VM未実施） | [初回確認](../labs/vm/FIRST_RUN.md) |
+| `osupdate` | 署名付きaptリポジトリと更新復旧（静的検証のみ、実VM未実施） | [初回確認](../labs/vm/FIRST_RUN.md) |
+| `sshd` | 専用sshdの堅牢化とProxyJump（静的検証のみ、実VM未実施） | [初回確認](../labs/vm/FIRST_RUN.md) |
+| `mounts` | fstab誤記・swap・LVM拡張（静的検証のみ、実VM未実施） | [初回確認](../labs/vm/FIRST_RUN.md) |
+| `journald` | journaldの永続化と保存量（静的検証のみ、実VM未実施） | [初回確認](../labs/vm/FIRST_RUN.md) |
+| `sysctl` | sysctlの永続化とmodprobe blacklist（静的検証のみ、実VM未実施） | [初回確認](../labs/vm/FIRST_RUN.md) |
+| `limits` | MemoryMax・LimitNOFILEとOOM（静的検証のみ、実VM未実施） | [初回確認](../labs/vm/FIRST_RUN.md) |
+| `timesync` | タイムゾーン・NTP・ロケール（静的検証のみ、実VM未実施） | [初回確認](../labs/vm/FIRST_RUN.md) |
+| `guard` | fail2banとauditd（静的検証のみ、実VM未実施） | [初回確認](../labs/vm/FIRST_RUN.md) |
+| `dnsserver` | BINDの権威ゾーン（静的検証のみ、実VM未実施） | [初回確認](../labs/vm/FIRST_RUN.md) |
+| `mailserver` | Postfixの専用インスタンス（静的検証のみ、実VM未実施） | [初回確認](../labs/vm/FIRST_RUN.md) |
+| `fileshare` | NFS（2台）（静的検証のみ、実VM未実施） | [初回確認](../labs/vm/FIRST_RUN.md) |
+| `apache` | Apacheの仮想ホストと認証（静的検証のみ、実VM未実施） | [初回確認](../labs/vm/FIRST_RUN.md) |
+| `netlink` | bridge・VLAN・bond・ポリシールート（静的検証のみ、実VM未実施） | [初回確認](../labs/vm/FIRST_RUN.md) |
+| `pam` | PAMスタック（静的検証のみ、実VM未実施） | [初回確認](../labs/vm/FIRST_RUN.md) |
+| `podman` | rootless PodmanとQuadlet（静的検証のみ、実VM未実施） | [初回確認](../labs/vm/FIRST_RUN.md) |
+| `ldap` | 専用slapdとACL（静的検証のみ、実VM未実施） | [初回確認](../labs/vm/FIRST_RUN.md) |
+| `samba` | 専用smbd（静的検証のみ、実VM未実施） | [初回確認](../labs/vm/FIRST_RUN.md) |
+| `libvirt` | libvirtのテスト用ドライバー（静的検証のみ、実VM未実施） | [初回確認](../labs/vm/FIRST_RUN.md) |
+| `tuned` | tunedのカスタムプロファイル（静的検証のみ、実VM未実施） | [初回確認](../labs/vm/FIRST_RUN.md) |
+| `kbuild` | カーネルモジュールのビルド（静的検証のみ、実VM未実施） | [初回確認](../labs/vm/FIRST_RUN.md) |
+| `grubrescue` | ループバック上のGRUB導入と修復（静的検証のみ、実VM未実施） | [初回確認](../labs/vm/FIRST_RUN.md) |
+| `selinux` | SELinux（RHEL系VM専用）（静的検証のみ、実VM未実施） | [初回確認](../labs/vm/FIRST_RUN.md) |
+| `dnf` | dnf/rpm（RHEL系VM専用）（静的検証のみ、実VM未実施） | [初回確認](../labs/vm/FIRST_RUN.md) |
+| `firewalld` | firewalld（RHEL系VM専用）（静的検証のみ、実VM未実施） | [初回確認](../labs/vm/FIRST_RUN.md) |
 
 各 `check` は段階を区別するため、最後の状態だけ作って途中の経験を省略しません。
 `ssh` は実SSH接続ですが、対象はVM内のloopbackです。別VMとの疎通は `network` で確認します。

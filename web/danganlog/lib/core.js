@@ -120,7 +120,7 @@ function feedbackFor(view, wasDone) {
 }
 
 /* worker との要求・応答の対応づけ。makeWorker はテストでは偽物に差し替える。 */
-function createClient(makeWorker, timeoutMs) {
+function createClient(makeWorker, timeoutMs, onProgress) {
 var worker = null;
 var seq = 0;
 var pending = {};
@@ -132,6 +132,8 @@ var pending = {};
     worker = makeWorker();
     worker.onmessage = function (event) {
       var data = event.data || {};
+      if (data.progress && onProgress) { onProgress(data.progress); return; }
+      if (data.fatal) { failAll(new Error(data.fatal)); return; }
       var entry = pending[data.id];
       if (!entry) return;
       delete pending[data.id];

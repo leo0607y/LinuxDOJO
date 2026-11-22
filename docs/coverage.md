@@ -31,6 +31,21 @@
 
 この表は「不足を実装した」記録であり、「小規模サーバー管理まで網羅した」という評価ではありません。実CPU/OOM/I/O障害の切り分け、実cron、対話的なtmuxのdetach/attach、デスクトップの日本語入力・無線・音声・アプリ関連付けは、引き続き実習の深さが足りません。後掲の修了確認には、手動確認で補う項目が含まれています。
 
+## 追加監査の結果と第2弾の実装状況
+
+`objectives_matrix.md`（LPIC-1/2、LFCS、RHCSA の試験範囲178行との突き合わせ）の結果、第1弾の時点では COVERED 55、PARTIAL 112、MISSING 11 でした。その後、次を追加しました。いずれも作成直後で、**実VMでの実行は未実施**です（ネイティブ実習は実機で実行済み）。
+
+| 領域 | 追加した実習 | 検証状況 |
+|---|---|---|
+| 実cron、bash堅牢化、tcpdump、deb自作 | native `cron`、`trap`、`tcpdump`、`debbuild` | ホストの実ツールで実行しテスト通過。実cronデーモンと実キャプチャ（権限不足のためpcap再生で代替）は未検証 |
+| sshd堅牢化、fstab/swap/LVM、journald、sysctl、cgroup/OOM、時刻/ロケール、fail2ban/auditd | VM `sshd`、`mounts`、`journald`、`sysctl`、`limits`、`timesync`、`guard` | 静的のみ、実VM未実施 |
+| DNS/メール/NFS/Apache/Samba/LDAP | VM `dnsserver`、`mailserver`、`fileshare`、`apache`、`samba`、`ldap` | 静的のみ、実VM未実施。サーバー系パッケージは setup が導入コマンドを案内 |
+| bridge/VLAN/bond、PAM、podman、libvirt、tuned | VM `netlink`、`pam`、`podman`、`libvirt`、`tuned` | 静的のみ、実VM未実施 |
+| カーネル、GRUB | VM `kbuild`、`grubrescue` | 静的のみ、実VM未実施。カーネル全体のビルドと実機のレスキュー起動は自動判定しない |
+| RHEL系（SELinux、dnf/rpm、firewalld） | VM `selinux`、`dnf`、`firewalld` | 静的のみ、RHEL系VMでは未実施。現行の書き出しはUbuntu専用で、手動手順は `labs/vm/RHEL.md` |
+
+これらは「実装した」記録であり、実VMで通るまでは「検証済み」に数えません。初回確認項目は `labs/vm/FIRST_RUN.md`、集計は `docs/objectives_matrix.md`（再集計は第2弾の実装後に行う）を参照します。
+
 ## 追加監査で見つかった未対応の領域
 
 上の6件とは別に、2026-11-21の監査で次の領域は「実操作の課題がない、または読解止まり」と判定しました。既存501問の多くは採取済み出力や設定を読む方式のため、語が教材に出ることは実操作の証拠としていません。優先度順です。

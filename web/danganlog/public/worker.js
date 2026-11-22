@@ -6,6 +6,35 @@ let runtime;
 let initialization;
 let queue = Promise.resolve();
 
+/* 読み込みの進み具合を画面へ知らせる。fetch を包み、応答の本文が流れた量を数える。 */
+let progressInstalled = false;
+function installProgress() {
+  if (progressInstalled) return;
+  progressInstalled = true;
+  const nativeFetch = self.fetch.bind(self);
+  let loaded = 0;
+  let seen = 0;
+  const ESTIMATE = 15200000; /* pyodide 約13.5MB + 教材 約1.4MB。実際の Content-Length が上回ればそちらを使う */
+  const report = () => self.postMessage({ progress: { loaded, total: Math.max(seen, ESTIMATE) } });
+  self.fetch = async (input, init) => {
+    let response;
+    try { response = await nativeFetch(input, init); } catch (error) {
+      self.postMessage({ fatal: '実行環境のファイルを取得できませんでした (' + String(typeof input === 'string' ? input : input.url).split('/').pop() + ')。ネットワークを確認してください。' });
+      throw error;
+    }
+    if (!response.ok) {
+      self.postMessage({ fatal: '実行環境のファイルを取得できませんでした (HTTP ' + response.status + ')。' });
+      return response;
+    }
+    if (!response.body) return response;
+    seen += Number(response.headers.get('content-length')) || 0;
+    const counter = new TransformStream({
+      transform(chunk, controller) { loaded += chunk.byteLength; report(); controller.enqueue(chunk); }
+    });
+    return new Response(response.body.pipeThrough(counter), { status: response.status, statusText: response.statusText, headers: response.headers });
+  };
+}
+
 const PYTHON_BRIDGE = String.raw`
 import base64, copy, json, os, re, shutil, sys, types
 from pathlib import Path, PurePosixPath
@@ -252,6 +281,7 @@ def browser_request(request_json):
 
 async function initialize() {
   if (!initialization) initialization = (async () => {
+    installProgress();
     importScripts(PYODIDE_BASE + 'pyodide.js');
     runtime = await loadPyodide({ indexURL: PYODIDE_BASE });
     const response = await fetch(SOURCE_URL);

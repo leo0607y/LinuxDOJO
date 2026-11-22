@@ -112,15 +112,15 @@ TOPICS = [
 
 # 本物のツール実習との対応。VMが必要な管理操作はdocs/coverage.mdに分けて示す。
 _NATIVE = {
-    "shell": ["shell"], "files": ["find"], "text": ["shell"],
+    "shell": ["shell", "script", "dotfiles", "zsh", "fish", "stow", "manpages"], "files": ["find"], "text": ["shell", "regex"],
     "search": ["find", "rg", "jq"], "editor": ["vim"],
-    "archive": ["archive", "release"], "backup": ["rsync", "archive"],
-    "process": ["incident"], "network": ["curl"], "http": ["curl"],
-    "tls": ["tls"], "ssh": ["ssh"], "tmux": ["tmux"],
+    "archive": ["archive", "release"], "backup": ["rsync", "archive", "backup"],
+    "process": ["incident"], "network": ["curl", "tcpdump"], "http": ["curl"],
+    "tls": ["tls", "localca"], "ssh": ["ssh"], "tmux": ["tmux"],
     "git": ["git"], "python": ["python", "python-packages"], "build": ["build"],
-    "database": ["sqlite"], "automation": ["shell", "incident"],
+    "database": ["sqlite"], "automation": ["shell", "incident", "cron", "trap"],
     "recovery": ["incident", "release"], "productivity": ["fzf"],
-    "containers": ["docker"], "logging": ["logrotate"],
+    "containers": ["docker"], "logging": ["logrotate"], "packages": ["debbuild"], "cloud": ["awscli-s3", "awscli-query", "ansible", "kubectl"], "desktop": ["xorg", "desktopfile", "flatpak"],
 }
 for _item in TOPICS:
     _item["labs"] = _NATIVE.get(_item["id"], [])

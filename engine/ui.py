@@ -10,18 +10,26 @@ import signal
 import sys
 import unicodedata
 
-USE_COLOR = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
+USE_COLOR = (sys.stdout.isatty() and not os.environ.get("NO_COLOR")
+             and os.environ.get("TERM", "") != "dumb")
 if os.environ.get("LQ_FORCE_COLOR"):
     USE_COLOR = True
 
+# パレットはここで一度だけ定義する。
+#   アクセント: cyan（見出し・キー・コマンド） / 補助: dim / 成功: green / 失敗: red / 注意: yellow
+# 旧来の色名（blue・magenta・bcyan など）はすべてアクセントに寄せ、画面ごとに色が散らばらないようにする。
+ACCENT = "36"
 CODES = {
     "reset": "0", "bold": "1", "dim": "2", "italic": "3", "under": "4", "blink": "5", "rev": "7",
-    "black": "30", "red": "31", "green": "32", "yellow": "33", "blue": "34",
-    "magenta": "35", "cyan": "36", "white": "37", "gray": "90",
-    "bred": "91", "bgreen": "92", "byellow": "93", "bblue": "94",
-    "bmagenta": "95", "bcyan": "96", "bwhite": "97",
+    "black": "30", "red": "31", "green": "32", "yellow": "33", "white": "0",
+    "gray": "2",
+    "blue": ACCENT, "magenta": ACCENT, "cyan": ACCENT,
+    "bred": "91", "bgreen": "92", "byellow": "33", "bblue": ACCENT,
+    "bmagenta": ACCENT, "bcyan": ACCENT, "bwhite": "1",
+    "accent": ACCENT, "ok": "32", "ng": "31", "warn": "33",
     "on_blue": "44", "on_magenta": "45", "on_green": "42", "on_red": "41", "on_gray": "100",
 }
+BORDER_TONES = {"red": "red", "yellow": "yellow", "ok": "green", "ng": "red", "warn": "yellow"}
 
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
@@ -36,6 +44,8 @@ DONE = "[x]"         # 完了済みの一覧マーク
 TODO = "[ ]"         # 未完了の一覧マーク
 FOOT_BACK = "Enter: 戻る"
 FOOT_QUIT = "q: 戻る"
+NEXT = "[>]"          # 次に進む場所
+PRODUCT = "LinuxDOJO"
 
 
 def c(text, *styles):
@@ -132,6 +142,12 @@ def box(lines, title=None, color="cyan", w=None, title_color=None):
     """全角文字を考慮した罫線ボックスを描画して文字列で返す。"""
     w = w or term_width() - 2
     inner = w - 4
+    # 枠線は控えめ（dim）。赤・黄・緑は意味があるとき（NG・注意・OK）だけ。
+    tone = BORDER_TONES.get(color)
+    if tone:
+        title_color, edge = tone, tone
+    else:
+        title_color, edge = "accent", "dim"
     body = []
     for ln in lines:
         for seg in str(ln).split("\n"):
@@ -140,19 +156,22 @@ def box(lines, title=None, color="cyan", w=None, title_color=None):
     if title:
         t = f" {title} "
         rest = max(0, w - 2 - width(t) - 2)
-        out.append(c("╭──", color) + c(t, title_color or color, "bold") + c("─" * rest + "╮", color))
+        out.append(c("╭──", edge) + c(t, title_color, "bold") + c("─" * rest + "╮", edge))
     else:
-        out.append(c("╭" + "─" * (w - 2) + "╮", color))
+        out.append(c("╭" + "─" * (w - 2) + "╮", edge))
     for ln in body:
-        out.append(c("│ ", color) + pad(ln, inner) + c(" │", color))
-    out.append(c("╰" + "─" * (w - 2) + "╯", color))
+        out.append(c("│ ", edge) + pad(ln, inner) + c(" │", edge))
+    out.append(c("╰" + "─" * (w - 2) + "╯", edge))
     return "\n".join(out)
 
 
-def progress_bar(ratio, n=10, full="■", empty="□", color="bgreen"):
+def progress_bar(ratio, n=10, full="█", empty="░", color="accent"):
+    """ブロック文字の進捗バー。値がある限り最低 1 マス、100% 未満は最大でも n-1 マス。"""
     ratio = max(0.0, min(1.0, ratio))
     k = int(round(ratio * n))
-    return "[" + c(full * k, color) + c(empty * (n - k), "gray") + "]"
+    if 0 < ratio < 1:
+        k = max(1, min(n - 1, k))
+    return c(full * k, color) + c(empty * (n - k), "dim")
 
 
 def table(headers, rows, colors=None):
@@ -161,8 +180,8 @@ def table(headers, rows, colors=None):
         for i, cell in enumerate(r):
             ws[i] = max(ws[i], width(str(cell)))
     sep = "  "
-    out = [sep.join(c(pad(h, ws[i]), "bold", "white") for i, h in enumerate(headers))]
-    out.append(c(sep.join("─" * x for x in ws), "gray"))
+    out = [sep.join(c(pad(h, ws[i]), "bold") for i, h in enumerate(headers))]
+    out.append(c(sep.join("─" * x for x in ws), "dim"))
     for r in rows:
         out.append(sep.join(pad(str(cell), ws[i]) for i, cell in enumerate(r)))
     return "\n".join(out)
@@ -195,7 +214,7 @@ def invalid_choice(value, choices):
 
 def clear():
     """画面とスクロールバックの両方を消す。前の画面まで遡ってスクロールできないようにする。"""
-    if sys.stdout.isatty():
+    if sys.stdout.isatty() and os.environ.get("TERM", "") != "dumb":
         sys.stdout.write("\x1b[H\x1b[2J\x1b[3J")
         sys.stdout.flush()
 
@@ -300,25 +319,89 @@ class QuestionScreen:
         return False
 
 
-def hr(ch="─", color="gray"):
-    return c(ch * (term_width() - 2), color)
+def hr(ch="─", color="dim", w=None):
+    return c(ch * (w or term_width() - 2), color)
+
+
+def rule(label=None, w=None):
+    """見出し付きの区切り線。label があれば「── label ───」の形にする。w を省くと画面幅（左に 1 桁の余白）。"""
+    margin = ""
+    if w is None:
+        w, margin = term_width() - 3, " "
+    if not label:
+        return margin + c("─" * w, "dim")
+    return margin + c("── ", "dim") + c(label, "bold") + c(" " + "─" * max(0, w - width(label) - 4), "dim")
+
+
+def header(crumbs=(), right="", w=None):
+    """全画面共通のコンパクトな見出し（製品名 › 現在地 ... 右側の要約）と区切り線の 2 行。"""
+    w = w or term_width() - 2
+    left = " " + c(PRODUCT, "bold", "accent")
+    for crumb in crumbs:
+        left += c("  ›  ", "dim") + c(crumb, "bold") if crumb is crumbs[-1] else c("  ›  ", "dim") + crumb
+    if right:
+        room = w - width(left) - 2
+        if width(strip_ansi(right)) > room:
+            right = clip(strip_ansi(right), max(0, room))
+        left += " " * max(2, w - width(left) - width(right) - 1) + right
+    return left + "\n" + c("─" * w, "dim")
+
+
+def menu_row(key, label, desc="", key_w=3, label_w=None, w=None, strong=False, tag="", tag_w=0):
+    """番号キー・名前・短い説明を桁揃えした 1 行。label_w を揃えると説明が縦にそろう。
+
+    tag（例: 現在）は名前の右に tag_w 桁の固定欄として出し、説明の位置をずらさない。
+    """
+    w = w or term_width() - 2
+    k = pad(c(f"[{key}]", "bold", "accent"), key_w)
+    lw = label_w if label_w is not None else width(label)
+    lw = max(4, min(lw, w - 4 - key_w - 2 - (tag_w + 2 if tag_w else 0)))
+    room = w - 4 - key_w - lw - 2 - (tag_w + 2 if tag_w else 0)
+    text = pad(c(clip(label, lw), "bold") if strong else clip(label, lw), lw)
+    row = f"  {k} {text}"
+    if tag_w:
+        row += "  " + pad(c(tag, "bold", "accent") if tag else "", tag_w)
+    if desc and room >= 8:
+        row += "  " + c(clip(desc, room), "dim")
+    return row
+
+
+def footer(*pairs):
+    """画面下部のキー案内。("b", "戻る") のように並べる。全画面で同じ書式にそろえ、狭い端末では後ろの項目を省く。"""
+    limit = term_width() - 4
+    out = ""
+    for k, v in pairs:
+        item = f"{k} {v}".rstrip()
+        trial = out + ("   " if out else "") + item
+        if out and width(trial) > limit:
+            break
+        out = trial
+    return c("  " + out, "dim")
+
+
+def status_line(kind, text, detail=""):
+    """OK / NG / 注意 / 補足 のフィードバック 1 行。色は意味に対応するときだけ付ける。"""
+    marker, color = {"ok": (OK, "green"), "ng": (NG, "red"), "warn": (WARN, "yellow"),
+                     "info": (INFO, "dim")}[kind]
+    return "  " + c(marker, color, "bold") + " " + c(text, "bold" if kind != "info" else "dim") + (
+        c("  " + detail, "dim") if detail else "")
 
 
 TITLE_ART = r"""
-  ██╗     ██╗███╗   ██╗██╗   ██╗██╗  ██╗     ██████╗ ██╗   ██╗███████╗███████╗████████╗
-  ██║     ██║████╗  ██║██║   ██║╚██╗██╔╝    ██╔═══██╗██║   ██║██╔════╝██╔════╝╚══██╔══╝
-  ██║     ██║██╔██╗ ██║██║   ██║ ╚███╔╝     ██║   ██║██║   ██║█████╗  ███████╗   ██║
-  ██║     ██║██║╚██╗██║██║   ██║ ██╔██╗     ██║▄▄ ██║██║   ██║██╔══╝  ╚════██║   ██║
-  ███████╗██║██║ ╚████║╚██████╔╝██╔╝ ██╗    ╚██████╔╝╚██████╔╝███████╗███████║   ██║
-  ╚══════╝╚═╝╚═╝  ╚═══╝ ╚═════╝ ╚═╝  ╚═╝     ╚══▀▀═╝  ╚═════╝ ╚══════╝╚══════╝   ╚═╝
+  ██╗     ██╗███╗   ██╗██╗   ██╗██╗  ██╗    ██████╗  ██████╗      ██╗ ██████╗
+  ██║     ██║████╗  ██║██║   ██║╚██╗██╔╝    ██╔══██╗██╔═══██╗     ██║██╔═══██╗
+  ██║     ██║██╔██╗ ██║██║   ██║ ╚███╔╝     ██║  ██║██║   ██║     ██║██║   ██║
+  ██║     ██║██║╚██╗██║██║   ██║ ██╔██╗     ██║  ██║██║   ██║██   ██║██║   ██║
+  ███████╗██║██║ ╚████║╚██████╔╝██╔╝ ██╗    ██████╔╝╚██████╔╝╚█████╔╝╚██████╔╝
+  ╚══════╝╚═╝╚═╝  ╚═══╝ ╚═════╝ ╚═╝  ╚═╝    ╚═════╝  ╚═════╝  ╚════╝  ╚═════╝
 """
 
 TITLE_ART_SMALL = r"""
-   _     _                    ___                  _
-  | |   (_)_ __  _   ___  __ / _ \ _   _  ___  ___| |_
-  | |   | | '_ \| | | \ \/ /| | | | | | |/ _ \/ __| __|
-  | |___| | | | | |_| |>  < | |_| | |_| |  __/\__ \ |_
-  |_____|_|_| |_|\__,_/_/\_\ \__\_\\__,_|\___||___/\__|
+  _     _                   ____   ___      _  ___
+ | |   (_)_ __  _   ___  __|  _ \ / _ \    | |/ _ \
+ | |   | | '_ \| | | \ \/ /| | | | | | |_  | | | | |
+ | |___| | | | | |_| |>  < | |_| | |_| | |_| | |_| |
+ |_____|_|_| |_|\__,_/_/\_\|____/ \___/ \___/ \___/
 """
 
 PENGUIN = r"""
@@ -331,25 +414,23 @@ PENGUIN = r"""
    \___)=(___/
 """
 
-GRADIENT = ["bmagenta", "magenta", "bblue", "blue", "bcyan", "cyan"]
-
 
 def title_art():
-    art = TITLE_ART if term_width() >= 92 else TITLE_ART_SMALL
-    lines = art.strip("\n").split("\n")
-    return "\n".join(c(ln, GRADIENT[i % len(GRADIENT)], "bold") for i, ln in enumerate(lines))
+    art = TITLE_ART if term_width() >= 88 else TITLE_ART_SMALL
+    return "\n".join(c(ln, "accent") for ln in art.strip("\n").split("\n"))
 
 
 CLEAR_ART = r"""
-   __  __ ___ ____ ____ ___ ___  _   _    ____ _     _____    _    ____  _
-  |  \/  |_ _/ ___/ ___|_ _/ _ \| \ | |  / ___| |   | ____|  / \  |  _ \| |
-  | |\/| || |\___ \___ \| | | | |  \| | | |   | |   |  _|   / _ \ | |_) | |
-  | |  | || | ___) |__) | | |_| | |\  | | |___| |___| |___ / ___ \|  _ <|_|
-  |_|  |_|___|____/____/___\___/|_| \_|  \____|_____|_____/_/   \_\_| \_(_)
+  __  __ ___ ____ ____ ___ ___  _   _    ____ _     _____    _    ____  _
+ |  \/  |_ _/ ___/ ___|_ _/ _ \| \ | |  / ___| |   | ____|  / \  |  _ \| |
+ | |\/| || |\___ \___ \| | | | |  \| | | |   | |   |  _|   / _ \ | |_) | |
+ | |  | || | ___) |__) | | |_| | |\  | | |___| |___| |___ / ___ \|  _ <|_|
+ |_|  |_|___|____/____/___\___/|_| \_|  \____|_____|_____/_/   \_\_| \_(_)
 """
 
 
 def clear_art():
-    lines = CLEAR_ART.strip("\n").split("\n")
-    cols = ["byellow", "yellow", "bgreen", "green", "bcyan"]
-    return "\n".join(c(ln, cols[i % len(cols)], "bold") for i, ln in enumerate(lines))
+    """クリア演出。大きな文字は幅が足りるときだけ。通常は 1 行の見出しにとどめる。"""
+    if term_width() < 76 or term_rows() < 30:
+        return ""
+    return "\n".join(c(ln, "green", "bold") for ln in CLEAR_ART.strip("\n").split("\n"))

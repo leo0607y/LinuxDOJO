@@ -62,7 +62,7 @@ __lq_ps1_path() {
     *) printf '\001\e[1;31m\002(サンドボックス外) %s' "$PWD" ;;
   esac
 }
-PS1='\[\e[1;97;45m\] LQ ${LQ_MISSION} \[\e[0m\] \[\e[1;94m\]$(__lq_ps1_path)\[\e[0m\] \[\e[1;92m\]\$\[\e[0m\] '
+PS1='\[\e[1;36m\]LQ ${LQ_MISSION}\[\e[0m\] \[\e[2m\]$(__lq_ps1_path)\[\e[0m\] \[\e[1;36m\]\$\[\e[0m\] '
 
 builtin cd "$LQ_WORK" 2>/dev/null
-__lq mission
+__lq intro

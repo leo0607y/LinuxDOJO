@@ -113,7 +113,8 @@ lab_reset() {
         [[ $(getent passwd "$U_USER" | cut -d: -f3,4 | tr ':' ' ') == "$(cat "$LAB_STATE/alice.ids")" ]] || { echo '記録したUID/GIDと違うため削除しません。'; return 1; }
         [[ ! -e $U_SUDOERS || -f $U_SUDOERS && ! -L $U_SUDOERS ]] || return 1
         rm -f -- "$U_SUDOERS"
-        userdel --remove "$U_USER" || return 1
+        # userdel warns about a missing mail spool on cloud images; that is not an error.
+        userdel --remove "$U_USER" 2> >(grep -v 'mail spool' >&2) || return 1
     else
         [[ ! -f $U_SUDOERS || -L $U_SUDOERS ]] || rm -f -- "$U_SUDOERS"
     fi

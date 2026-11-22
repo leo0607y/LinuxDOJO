@@ -44,7 +44,7 @@ class MenuTests(unittest.TestCase):
     def test_main_menu_explains_unknown_input_and_how_to_quit(self):
         text = self.run_main_menu(["zzz", "q"])
         self.assertIn("「zzz」は選べません", text)
-        self.assertIn("終了は q", text)
+        self.assertIn("q 終了", text)
         self.assertIn("次回は", text)
 
     def run_toolbox(self, answers):
@@ -61,7 +61,7 @@ class MenuTests(unittest.TestCase):
         text = self.run_toolbox(["1", "存在しない言葉zzz", "", "2", "nosuch", "", "b"])
         self.assertIn("該当する分野がありません", text)
         self.assertIn("「nosuch」という実習はありません", text)
-        self.assertIn("戻る（メインメニューへ）", text)
+        self.assertIn("メインメニューへ", text)
 
 
 class PathAndLauncherTests(unittest.TestCase):

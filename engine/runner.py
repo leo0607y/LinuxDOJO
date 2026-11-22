@@ -65,6 +65,7 @@ STAGES = {
     32: ("Stage 32", "開発者ツールボックス（jq・curl・fzf・rg ほか）"),
     33: ("Stage 33", "言語環境・ビルド・デバッグ・品質ツール"),
     34: ("Stage 34", "SSH・tmux・リモート作業の実践"),
+    35: ("Stage 35", "デスクトップ周辺機器（Wi-Fi・Bluetooth・音声・印刷）の模擬実習"),
     EXTRA: ("Extra", "現場で一目置かれる小ネタ・時短術 (実践)"),
 }
 
@@ -580,10 +581,15 @@ def launch_shell(mission: Mission, token: str) -> str:
         pass
     from engine import ui
     ctx = Ctx(mission, token)
-    title = f"実践  {mission.id}  {mission.title}"
-    objectives = ["・" + mission.render(item, ctx.data) for item in mission.objectives]
-    summary = [title, "", "やってみよう", *objectives]
-    header = [title, "", *mission.render(mission.story, ctx.data).splitlines(), "", "やってみよう", *objectives]
+    idx = [x.id for x in missions_of(mission.stage)].index(mission.id) + 1
+    where = ui.c(f"{STAGES[mission.stage][0]}  第 {idx} 問 / 全 {len(missions_of(mission.stage))} 問", "dim")
+    title = ui.c(f"MISSION {mission.id}", "bold", "accent") + "  " + ui.c(mission.title, "bold")
+    objectives = [ui.c(f"{i}.", "bold", "accent") + " " + ui.fmt(mission.render(item, ctx.data))
+                  for i, item in enumerate(mission.objectives, 1)]
+    task = ui.rule("達成条件", w=max(20, shutil.get_terminal_size((100, 30)).columns - 6))
+    summary = [where, title, task, *objectives]
+    header = [where, title, "", *[ui.fmt(x) for x in mission.render(mission.story, ctx.data).strip().splitlines()],
+              "", task, *objectives]
     with ui.QuestionScreen(header, summary=summary):
         subprocess.call(["bash", "--rcfile", str(SHELLRC), "-i"], cwd=str(stage_dir(mission.stage)), env=env)
     try:

@@ -206,7 +206,7 @@ def play(scenario):
                 print(message)
                 if good:
                     record_result(scenario, assisted)
-                    print(ui.c(f"{ui.OK} 総合復習クリア！ " + ("手本ありで達成。reset で自力の復習もできます。" if assisted else "ヒントなしで達成できました。"), "bgreen"))
+                    print(ui.status_line("ok", "総合復習クリア", "手本ありで達成。reset で自力の復習もできます。" if assisted else "ヒントなしで達成できました。"))
                     print(scenario["explanation"])
                     print("本物の bash で試す次の問題: " + " / ".join(scenario["practice"]))
                 continue
@@ -343,20 +343,25 @@ def _groups():
 
 def _status(completed, scenario_id):
     result = completed.get(scenario_id)
-    return "・未達成" if result is None else "△手本あり" if result["assisted"] else "◎自力達成"
+    return ui.c("未達成", "dim") if result is None else ui.c("△手本あり", "yellow") if result["assisted"] else ui.c("◎自力達成", "bold")
 
 
 def _choose_in_group(title, items):
     while True:
         ui.clear()
         completed = save.load()["learning"].get("readiness", {}).get("completed", {})
-        print(f"\n  {title} — * は難しさ（* 基本 / ** 組み合わせ / *** 総合）\n")
+        print(ui.header(["課題まつり", title], ""))
+        print("\n  " + ui.c("* 基本 / ** 組み合わせ / *** 総合", "dim") + "\n")
+        tw = max(20, ui.term_width() - 2 - 24)
         for index, scenario in enumerate(items, 1):
             stars = "*" * scenario.get("level", 1)
-            print(f"  [{index:>2}] {ui.pad(stars, 4)} {ui.pad(scenario['title'], 44)} {_status(completed, scenario['id'])}")
+            print(f"  {ui.pad(ui.c(f'[{index}]', 'bold', 'accent'), 4)} {ui.pad(ui.c(stars, 'dim'), 4)} "
+                  f"{ui.pad(ui.clip(scenario['title'], tw), tw)} {_status(completed, scenario['id'])}")
+        print()
+        print(ui.footer(("番号", "挑戦"), ("Enter", "次の未達成"), ("b", "戻る")))
         print(ui.take_flash(), end="")
         try:
-            choice = input("\n  課題番号 / Enter: 次の未達成 / b: 戻る（パック一覧へ） > ").strip().lower()
+            choice = input(ui.c("\n  > ", "bold", "accent")).strip().lower()
         except (EOFError, KeyboardInterrupt):
             return
         if choice in ("b", "q", "menu"):
@@ -382,16 +387,25 @@ def run():
         groups = _groups()
         total = sum(len(items) for _, items in groups)
         solo = sum(1 for _, items in groups for s in items if completed.get(s["id"], {"assisted": True})["assisted"] is False)
-        print(ui.box(["目的だけを読み、自分で手順を組み立てる力試しです。正解の手順は1つではありません。",
-                      f"全 {total} 課題（自力達成 {solo}）。hint や answer を使った達成は △ で記録します。", "",
-                      *mastery_lines(d)], title="課題まつり・Linux 自由自在マップ", color="green"))
+        print(ui.header(["課題まつり"], f"{ui.progress_bar(solo / total if total else 0, 8)} 自力 {solo}/{total}"))
+        print("\n  " + ui.c("目的だけを読み、自分で手順を組み立てる力試しです。正解の手順は 1 つではありません。", "bold"))
+        print(ui.c(f"  全 {total} 課題。hint や answer を使った達成は △ で記録します。", "dim"))
+        print()
+        lines = mastery_lines(d)
+        print("  " + lines[0])
+        print(ui.c("  " + ui.clip(lines[-2].strip().split("（")[0], ui.term_width() - 6), "dim"))
+        print()
+        tw = max(16, ui.term_width() - 2 - 36)
         for index, (title, items) in enumerate(groups, 1):
             done = sum(1 for s in items if s["id"] in completed)
             mine = sum(1 for s in items if s["id"] in completed and not completed[s["id"]]["assisted"])
-            print(f"  [{index}] {ui.pad(title, 36)} {ui.progress_bar(done / len(items), 10)} {done}/{len(items)}（自力 {mine}）")
+            print(f"  {ui.pad(ui.c(f'[{index}]', 'bold', 'accent'), 4)} {ui.pad(ui.clip(title, tw), tw)} "
+                  f"{ui.progress_bar(done / len(items), 8)} {ui.pad(f'{done}/{len(items)}', 6)}" + ui.c(f"自力 {mine}", "dim"))
+        print()
+        print(ui.footer(("番号", "開く"), ("Enter", "前回の課題"), ("b", "戻る")))
         print(ui.take_flash(), end="")
         try:
-            choice = input("\n  パック番号 / Enter: 前回の課題 / b: メインメニューへ戻る > ").strip().lower()
+            choice = input(ui.c("\n  > ", "bold", "accent")).strip().lower()
         except (EOFError, KeyboardInterrupt):
             return
         if choice in ("b", "q", "menu"):

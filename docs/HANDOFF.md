@@ -1,8 +1,8 @@
 # 引き継ぎ書（LinuxQuest 教材拡張）
 
-最終更新: 2026-11-21 / ブランチ: `learning-expansion` / 状態を変えたら必ずこの表も更新する。
+最終更新: 2026-11-22 / ブランチ: `learning-expansion` / 状態を変えたら必ずこの表も更新する。
 
-## 🔰 再開手順（別のAI／別セッションはまずここから）
+## 再開手順（別のAI／別セッションはまずここから）
 1. `git status` と `git log --oneline | head` を見る。作業は `learning-expansion` ブランチ。**未コミットの課題ファイルがディスク上に残っていることがある**（コミットはStage全体の統合テスト後にまとめて行う運用のため）。
 2. `python3 tools/stage_status.py` を実行する。**この出力が正**で、下の表より優先する。
    - `STUB`（1行だけ）= 未作成。作成を割り当て直す。サブエージェントが作成中の可能性もあるので、ファイルの更新時刻（`ls -l curriculum/`）が直近なら数分待つ。
@@ -17,6 +17,46 @@
 - 1Stage = 1エージェント。担当ファイル以外は編集させない（配線は親が先に済ませる）。
 - 指示は `docs/STAGE_BRIEF.md` ＋ 担当Stageの「必須キーワード一覧」。キーワードが課題内に名前で出ているか、最後に grep で検証する。
 - エージェントの自己報告は鵜呑みにせず、親が全体テストを再実行する。他エージェントが書き途中のファイルがあると一時的に import エラーになる（待って再実行）。
+
+## 追加実習・サイト版の状況（2026-11-22、随時更新）
+
+### いまの状態（最優先で読む）
+- ブランチ `learning-expansion`。**大量の変更が未コミット、または直前コミット以降に追加されたものです。** まず `git status` と `git log --oneline | head -5` を確認し、`python3 -m unittest discover -s tests` を流して現状を把握する。他のエージェントが作業中の場合、一時的な失敗が出ることがある。
+- 利用者の方針（守ること）:
+  - 絵文字を使わない（コード、資料、サイト、起動スクリプトすべて）。
+  - 検証していないものを「検証済み」と書かない。実VMで通ったものだけを実VM検証済みとする。
+  - サイトの**デプロイは、利用者が開発サーバーで見た目を確認してから**。それまで `wrangler deploy` や `pages deploy` を実行しない（自動許可の判定でも拒否された）。
+  - 不足（未対応）を0にする方針。`docs/objectives_matrix.md` の MISSING を減らし続ける。
+  - 引き継ぎ書をこまめに更新する。
+
+### 実装済みの範囲
+- VMモジュール: 合計 約65（`labs/vm/guest/modules/*.sh`、`ls` で数える）。既存9（packages software ssh permissions network performance storage boot webstack）は以前の実VMで検証済み。追加分は下記の実VM検証を進行中。RHEL系3本（selinux dnf firewalld）は RHEL 系 VM が必要で、`labs/vm/RHEL.md` に手動手順がある。Ubuntu VMでは常に拒否される。
+- ネイティブ実習: 合計39（`curriculum/toolbox_labs.py` と `toolbox_labs2.py`〜`toolbox_labs5.py`）。`add` は ID の重複で例外を出す。
+- 模擬の周辺機器実習（Wi-Fi・Bluetooth・音声・印刷）: `engine/commands/desktop.py` と `curriculum/stage35_desktop_hw.py`（担当エージェントが作業中。STAGES[35] は配線済み）。模擬であり、実機の技能の証明ではない。
+- ターミナル版のUI: `engine/ui.py` に配色・記号・共通部品（header、menu_row、footer など）を定義。ターミナル風の見た目に刷新済み。
+
+### 実VMでの検証（重要）
+- この環境に qemu も sudo も無いが、`/dev/kvm` は利用者が読み書きでき、root なしの検証土台を作った: `tools/vmtest/vmtest.py`。qemu は `apt-get download` と `dpkg -x` で `~/.cache/linuxdojo-vm/` に展開、公式 Ubuntu 24.04 イメージは SHA256 と gpg 署名を照合して使う。
+- 使い方: `python3 tools/vmtest/vmtest.py prepare` → `up NAME --role app|client` → `install NAME` → `run-module NAME MOD --steps setup,check,reset` → `destroy NAME`。2台構成は `VMTEST_LINK_PORT` を VM の組ごとに変える。
+- 1モジュールの setup、check、reset は約4秒。VMの起動と cloud-init は約80秒。
+- 検証担当を8グループに分けて実行した（g1〜g8）。結果は `docs/vm_verification/g*.md`。**これが実VMでの通過記録の正。** 通ったものだけが「実VM検証済み」。失敗や未検証はそのまま残っている。
+- 検証結果を `docs/coverage.md`、`docs/objectives_matrix.md`、`labs/vm/README.md` の表、`labs/vm/FIRST_RUN.md` に反映する作業が残っている。
+
+### サイト版（danganlog.com 向け）
+- `web/danganlog`: Next.js 15 の静的書き出し（`output: 'export'`）。サーバー実行なし、従量課金のサービスなし。Pyodide は自前配信。UI は Ubuntu 端末風（画面全体が端末、課題は1行固定、出力だけスクロール）。
+- 起動: Node 22 が必要（この環境ではスクラッチパッドに展開したもの）。`cd web/danganlog && npm ci && npm run dev -- -p 3000`。ビルド: `npm run build`（`tools/build_web.py` が `python-source.json` を生成）。
+- テスト: `npm test`（node）、`npm run test:e2e`（Playwright、実ブラウザ。14件通過を確認済み）。
+- `/course/`: 32トピックの講座ページ（`tools/build_course_data.py` が生成）。見た目を Ubuntu 端末風に揃える作業が未確認。
+- Cloudflare: `wrangler login` 済み。アカウントには別の既存プロジェクトがあり、**触らない**。新規プロジェクト名は `danganlog` の予定。デプロイは利用者の見た目確認後。手順は `web/danganlog/README.md`。
+
+### 残りの作業（優先順）
+1. 実VM検証の結果（`docs/vm_verification/`）を、各表に反映し、`FIRST_RUN.md` を「実VMで確認した事項」に更新する。
+2. 全テスト実行（`python3 -m unittest discover -s tests`、`npm test`、`npm run test:e2e`）。失敗は他エージェントの作業の途中状態かを確認する。
+3. `docs/objectives_matrix.md` を再集計し、未対応の行を0に近づける（未対応の内訳はその表を参照）。
+4. 模擬の周辺機器実習の取り込み確認（`tests/test_desktop_sim.py`）。
+5. サイト版: 利用者の見た目確認 → 指摘の修正 → 確認後にデプロイ。
+6. RHEL 系 VM（Rocky/Alma）での `selinux` `dnf` `firewalld` の実機検証（`tools/vmtest` は Ubuntu 専用。拡張が必要）。
+7. コミットと push（`git -c user.name=... -c user.email=...` で既存の作者を使う。末尾に Co-Authored-By を付ける。`.gitignore` は許可リスト方式なので、新規ファイルは allowlist を確認する）。
 
 ## 常用コースの追加（2026-11-21）
 
@@ -57,41 +97,41 @@ Linuxを学ぶうえで「使うもの・使わなくても必要なもの」を
 ## 現在地（一目で）
 | 区分 | 状態 | 備考 |
 |---|---|---|
-| Stage 1〜13（102問） | ✅ 完了・コミット済 `f7feabe` | 全問 PASS を確認済み |
-| Stage 14〜18（62問） | ✅ 完了・コミット済 `e833997` | 実践は計164問、unittest 246件 OK |
-| ui.clear のスクロールバック消去 | ✅ 実装済（`e833997`） | **実端末での目視は未確認** |
-| Stage 19〜34（337問） | ✅ 統合テスト済み | 全501問 PASS（130.8秒）。Stage 30も28問すべてPASS |
-| 統合テスト・READMEの問数更新・コミット | ✅ 完了 | 全501問 PASS、unittest 246件 OK、compileall・diff --check OK。README・進捗テストは501問 |
+| Stage 1〜13（102問） | 完了・コミット済 `f7feabe` | 全問 PASS を確認済み |
+| Stage 14〜18（62問） | 完了・コミット済 `e833997` | 実践は計164問、unittest 246件 OK |
+| ui.clear のスクロールバック消去 | 実装済（`e833997`） | **実端末での目視は未確認** |
+| Stage 19〜34（337問） | 統合テスト済み | 全501問 PASS（130.8秒）。Stage 30も28問すべてPASS |
+| 統合テスト・READMEの問数更新・コミット | 完了 | 全501問 PASS、unittest 246件 OK、compileall・diff --check OK。README・進捗テストは501問 |
 | 資格試験の公式範囲との全項目対応表 | ⏳ 未着手 | LPIC/LinuC/RHCSA 範囲 ↔ 課題ID |
-| 「必要ツール」宣言の仕組み | ✅ 常用20実習に実装 | 既存501問への一律適用は未実施 |
-| 常用コース・対応表・実機検証 | ✅ 追加 | 上の「常用コースの追加」を参照 |
+| 「必要ツール」宣言の仕組み | 常用20実習に実装 | 既存501問への一律適用は未実施 |
+| 常用コース・対応表・実機検証 | 追加 | 上の「常用コースの追加」を参照 |
 
 ## Stage 一覧（ID・内容・状態）
-状態の凡例: ✅統合テスト済 / 📝作成済(未統合テスト) / 🔄作成中 / ⏳未着手。2026-11-21に全501問の初期状態・誤答拒否・想定解・メタデータを実行検証済み。記録診断や静的検査の限界は下表に残す。
+状態の凡例: 統合テスト済 / 作成済(未統合テスト) / 作成中 / ⏳未着手。2026-11-21に全501問の初期状態・誤答拒否・想定解・メタデータを実行検証済み。記録診断や静的検査の限界は下表に残す。
 
 | Stage | 内容 | 目安問数 | 状態 |
 |---|---|---|---|
-| 14 | ブート・カーネル・ハード | 12 | ✅ |
-| 15 | ストレージ構築 | 12 | ✅（実機mkfsは未使用、記録診断中心） |
-| 16 | SELinux/ACL/属性/資源制限 | 12 | ✅ |
-| 17 | ネットワーク管理・共有・パッケージ・バイナリ調査 | 12 | ✅（iconv/rsync/xxd に実依存） |
-| 18 | プロセス・GPG・コンテナ基盤・Ansible ほか | 14 | ✅ |
-| 19 | 補完（tune2fs・hexdump・firewall-cmd・ausearch 等） | 16 | ✅ 統合テストPASS（16/16 PASS） |
-| 20 | 暗号化・VPN・SSHトンネル | 16 | ✅ 統合テストPASS（16/16 PASS） |
-| 21 | DNS・DHCP・メール・LDAP・負荷分散 | 16 | ✅ 統合テストPASS（16/16 PASS。21-2/21-16 は複数話題を統合） |
-| 22 | 仮想化・NAT・Kubernetes・IaC・監視 | 16 | ✅ 統合テストPASS（22-6/22-10は模範解答を記録から解析してJSONを作る方式に修正し、個別テストPASS。Ansibleは対比のみ） |
-| 23 | バックアップ・DB・ストレージ応用・ログ運用 | 16 | ✅ 統合テストPASS（16/16 PASS。実ツールは使わず記録/設定検査） |
-| 24 | 正規表現・シェル上級・パッケージ作成・カーネルビルド | 18 | ✅ 統合テストPASS（24-10〜15 の一部はトークン検査のみ=コマンドを実行しない） |
-| 25 | ハッシュ・テキスト・シェル組み込みの総ざらい | 24 | ✅ 統合テストPASS（xzless/zless/znew は名前のみで未実行） |
-| 26 | ファイルシステム・ブロックデバイス工具 | 22 | ✅ 統合テストPASS（22/22 PASS。エージェント報告は「pending」だけだったが成果は有効） |
-| 27 | プロセス・資源・システム情報 | 24 | ✅ 統合テストPASS |
-| 28 | ユーザー管理・systemd周辺・kmod・/etc設定 | 24 | ✅ 統合テストPASS（実行せず記録・設定の検査のみ） |
-| 29 | 低レベルネットワーク・パッケージ・man・SSH補助 | 24 | ✅ 統合テストPASS（実行せず記録・設定の検査のみ。ssh-add/tldr は軽い扱い） |
-| 30 | Git実践 | 28 | ✅ 統合テストPASS（28/28。APIエラー後もファイルは残存） |
-| 31 | Vim・nano・Emacs | 20 | ✅ 統合テストPASS（emacs/ctags は無く記録診断。`:%s///gc` と `"+` は説明のみで非実行） |
-| 32 | 開発者ツールボックス（jq/curl/fzf/rg ほか） | 26 | ✅ 統合テストPASS（fd/fzf/bat/tree/ncdu などは1問に統合。yq/sqlite3/stow は無くフォールバック） |
-| 33 | 言語環境・ビルド・デバッグ・品質ツール | 22 | ✅ 統合テストPASS（gcc/make/cmake/gdb/valgrind/shellcheck 等は実行せず静的検査・記録診断のみ） |
-| 34 | SSH・tmux・リモート作業 | 25 | ✅ 統合テストPASS（tmux/sshd/sshfs は実行せず記録・設定検査。ssh 不在時のフォールバックは未検証。34-3 は Stage 20 と一部重複） |
+| 14 | ブート・カーネル・ハード | 12 | |
+| 15 | ストレージ構築 | 12 | （実機mkfsは未使用、記録診断中心） |
+| 16 | SELinux/ACL/属性/資源制限 | 12 | |
+| 17 | ネットワーク管理・共有・パッケージ・バイナリ調査 | 12 | （iconv/rsync/xxd に実依存） |
+| 18 | プロセス・GPG・コンテナ基盤・Ansible ほか | 14 | |
+| 19 | 補完（tune2fs・hexdump・firewall-cmd・ausearch 等） | 16 | 統合テストPASS（16/16 PASS） |
+| 20 | 暗号化・VPN・SSHトンネル | 16 | 統合テストPASS（16/16 PASS） |
+| 21 | DNS・DHCP・メール・LDAP・負荷分散 | 16 | 統合テストPASS（16/16 PASS。21-2/21-16 は複数話題を統合） |
+| 22 | 仮想化・NAT・Kubernetes・IaC・監視 | 16 | 統合テストPASS（22-6/22-10は模範解答を記録から解析してJSONを作る方式に修正し、個別テストPASS。Ansibleは対比のみ） |
+| 23 | バックアップ・DB・ストレージ応用・ログ運用 | 16 | 統合テストPASS（16/16 PASS。実ツールは使わず記録/設定検査） |
+| 24 | 正規表現・シェル上級・パッケージ作成・カーネルビルド | 18 | 統合テストPASS（24-10〜15 の一部はトークン検査のみ=コマンドを実行しない） |
+| 25 | ハッシュ・テキスト・シェル組み込みの総ざらい | 24 | 統合テストPASS（xzless/zless/znew は名前のみで未実行） |
+| 26 | ファイルシステム・ブロックデバイス工具 | 22 | 統合テストPASS（22/22 PASS。エージェント報告は「pending」だけだったが成果は有効） |
+| 27 | プロセス・資源・システム情報 | 24 | 統合テストPASS |
+| 28 | ユーザー管理・systemd周辺・kmod・/etc設定 | 24 | 統合テストPASS（実行せず記録・設定の検査のみ） |
+| 29 | 低レベルネットワーク・パッケージ・man・SSH補助 | 24 | 統合テストPASS（実行せず記録・設定の検査のみ。ssh-add/tldr は軽い扱い） |
+| 30 | Git実践 | 28 | 統合テストPASS（28/28。APIエラー後もファイルは残存） |
+| 31 | Vim・nano・Emacs | 20 | 統合テストPASS（emacs/ctags は無く記録診断。`:%s///gc` と `"+` は説明のみで非実行） |
+| 32 | 開発者ツールボックス（jq/curl/fzf/rg ほか） | 26 | 統合テストPASS（fd/fzf/bat/tree/ncdu などは1問に統合。yq/sqlite3/stow は無くフォールバック） |
+| 33 | 言語環境・ビルド・デバッグ・品質ツール | 22 | 統合テストPASS（gcc/make/cmake/gdb/valgrind/shellcheck 等は実行せず静的検査・記録診断のみ） |
+| 34 | SSH・tmux・リモート作業 | 25 | 統合テストPASS（tmux/sshd/sshfs は実行せず記録・設定検査。ssh 不在時のフォールバックは未検証。34-3 は Stage 20 と一部重複） |
 
 ## 配線の仕組み（新しいStageを足すとき）
 1. `curriculum/stageNN_xxx.py` を作り `curriculum/__init__.py` に import を足す

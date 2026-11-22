@@ -34,3 +34,4 @@ from curriculum import stage31_editors  # noqa: F401
 from curriculum import stage32_dev_toolbox  # noqa: F401
 from curriculum import stage33_lang_build_quality  # noqa: F401
 from curriculum import stage34_ssh_tmux_remote  # noqa: F401
+from curriculum import stage35_desktop_hw  # noqa: F401
