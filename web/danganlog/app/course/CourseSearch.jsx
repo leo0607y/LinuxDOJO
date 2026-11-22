@@ -21,12 +21,12 @@ export default function CourseSearch() {
   const results = entries ? searchEntries(entries, query) : [];
   const asked = query.trim().length > 0;
   return (
-    <section aria-labelledby="search-title">
+    <section className={styles.searchPanel} aria-labelledby="search-title">
       <h2 id="search-title">目的から探す</h2>
       <div className={styles.search} role="search">
-        <label htmlFor="course-q">やりたいこと、困っていること、コマンド名 (例: 権限 読めない / 圧縮 / curl)</label>
-        <input id="course-q" type="search" value={query} autoComplete="off"
-          onChange={(e) => setQuery(e.target.value)} disabled={!entries && !error} />
+        <label htmlFor="course-q">やりたいこと、困っていること、コマンド名</label>
+        <input id="course-q" type="search" placeholder="例　権限 読めない / 圧縮 / curl" value={query} autoComplete="off"
+          onChange={(e) => setQuery(e.target.value)} disabled={!entries} />
       </div>
       {error ? <p role="alert">{error}</p> : null}
       <div aria-live="polite" role="status">

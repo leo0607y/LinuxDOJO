@@ -6,8 +6,11 @@ import {
   firstOpenIndex, lastLine, loadSavedState, pad2, safeStorage, saveState
 } from '../lib/core.js';
 
+import Masthead from './Masthead.jsx';
+import { applyTheme, readPrefs, savePrefs } from './preferences.js';
+
 const MAX_ENTRIES = 200;
-const PREFS_KEY = 'dangan-log:prefs:v1';
+const STARTER_COMMANDS = [['hint', 'ヒントを読む'], ['menu', 'レッスンを選ぶ'], ['modes', 'コースを選ぶ']];
 const LOCAL_COMMANDS = ['help', 'hint', 'answer', 'next', 'prev', 'menu', 'modes', 'progress', 'goto', 'theme', 'simple', 'clear', 'data', 'course', 'reset', 'check'];
 const HELP_TEXT = [
   'help           このヘルプ',
@@ -28,16 +31,6 @@ const HELP_TEXT = [
   'Tab で補完、上下キーで入力履歴。レッスンの答えは、ふつうのコマンドとして入力します。'
 ].join('\n');
 
-function readPrefs() {
-  try { return JSON.parse(window.localStorage.getItem(PREFS_KEY) || '{}') || {}; } catch (e) { return {}; }
-}
-function savePrefs(patch) {
-  try { window.localStorage.setItem(PREFS_KEY, JSON.stringify(Object.assign(readPrefs(), patch))); } catch (e) { /* 保存できない環境 */ }
-}
-function applyTheme(t) {
-  const el = document.documentElement;
-  if (t === 'dark' || t === 'light') el.setAttribute('data-theme', t); else el.removeAttribute('data-theme');
-}
 function megabytes(n) { return (n / 1048576).toFixed(1); }
 function bar(ratio, width) {
   const n = Math.max(0, Math.min(width, Math.round(ratio * width)));
@@ -87,6 +80,7 @@ export default function Dojo() {
   const historyRef = useRef(null);
   const inputRef = useRef(null);
   const outRef = useRef(null);
+  const workbenchRef = useRef(null);
   const pendingRef = useRef(null);
   const dataRef = useRef(null);
   const viewRef = useRef(null);
@@ -104,7 +98,10 @@ export default function Dojo() {
   }, []);
 
   useEffect(() => {
-    if (outRef.current) outRef.current.scrollTop = outRef.current.scrollHeight;
+    const log = outRef.current;
+    const workbench = workbenchRef.current;
+    if (log) log.scrollTop = log.scrollHeight;
+    if (workbench) workbench.scrollTop = entries.length ? workbench.scrollHeight : 0;
   }, [entries, view]);
 
   const persist = useCallback((state) => {
@@ -398,7 +395,7 @@ export default function Dojo() {
 
   useEffect(() => {
     const p = readPrefs();
-    if (p.theme === 'dark' || p.theme === 'light') { setThemeState(p.theme); applyTheme(p.theme); }
+    if (p.theme === 'dark' || p.theme === 'light') setThemeState(p.theme);
     if (p.simple) setSimpleState(true);
   }, []);
 
@@ -416,18 +413,31 @@ export default function Dojo() {
 
   return (
     <div className={'tw' + (simple ? ' simple' : '')}>
-      <header className="gbar">
-        <span className="gb-side"></span>
-        <div className="gb-title">learner@danganlog: ~</div>
-        <span className="gb-side gb-ctl" aria-hidden="true"><span>&#8211;</span><span>&#9633;</span><span>&times;</span></span>
-      </header>
-      <div className="screen">
-        <div className="term-out" ref={outRef} role="log" aria-live="polite" aria-relevant="additions" aria-label="ターミナルの出力" tabIndex={0}>
-          <section className="motd" aria-labelledby="lesson-title">
-            <div className="dim">{course ? course.name : 'Linux DOJO'} -- LESSON {lessonNo}{course ? '/' + pad2(course.total) : ''}</div>
-            <h1 id="lesson-title">{lesson ? lesson.title : 'Linux DOJO'}</h1>
-            {lesson ? <div className="motd-text">{lesson.explanation}</div> : <div className="motd-text dim">ブラウザー内の模擬環境です。実際のPCは変更しません。help で使い方、Tab で補完できます。</div>}
+      <Masthead />
+      <main className="screen">
+        <div className="workbench" ref={workbenchRef} tabIndex={0} aria-label="レッスンの説明と出力">
+          <section className="motd" aria-labelledby="lesson-title" key={viewMode + lessonNo} tabIndex={0}>
+            <p className="lesson-meta"><span>LESSON <b>{lessonNo}</b>{course && ' / ' + pad2(course.total)}</span>{course?.name}</p>
+            <h1 id="lesson-title">{lesson ? lesson.title : 'Linux 道場'}</h1>
+            <div className="motd-text">{lesson ? lesson.explanation : 'ブラウザー内の模擬環境です。実際のPCは変更しません。help で使い方、Tab で補完できます。'}</div>
+            {course && <div className="course-progress">
+              <label htmlFor="lesson-progress">コースの達成数 <b>{course.done} / {course.total}</b></label>
+              <progress id="lesson-progress" value={course.done} max={course.total} />
+            </div>}
           </section>
+          <section className="console" aria-labelledby="console-title">
+            <div className="console-tools">
+              <h2 id="console-title">模擬ターミナル</h2>
+              {!simple && <button className="help-button" type="button" disabled={off} onClick={act('help')}>操作ヘルプ</button>}
+            </div>
+            {!simple && ready && lesson && !entries.length && <div className="starter-commands">
+              {STARTER_COMMANDS.map(([command, label]) => (
+                <button key={command} type="button" disabled={off} onClick={() => { inputRef.current?.focus(); runLocal(command); }}>
+                  <code>{command}</code><span>{label}</span>
+                </button>
+              ))}
+            </div>}
+            <div className="term-out" ref={outRef} role="log" aria-live="polite" aria-relevant="additions" aria-label="ターミナルの出力" tabIndex={0}>
           {status === 'loading' ? (
             <div className="boot">
               <div><Ps prompt="learner@danganlog ~" /> boot pyodide --self-hosted</div>
@@ -451,8 +461,10 @@ export default function Dojo() {
             </div>
           ))}
           {view && view.editor ? <pre className="out editor" aria-label="エディターの表示">{view.editor}</pre> : null}
+            </div>
+          </section>
         </div>
-        <div className="mission"><span className="tag tag-hint">[課題 {lessonNo}]</span> <span id="mission-text">{lesson ? lesson.task : '準備ができると課題が表示されます。'}</span></div>
+        <div className="mission"><span className="mission-label">課題 {lessonNo}</span><span id="mission-text">{lesson ? lesson.task : '準備ができると課題が表示されます。'}</span></div>
         <form className="prompt" onSubmit={submit} autoComplete="off" aria-busy={busy}>
           <label htmlFor="terminal-input" className="ps"><Ps prompt={(view && view.prompt) || 'learner@danganlog ~'} /></label>
           <span className="field">
@@ -480,18 +492,17 @@ export default function Dojo() {
             <button type="button" className="kbtn" disabled={off} onClick={() => runLocal('help')}>ヘルプ</button>
           </div>
         ) : null}
-      </div>
+      </main>
       <footer className="foot">
         <span className="foot-keys">help / Tab 補完 / ↑↓ 履歴</span>
         <span className="foot-r">
-          <a href="/course/">講座</a>
           <button type="button" aria-pressed={simple} onClick={() => setSimple(!simple)}>シンプル表示</button>
           <button type="button" onClick={() => setTheme(effectiveTheme() === 'dark' ? 'light' : 'dark')}>テーマ</button>
           <span className={'rt ' + status}>{status === 'ready' ? 'ready' : status === 'error' ? 'error' : 'loading ' + pct + '%'}</span>
         </span>
       </footer>
-      <dialog ref={dataRef}>
-        <div className="dialog-heading"><h2>学習データ</h2><button type="button" className="kbtn" aria-label="閉じる" onClick={() => closeDialog(dataRef)}>[x]</button></div>
+      <dialog ref={dataRef} aria-labelledby="data-title">
+        <div className="dialog-heading"><h2 id="data-title">学習データ</h2><button type="button" className="kbtn" aria-label="閉じる" onClick={() => closeDialog(dataRef)}>[x]</button></div>
         <p>学習の進み具合と練習ファイルは、このブラウザーに保存されます。別の端末へ移すときは、JSONファイルで書き出してください。</p>
         <div className="data-actions">
           <button type="button" className="kbtn enter" onClick={exportData}>学習データを書き出す</button>

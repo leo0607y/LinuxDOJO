@@ -18,7 +18,7 @@ export default function CoveragePage() {
         公開されている試験範囲の各行について、このコースが実操作で検証しているかを厳しめに判定した結果です。資格対策教材ではなく、修了の証明でもありません。
         合計 {total.rows} 行のうち、実操作で検証済みは {total.covered} 行 ({pct(total.covered, total.rows)}%)、実装済み・実VM未検証は {total.unverified} 行、一部のみは {total.partial} 行、未対応は {total.missing} 行です。
       </p>
-      <div className={styles.tablewrap}>
+      <div className={styles.tablewrap} role="region" aria-label="試験別の判定件数" tabIndex={0}>
         <table className={styles.table}>
           <caption className={styles.crumbs}>試験別の判定件数 (出典: docs/objectives_matrix.md)</caption>
           <thead><tr><th scope="col">試験</th><th scope="col" className={styles.num}>行数</th><th scope="col" className={styles.num}>COVERED-REAL (検証済み)</th><th scope="col" className={styles.num}>IMPLEMENTED-UNVERIFIED (実装済み・未検証)</th><th scope="col" className={styles.num}>PARTIAL (一部のみ)</th><th scope="col" className={styles.num}>MISSING (未対応)</th></tr></thead>

@@ -23,17 +23,18 @@
 - PostgreSQL: 実VM検証と修正を取り込み。ロール属性・SCRAM・実効HBA/再起動設定・最小権限・論理復元・物理backupの由来を確認。`g6-postgres.md`に公式runner実出力。
 - 常用の安全操作: `ffed7f8`。native `safe-cleanup`（40本目）、NUL区切り・特殊ファイル名・リンク非追跡・退避・隔離移動・復元。実ツール3テスト成功。toolbox関連42テスト成功/skip14。
 - users/lynis: `aabd59d`。最小sudo復旧、Lynis実監査59→60・対象警告消失・誤設定拒否・reset。実出力は `g1-users.md`, `g8-lynis.md`。
+- サイトUI: `docs/UI_REVIEW.md`に設計と実画面確認を記録。単調な配色・角丸カード・偽ウィンドウ操作を廃し、説明/端末の2ペインと索引へ。デプロイは未実行。
 - 全体テスト直近: 618件成功/skip48（192.6秒）、サイトbuild成功、npm7件、講座Node4件、E2E14件成功。**その後のUI・新課題は再実行が必要**。
 
 ### いま進行中・取り込み待ち
 | 担当 | 所有ファイル | 再開地点 |
 |---|---|---|
-| site_ui (Astra) | web/danganlog/app と components | 端末/講座の直線的な2ペイン・多色アクセントUI。dev 3106、1280/375/320幅の確認済み。最終axeと親によるbuild/E2E、画像確認、コミットが残る |
+| site_ui (Astra) | web/danganlog/app と components | 完了。4ページ×3幅の実画面確認、axe8画面0件。親も画像確認、build/npm7件/course4件/E2E14件成功。利用者の見た目確認待ち。dev3106 |
 | vm_postgres (Sol) | postgres.sh / scenarios/postgres.sh / g6-postgres.md | 完了。公式runner exit0、親で単体4件成功。標準mainを保ち2周の専用資源撤去を確認。物理復元からの起動/OS再起動は未検証 |
 | vm_podman (Sol) | podman.sh / test_vm_podman.py / scenarios/podman.sh / g7-podman.md | 完了。公式runner exit0、親で単体4件成功。ユーザーsystemd再起動後に自動復帰、2周の残骸なし。OS再起動は未検証 |
 
 ### 次に着手する順
-1. 上の3担当の結果を確認して、実VMログ・単体テスト・UI実画面を親でも確認し、各担当ごとにコミットする。
+1. 上の3担当は完了・親で取り込み確認済み。実行中の最終Python/501問結果を記録してコミットする（ログ `/tmp/training-accepted-{unittest,missions}.log`）。
 2. `docs/DAILY_USE_AUDIT.md` の常用時の抜けを実操作課題で補う（単なるコマンド名追加にしない）。
 3. 未完了VMモジュールの再検証。guard/libvirt/netlink/pam/systemdadv/tunedなどはWIP保存済みでも通過扱いにしない。RHEL3本はRHEL VM未用意。
 4. 変更が止まったら全Python、サイトbuild/npm/course/E2Eを1回通し、結果とskipを記録。見た目の利用者確認前にデプロイしない。
@@ -42,7 +43,7 @@
 
 ### 環境とログの場所
 - Node 22: `<node-dir>/bin` をPATHへ追加。消えていれば別途用意する。
-- VM: `~/.cache/linuxdojo-vm/vms/`。g1-app/client、g3-app〜g8-appを保持。`up NAME` で停止済みを再開できる。g6/g7は担当作業中なので触らない。
+- VM: `~/.cache/linuxdojo-vm/vms/`。g1-app/client、g3-app〜g8-appを保持。`up NAME` で停止済みを再開できる。g6/g7の担当作業は完了し、専用資源は撤去済み。記録を確認して再利用する。
 - `vmtest.py install` は共有 `bundle/` を書き換えるため並列実行しない。VM内の試験自体は別VMなら並列可。
 - 一時ログ: `/tmp/training-*.log`。**実VM通過ログはdocsへ保存するまで完了としない**。画像: `/tmp/dangan-{terminal,course,detail,coverage}-{1280,375,320}.png`。
 - サイトdev `http://127.0.0.1:3106` はUI担当用。既存3000は変更しない。開発サーバーは公開デプロイではない。
@@ -70,25 +71,11 @@
 - 日常Linuxで知らないと困る操作の抜けを監査し、実操作できる課題で補う。名前だけ増やさない。
 - ターミナル版のスタートは以前のペンギンとカラフルな文字を戻し、動き・表情を付ける。
 
-### Codexでの再開チェックポイント（2026-11-22）
-- 前セッションのバックグラウンド担当は継続していない。Codexでは新たに site_ui / vm_postgres / vm_podman を起動。完了報告待ちにはせず、残存ファイル・VMから再検証する。
-- 再開時HEADは `ff43122`。記録がある実VM検証は `g2-system.md` の5モジュールのみ（従来の9モジュールとは別）。g1/g3〜g8の途中修正を検証済みとは扱わない。
-- 残存VM: g1-app/client、g3-app〜g8-app。削除せず状態を確認して再利用する。
-- 周辺機器の模擬パック31問を取り込み。`python3 -m unittest discover -s tests -p test_desktop_sim.py`: 11テスト成功（初期未達成・全正解・罠拒否・ホストsubprocess禁止を含む）。実機検証ではない。
-- FTP実VM再検証完了: `docs/vm_verification/g8-ftp.md`。ACL再検証と追加修正完了: `permissions-recheck.md`。再実行スクリプトは `tools/vmtest/scenarios/`。FTPの単体6テストも成功。g8全体の完了ではない。
-- サイトの `npm test` 7テスト成功、静的ビルド成功。ブラウザE2E実行中。
-- 全Pythonテスト初回: 611件、errors=1、skip=49（190秒）。講座データが対応表の旧3区分を前提にしていたため失敗。4区分対応と目標行の集計照合を修正し、関連7テスト成功（nodeなしの1件skip）。
-- 講座のVM表示に記録済みg2とFTPを反映。追加native実習を既定で「検証済み」にしない。ビルド時に講座データも毎回再生成する。
-- サイトの初回E2E 14/14成功。上記講座変更後のビルド/E2Eは改めて実行する。
-- firewall実VM再検証完了（`g1-firewall.md`）。HTTPの部分受信による誤拒否も修正。g1全体は未完了。lynisは再検証中。
-- 対応表へg2の13行とFTPを反映。印刷は模擬のためPARTIAL。集計は生成処理で実際の目標行と照合する。
-- 前担当の途中変更: guard/libvirt/netlink/pam/podman/postgres/systemdadv/tuned。VM関連単体テスト202件は成功したが、この8本の実VM通過は未確認。作業消失防止のWIPコミットとして保存。これらは実VM未検証のままで、次に個別シナリオを追加して確認する。
-- localcaの実TLSテスト中にパイプ未closeのResourceWarningが出たため修正。ResourceWarningをerrorにした4テストが成功（33秒）。
-- lynisは短いバナーでBANN-7130が残ることを実測。Lynisログの一致語数に合わせてヒントと解答例を改善し、指標59→60・対象警告消失・誤設定拒否・resetまで通過。`g8-lynis.md`へ実出力保存。
-- usersもg1-appで正解・過剰sudo/管理グループ/期限切れ/モード誤りの拒否・resetを確認。`g1-users.md`へ実出力保存。
-- 講座修正後の全Python: 618件成功、skip48、192.6秒。サイトbuild、npm test7件、course node4件、E2E14件成功（その後のUI・課題追加は再検証が必要）。
-- 常用安全操作: native `safe-cleanup` を追加（40本目）。空白/改行/タブ/先頭ハイフン・リンク非追跡・NUL一覧・tar退避・チェックサム・隔離移動・復元。実ツール3テスト成功。
-- 起動画面: ペンギン復帰・青/紫/シアンの配色復帰・短い瞬き/ウインク/笑顔を追加。NO_COLOR/非TTY/LQ_NO_ANIMATIONでは静止。レイアウト10テスト成功。
+### 検証の読み方
+- 実VM通過済みの追加分は上の最新チェックポイントと `docs/vm_verification/` を参照。WIP保存時点の未検証ラベルより、後の個別通過記録を優先する。
+- `guard libvirt netlink pam systemdadv tuned` など、通過記録のない追加分は未検証のまま。全VM検証8グループが完了したわけではない。
+- native40件は登録数。未導入ツールは合格にせずskipする。safe-cleanupは実ツール3テスト成功。
+- 再開前の記録は以下に履歴として残す。件数やステータスが違う場合、先頭の最新チェックポイントを優先する。
 
 ### 実装済みの範囲
 - VMモジュール: 合計51（`labs/vm/guest/modules/*.sh`、`ls` で数える）。既存9（packages software ssh permissions network performance storage boot webstack）は以前の実VMで検証済み。追加分は下記の実VM検証を進行中。RHEL系3本（selinux dnf firewalld）は RHEL 系 VM が必要で、`labs/vm/RHEL.md` に手動手順がある。Ubuntu VMでは常に拒否される。

@@ -18,7 +18,7 @@ export async function generateMetadata({ params }) {
 }
 
 function Block({ b }) {
-  if (b.t === 'pre') return <pre className={styles.pre}><code>{b.x}</code></pre>;
+  if (b.t === 'pre') return <pre className={styles.pre} tabIndex={0} aria-label="コマンド例"><code>{b.x}</code></pre>;
   if (b.t === 'ul') return <ul className={styles.list}>{b.x.map((x, i) => <li key={i}><Inline text={x} /></li>)}</ul>;
   return <p><Inline text={b.x} /></p>;
 }
@@ -28,7 +28,7 @@ export default async function TopicPage({ params }) {
   const t = getTopic(id);
   if (!t) notFound();
   return (
-    <article>
+    <article className={styles.article}>
       <p className={styles.crumbs}><Link href="/course/">トピック一覧</Link> / {t.category}{t.level === 'extension' ? ' (拡張)' : ''}</p>
       <h1>{t.title}</h1>
       <p className={styles.goal}><Inline text={t.goal} /></p>
