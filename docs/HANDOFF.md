@@ -50,8 +50,8 @@
 - 対応表へg2の13行とFTPを反映。印刷は模擬のためPARTIAL。集計は生成処理で実際の目標行と照合する。
 - 前担当の途中変更: guard/libvirt/netlink/pam/podman/postgres/systemdadv/tuned。VM関連単体テスト202件は成功したが、この8本の実VM通過は未確認。作業消失防止のWIPコミットとして保存。これらは実VM未検証のままで、次に個別シナリオを追加して確認する。
 - localcaの実TLSテスト中にパイプ未closeのResourceWarningが出たため修正。ResourceWarningをerrorにした4テストが成功（33秒）。
-- lynisは短いバナーでBANN-7130が残ることを実測。Lynisログの一致語数に合わせてヒントと解答例を改善し、指標59→60・対象警告消失・誤設定拒否・resetまで通過。記録作成待ち。
-- usersもg1-appで正解・過剰sudo/管理グループ/期限切れ/モード誤りの拒否・resetを確認。記録作成待ち。
+- lynisは短いバナーでBANN-7130が残ることを実測。Lynisログの一致語数に合わせてヒントと解答例を改善し、指標59→60・対象警告消失・誤設定拒否・resetまで通過。`g8-lynis.md`へ実出力保存。
+- usersもg1-appで正解・過剰sudo/管理グループ/期限切れ/モード誤りの拒否・resetを確認。`g1-users.md`へ実出力保存。
 - 講座修正後の全Python: 618件成功、skip48、192.6秒。サイトbuild、npm test7件、course node4件、E2E14件成功（その後のUI・課題追加は再検証が必要）。
 - 常用安全操作: native `safe-cleanup` を追加（40本目）。空白/改行/タブ/先頭ハイフン・リンク非追跡・NUL一覧・tar退避・チェックサム・隔離移動・復元。実ツール3テスト成功。
 - 起動画面: ペンギン復帰・青/紫/シアンの配色復帰・短い瞬き/ウインク/笑顔を追加。NO_COLOR/非TTY/LQ_NO_ANIMATIONでは静止。レイアウト10テスト成功。

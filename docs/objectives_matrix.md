@@ -13,7 +13,7 @@
 
 ## 判定基準（第 2 版、厳格化）
 
-- **COVERED-REAL**: native 実習（ホストの実ツールで動かし成果物を検査）、または実 VM で実行済みの VM モジュール。従来9モジュールに加え、`sshd mounts journald sysctl limits ftp firewall` の実出力を `docs/vm_verification/` に記録済み。再起動後の確認など各記録の未検証範囲は残る。
+- **COVERED-REAL**: native 実習（ホストの実ツールで動かし成果物を検査）、または実 VM で実行済みの VM モジュール。従来9モジュールに加え、`sshd mounts journald sysctl limits ftp firewall users lynis` の実出力を `docs/vm_verification/` に記録済み。再起動後の確認など各記録の未検証範囲は残る。
 - **IMPLEMENTED-UNVERIFIED**: 実状態を判定する実習がディスク上に存在するが、実 VM で一度も実行していない（`bash -n`、誤文脈拒否のガード試験、静的な内容試験しか通っていない）。判定コードの出力形式・パッケージ名・タイミングが実機で正しい保証はない。
 - **PARTIAL**: 採取済み出力や設定例を読むだけのミッション、行の一部しか判定しない実習、またはモックでしか動かない実習。
 - **MISSING**: 該当する実習・ミッションがない、または名前が出るだけ。
@@ -54,7 +54,7 @@
 | 106.1 X11 の導入・設定 | MISSING | なし | 実習価値は低い（ヘッドレス VM では検証困難） | - |
 | 106.2 グラフィカルデスクトップ | MISSING | なし | 同上。手動確認項目として扱うのが妥当 | - |
 | 106.3 アクセシビリティ | MISSING | なし | 手動確認 | - |
-| 107.1 ユーザー・グループ管理 | IMPLEMENTED-UNVERIFIED | getent/id/chage/sudo -l による実状態判定。（旧記述: VM users（VM未実行。実 VM 未実行）、7-4, 28-1〜28-5 読解） | 実VMで users を初回通過させ、判定の実出力を確認 | V |
+| 107.1 ユーザー・グループ管理 | COVERED-REAL | getent/id/chage/sudo -l による実状態判定。（旧記述: VM users（VM未実行。実 VM 未実行）、7-4, 28-1〜28-5 読解） [実VM確認](vm_verification/g1-users.md)。 | 初回通過済み。複数環境での確認は別途 | V |
 | 107.2 ジョブのスケジューリング | PARTIAL | native cron は crontab を自前パーサで評価し、実 cron デーモンは動かさない。at/atd は未実習。VM software の systemd timer は実機。（旧記述: 6-7, 23-15, 29-20, 19-11（cron/at の記述・読解）。VM software は systemd timer を実際に動かす（cron/at は未）。native cron は実装済み） | native cron（実装済み）、at/atd の実投入と `atq` 確認 | N/V |
 | 107.3 ローカライズ | IMPLEMENTED-UNVERIFIED | ロケール生成・localectl の実効値・locale 警告なしを判定。タイムゾーンも判定。（旧記述: 17-7, 24-16, 28-18） | 実VMで timesync を初回通過させ、判定の実出力を確認 | V |
 | 108.1 システム時刻 | IMPLEMENTED-UNVERIFIED | timesyncd の実効 NTP/Fallback と TZ を判定。chrony/ntpd は対象外。（旧記述: 17-6, 19-15, 29-24, 24-18（読解）。VM timesync は実装済み） | 実VMで timesync を初回通過させ、判定の実出力を確認 | V |
@@ -148,7 +148,7 @@
 | 基本コマンド: アプリ・サービス固有の制約 | COVERED-REAL | systemd の MemoryMax/LimitNOFILE をドロップインで直し、実プロセスの /proc/PID/limits と cgroup memory.max で判定。（旧記述: 16-8, 16-9, 18-2, 27-13（ulimit/cgroup 読解）。VM limits は実装済み） 実出力: [g2記録](vm_verification/g2-system.md)。 | 初回通過確認済み。再起動の未検証範囲はg2記録を参照 | V |
 | 基本コマンド: ディスク容量の問題 | COVERED-REAL | VM storage（inode 枯渇）、11-3, 11-7, 3-8, 15-10 | なし | V |
 | 基本コマンド: SSL 証明書 | COVERED-REAL | native tls, 13-3, 20-10〜20-12, 20-16 | certbot/ACME の実動作は読解のみ | N |
-| ユーザー: ローカルユーザー・グループ | IMPLEMENTED-UNVERIFIED | ユーザー・グループ・sudoers の実状態。（旧記述: VM users（VM未実行）、7-4, 28-1〜28-5） | 実VMで users を初回通過させ、判定の実出力を確認 | V |
+| ユーザー: ローカルユーザー・グループ | COVERED-REAL | ユーザー・グループ・sudoers の実状態。（旧記述: VM users（VM未実行）、7-4, 28-1〜28-5） [実VM確認](vm_verification/g1-users.md)。 | 初回通過済み。複数環境での確認は別途 | V |
 | ユーザー: 個人/システム全体の環境プロファイル | PARTIAL | 28-19, 3-4, 24-16（作業フォルダ内の編集のみ） | `su -l` で反映確認（105.1 参照） | V |
 | ユーザー: ユーザー資源制限 | PARTIAL | limits は systemd サービスの制限。ユーザー対象の limits.conf/ulimit/PAM は判定しない。（旧記述: 16-8（limits.conf/ulimit 読解）。VM limits は実装済み） | VM limits（実装済み） | V |
 | ユーザー: ACL | COVERED-REAL | VM permissions（ACL、実機検証済み）、12-7, 16-4 | なし | V |
@@ -208,10 +208,10 @@
 | R48 ホスト名解決の設定 | COVERED-REAL | VM network, VM netconfig（静的）、13-2 | なし | V |
 | R49 ネットワークサービスの自動起動 | COVERED-REAL | VM software/webstack（enable＋再起動後確認） | なし | V |
 | R50 firewalld/firewall-cmd によるアクセス制限 | IMPLEMENTED-UNVERIFIED | permanent を --reload で再読込しても実接続で許可・reject を確認。RHEL系 VM 限定。（旧記述: 19-10（firewall-cmd 出力の読解）、VM firewall は nftables（VM未実行）で firewalld ではない） | 実VMで firewalld を初回通過させ、判定の実出力を確認 | V（RHEL 系） |
-| R51 ローカルユーザーの作成・削除・変更 | IMPLEMENTED-UNVERIFIED | ユーザー作成・シェル・UID/GID 維持を判定。（旧記述: VM users（VM未実行）、7-4, 28-1） | 実VMで users を初回通過させ、判定の実出力を確認 | V |
+| R51 ローカルユーザーの作成・削除・変更 | COVERED-REAL | ユーザー作成・シェル・UID/GID 維持を判定。（旧記述: VM users（VM未実行）、7-4, 28-1） [実VM確認](vm_verification/g1-users.md)。 | 初回通過済み。複数環境での確認は別途 | V |
 | R52 パスワード変更・有効期限 | PARTIAL | users は chage -l でアカウントが期限切れでないことを見るだけ。有効期限の設定課題ではない。（旧記述: 16-11（chage の読解）、VM users（静的）） | `chage -l/-M` を実 VM で | V |
-| R53 ローカルグループとメンバーシップ | IMPLEMENTED-UNVERIFIED | 補助グループとメンバーシップ。（旧記述: VM users（静的）、28-2） | 実VMで users を初回通過させ、判定の実出力を確認 | V |
-| R54 sudo 設定 | IMPLEMENTED-UNVERIFIED | sudoers(0440/visudo) と sudo -l による最小権限。（旧記述: VM users（静的。`sudo -n -l` 判定）、9-4, 16-10, 28-6） | 実VMで users を初回通過させ、判定の実出力を確認 | V |
+| R53 ローカルグループとメンバーシップ | COVERED-REAL | 補助グループとメンバーシップ。（旧記述: VM users（静的）、28-2） [実VM確認](vm_verification/g1-users.md)。 | 初回通過済み。複数環境での確認は別途 | V |
+| R54 sudo 設定 | COVERED-REAL | sudoers(0440/visudo) と sudo -l による最小権限。（旧記述: VM users（静的。`sudo -n -l` 判定）、9-4, 16-10, 28-6） [実VM確認](vm_verification/g1-users.md)。 | 初回通過済み。複数環境での確認は別途 | V |
 | R56 既定パーミッション（umask） | PARTIAL | 3-x, 28-19 に umask 言及。独立した実習なし | 専用ユーザーで umask を変えて作成ファイルのモード確認 | N |
 | R57 鍵認証 SSH | COVERED-REAL | native ssh, VM ssh, 34-5〜34-8 | なし | N/V |
 | R58 SELinux enforcing/permissive | IMPLEMENTED-UNVERIFIED | getenforce と /etc/selinux/config を判定。RHEL系 VM 限定。（旧記述: 16-1 読解のみ。Ubuntu では動かせない） | 実VMで selinux を初回通過させ、判定の実出力を確認 | V（RHEL 系） |
@@ -224,13 +224,13 @@
 
 | 試験 | 行数 | COVERED-REAL | IMPLEMENTED-UNVERIFIED | PARTIAL | MISSING |
 |---|---|---|---|---|---|
-| LPIC-1 | 42 | 16 | 7 | 16 | 3 |
+| LPIC-1 | 42 | 17 | 6 | 16 | 3 |
 | LPIC-2 | 41 | 10 | 11 | 19 | 1 |
-| LFCS | 34 | 16 | 8 | 10 | 0 |
-| RHCSA | 61 | 28 | 12 | 19 | 2 |
-| 合計（試験間の重複行を含む） | 178 | 70 | 38 | 64 | 6 |
+| LFCS | 34 | 17 | 7 | 10 | 0 |
+| RHCSA | 61 | 31 | 9 | 19 | 2 |
+| 合計（試験間の重複行を含む） | 178 | 75 | 33 | 64 | 6 |
 
-実VM通過記録のあるg2の13行とFTPを反映。印刷は模擬実習のためPARTIAL。未実行モジュールは昇格させていない。
+実VM通過記録のあるg2の13行、usersの5行、FTPを反映。印刷は模擬実習のためPARTIAL。未実行モジュールは昇格させていない。
 
 LFCS/RHCSA/LPIC は重複が大きい（シェル・ssh・パーミッション・systemd・ストレージ・ネットワーク）ので、合計を独立した目標数として扱わないこと。
 
@@ -320,7 +320,7 @@ LFCS/RHCSA/LPIC は重複が大きい（シェル・ssh・パーミッション�
 | ZFS / btrfs | PARTIAL | 23-12（スナップショットと zfs list の読解）、26-22（FS 選択基準）。実操作ゼロ | VM で btrfs を作りスナップショットと subvolume を操作（ZFS は導入が重い） |
 | systemd 応用（ソケット起動・テンプレート・サンドボックス） | PARTIAL | 28-21（socket/path ユニットの作成。作業フォルダ内の設定判定）、28-11（systemd-socket-activate）、9-5（NoNewPrivileges・ProtectSystem の設定を直す。デーモンは動かさない）、18-2（systemd-run）。VM software（unit/timer）は COVERED-REAL。VM limits（MemoryMax・LimitNOFILE の実プロセス判定）は IMPLEMENTED-UNVERIFIED。テンプレートユニット（`foo@.service`）は MISSING | `systemd-analyze security` の点数改善、テンプレートの実起動。user マネージャ（`systemd-run --user`）なら無権限で試せる |
 | cron と timer の使い分け | COVERED-REAL | native cron（最小環境・`%`・flock・多重起動）、VM software（systemd timer 実機）、23-15（at・anacron の読解）。cron デーモン自体は動かさない（自前パーサ）、at は読解のみ | at の実投入 |
-| セキュリティ堅牢化（CIS 風・lynis・ssh・audit） | IMPLEMENTED-UNVERIFIED（ssh/audit/fail2ban）、MISSING（lynis・CIS・自動更新） | VM sshd（sshd -T・鍵のみ・ProxyJump）、VM guard（fail2ban・auditd）、VM users（最小権限 sudo）、VM pam、VM sysctl は未実行。作業フォルダでの 9-2〜9-5, 20-8（ssh 設定の編集）は設定ファイル判定。`lynis`・`aide`・`unattended-upgrades` はコーパスに出ない | 堅牢化スキャンの実行と指摘対応、無人更新の設定。VM 向け |
+| セキュリティ堅牢化（CIS 風・lynis・ssh・audit） | PARTIAL | VM sshd（sshd -T・鍵のみ・ProxyJump）、VM guard（fail2ban・auditd）、VM users（最小権限 sudo）、VM pam、VM sysctl は未実行。作業フォルダでの 9-2〜9-5, 20-8（ssh 設定の編集）は設定ファイル判定。lynisは自動更新・バナー・umaskの実効値と指標改善を[実VM確認](vm_verification/g8-lynis.md)。aide/CIS全体は未対応 | 堅牢化スキャンの実行と指摘対応、無人更新の設定。VM 向け |
 | インシデント対応 | COVERED-REAL（ログ法医学）、PARTIAL（稼働中ホストの調査） | native incident（失敗再現→根拠を残し復旧）、10-1〜10-6（証拠保全・時系列・認証調査・報告書。作業フォルダのログを実ツールで集計）、VM guard（auditd による証跡、未実行） | 稼働中の不審プロセス・接続を `ss`/`lsof`/`ps` で追い、遮断する実機課題 |
 | ハードウェア・USB・udev | PARTIAL | 14-7（lspci/lsusb/dmidecode の読解）、14-11（udev ルールの設定判定）、14-8 | 実際に udev ルールを適用し `udevadm test` で確認する VM 課題。USB の実機接続は自動化できない |
 | デスクトップ Linux（パッケージ GUI・Wi-Fi・Bluetooth・音声・印刷・画面） | MISSING（Wi-Fi の設定のみ PARTIAL） | 17-1（nmcli プロファイルの読解）、18-6（Flatpak/Snap の権限出力）。bluetoothctl・pactl/wpctl・cups・xrandr/wayland はほぼ出ない | ヘッドレス VM では判定できない。手動確認チェックリストとして扱うのが妥当 |

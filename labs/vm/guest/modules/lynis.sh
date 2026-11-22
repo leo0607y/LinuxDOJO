@@ -69,7 +69,7 @@ _ly_check_apt() {
     for k in 'APT::Periodic::Update-Package-Lists "1";' 'APT::Periodic::Download-Upgradeable-Packages "1";' 'APT::Periodic::Unattended-Upgrade "1";' 'APT::Periodic::AutocleanInterval "7";'; do
         grep -qF "$k" <<<"$dump" || { echo "apt-config dump に ${k} がありません(実効値)。"; return 1; }
     done
-    grep -q 'APT::Periodic' "$LY_APT" || { echo "$LY_APT に APT::Periodic 設定を書きます。"; return 1; }
+    grep -qE '^[[:space:]]*APT::Periodic::' "$LY_APT" || { echo "$LY_APT に APT::Periodic 設定を書きます。"; return 1; }
 }
 
 _ly_check_banner() {
@@ -102,7 +102,8 @@ lynis(監査ツール)の結果を見ながら、ホスト全体に影響しな�
 1. sudo dojo-vm-lab lynis break  : 現在の状態でlynisを実行し、基準(hardening_index・suggestion・warning)を記録する(数分かかる)
 2. 自動更新: unattended-upgrades を入れ、$LY_APT に APT::Periodic の
    Update-Package-Lists=1 / Download-Upgradeable-Packages=1 / Unattended-Upgrade=1 / AutocleanInterval=7 を書く(apt-config dump で実効値確認)
-3. ログインバナー: $LY_ISSUE に無許可利用の警告(OS名・バージョンを含めない2行以上)を書く(元ファイルは reset で戻る)
+3. ログインバナー: $LY_ISSUE に無許可利用の警告(OS名・バージョンを含めない2行以上)を書く(元ファイルは reset で戻る)。
+   Lynisは警告の語彙も検査する。BANN-7130 が残る場合は専用ログで一致語数を確認し、legal warning / authorized access / prohibited / monitored / logged 等を意味のある文章で記す。
 4. umask: $LY_UMASK で umask 027 を設定。確認: env -i bash -l -c umask
 5. 自分でも sudo lynis audit system --quick --report-file /tmp/x.dat して suggestion[] を読み、指標の動きを確かめる(判定は専用レポートで行う)
 6. 判定: sudo dojo-vm-lab lynis check  (lynisを再実行し、hardening_indexが基準+1以上・新規warningなし・対象テストIDが suggestion から消えたことを確認)

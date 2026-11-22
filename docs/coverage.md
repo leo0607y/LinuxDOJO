@@ -8,6 +8,8 @@
 |---|---|---|
 | sshd / mounts / journald / sysctl / limits | 正解・故障/抜け道拒否・reset（再起動は未確認） | docs/vm_verification/g2-system.md |
 | ftp | 認証・chroot・PASV・往復転送・不正状態拒否・reset・再setup/reset | docs/vm_verification/g8-ftp.md |
+| users | 最小sudo・ユーザー/グループ修復・過剰権限拒否・reset | docs/vm_verification/g1-users.md |
+| lynis | 実監査59→60・対象警告解消・実効値・不正状態拒否・reset | docs/vm_verification/g8-lynis.md |
 | permissions（再確認） | 既存/新規ファイルのACL・不正状態拒否・reset・再setup/reset | docs/vm_verification/permissions-recheck.md |
 | firewall | 実nft/netns通信・確立済み接続・再読込/重複拒否・reset | docs/vm_verification/g1-firewall.md |
 
