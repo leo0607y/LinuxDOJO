@@ -226,7 +226,7 @@ multipass start linuxdojo-app linuxdojo-client
 
 2026-11-21には専用Ubuntu 24.04.5 KVM VMで既存9モジュールを実行しました（上記の新規5モジュールは含みません）。boot・storage・webstack・softwareの故障復旧と再起動後、SSHの実認証・転送と再起動後、実aptの更新・撤去、permissions・performanceを確認しました。networkは2台のVMでDNS故障前後と修復後を検証済みです。詳細は教材本体の `docs/coverage.md` の「実装と検証記録」を参照します。これは教材の特定環境での検証で、全ホスト・全Multipassドライバーの動作確認ではありません。
 
-**既存9モジュール以外の、後から追加した28モジュール（`users`、`netconfig`、`firewall`、`restore`、`osupdate`、`sshd`、`mounts`、`journald`、`sysctl`、`limits`、`timesync`、`guard`、`dnsserver`、`mailserver`、`fileshare`、`apache`、`netlink`、`pam`、`podman`、`ldap`、`samba`、`libvirt`、`tuned`、`kbuild`、`grubrescue`、`selinux`、`dnf`、`firewalld`）は、開発環境にqemuもsudoも無かったため、構文検査・誤った文脈での全actionの拒否・静的な安全確認・非特権部分の単体テストまでしか行っておらず、実VMでは一度も実行していません。** モジュールごとの初回確認項目と必要パッケージは [FIRST_RUN.md](FIRST_RUN.md) にまとめています。RHEL系の3モジュールは [RHEL.md](RHEL.md) の手順で別のVMが必要です。
+追加モジュールのうち `sshd mounts journald sysctl limits ftp firewall` は実VMで正解・不正状態の拒否・resetを確認済みです（個別の未検証範囲は教材本体 `docs/vm_verification/` の実出力を参照）。`permissions` も再確認して判定を修正しました。それ以外の追加分は中断後の再検証待ちで、静的検査の成功を実VM通過とは扱いません。初回確認項目と必要パッケージは [FIRST_RUN.md](FIRST_RUN.md)、RHEL系3本は [RHEL.md](RHEL.md) を参照してください。
 
 エクスポート、生成内容の整合性、ゲストスクリプトの構文、VM外で動作を拒否するガードは自動テストします。
 開発環境でMultipassが使えない場合、ゲストのパッケージ導入・デバイス作成・再起動・実際の復旧成功までは検証済みとはしません。

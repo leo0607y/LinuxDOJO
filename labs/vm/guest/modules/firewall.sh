@@ -49,6 +49,35 @@ raise SystemExit(0 if ok else 1)
 PY
 }
 
+# Host-initiated connection to a listener inside the peer namespace: the SYN-ACK returns through the
+# input hook, so it only works when established/related traffic is accepted.
+_fw_reverse_probe() {
+    ip netns exec "$FW_NS" python3 - "$FW_PEER_IP" <<'PY' &
+import socket, sys
+s = socket.socket(); s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+s.bind((sys.argv[1], 19099)); s.listen(1); s.settimeout(4)
+try:
+    c, _ = s.accept(); c.sendall(b'ok'); c.close()
+except OSError:
+    pass
+PY
+    local pid=$!
+    sleep 0.7
+    python3 - "$FW_PEER_IP" <<'PY'
+import socket, sys
+try:
+    s = socket.create_connection((sys.argv[1], 19099), timeout=2)
+    s.settimeout(2)
+    ok = s.recv(8) == b'ok'
+except OSError:
+    ok = False
+raise SystemExit(0 if ok else 1)
+PY
+    local rc=$?
+    kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+    return $rc
+}
+
 _fw_loopback_probe() {
     python3 - "$1" <<'PY'
 import socket, sys
@@ -56,7 +85,12 @@ try:
     s = socket.create_connection(('127.0.0.1', int(sys.argv[1])), timeout=2)
     s.settimeout(2)
     s.sendall(b'GET /health HTTP/1.0\r\n\r\n')
-    ok = b'linuxdojo-firewall' in s.recv(512)
+    data = b''
+    while True:
+        chunk = s.recv(512)
+        if not chunk: break
+        data += chunk
+    ok = b'linuxdojo-firewall' in data
 except OSError:
     ok = False
 raise SystemExit(0 if ok else 1)
@@ -98,7 +132,8 @@ EOS
 lab_setup() {
     _fw_ctx || return
     command -v nft >/dev/null && command -v ip >/dev/null || { echo 'nft と ip(iproute2) が必要です。' >&2; return 1; }
-    chmod 755 "$LAB_ROOT" "$LAB_ROOT/state" 2>/dev/null || true
+    # www-data must be able to traverse down to $LAB_STATE/www (the dispatcher creates these 0700).
+    chmod 755 "$LAB_ROOT" "$LAB_ROOT/state" "$LAB_STATE" || return 1
     install -d -m 755 "$LAB_STATE/www" "$FW_DIR"
     printf 'linuxdojo-firewall\n' > "$LAB_STATE/www/health"
     chmod 644 "$LAB_STATE/www/health"
@@ -190,6 +225,7 @@ _fw_verify_live() {
     _fw_probe 18080 || { echo 'namespaceから18080に接続できません。' >&2; return 1; }
     if _fw_probe 18081; then echo '18081 が拒否されていません。' >&2; return 1; fi
     ip netns exec "$FW_NS" ping -c1 -W2 "$FW_HOST_IP" >/dev/null 2>&1 || { echo 'ICMPが許可されていません。' >&2; return 1; }
+    _fw_reverse_probe || { echo '確立済み/関連接続(ct state established,related)が許可されていません。' >&2; return 1; }
 }
 
 lab_check() {
@@ -211,6 +247,14 @@ lab_check() {
     fi
     if ! _fw_verify_live; then
         echo "$FW_RULES の再読込後に要件を満たしません(永続化されていません)。" >&2
+        nft delete table inet dojo_fw 2>/dev/null; nft -f "$backup"
+        return 1
+    fi
+    # idempotence: loading the same file again must not duplicate rules
+    local before after
+    before=$(nft list table inet dojo_fw) && nft -f "$FW_RULES" 2>/dev/null && after=$(nft list table inet dojo_fw) || after=
+    if [[ $before != "$after" ]]; then
+        echo "$FW_RULES を再読込するとルールが重複/変化します。冒頭で table と delete table を書いてください。" >&2
         nft delete table inet dojo_fw 2>/dev/null; nft -f "$backup"
         return 1
     fi

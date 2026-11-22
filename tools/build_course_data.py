@@ -28,8 +28,8 @@ NATIVE_REAL = {"shell", "find", "archive", "rsync", "git", "vim", "jq", "rg", "c
 
 # VM 実習の検証状況。追加分の実出力は docs/vm_verification/ を参照。
 VM_REAL = {"boot", "storage", "packages", "permissions", "software", "ssh", "network", "performance", "webstack",
-           "sshd", "mounts", "journald", "sysctl", "limits", "ftp"}
-VM_STATIC = {"users", "netconfig", "firewall", "restore", "osupdate"}
+           "sshd", "mounts", "journald", "sysctl", "limits", "ftp", "firewall"}
+VM_STATIC = {"users", "netconfig", "restore", "osupdate"}
 VM_NEW = {"timesync", "guard"}
 VM_LABEL = {"real": "VM: 実VMで検証済み",
             "static": "VM: 静的検証のみ、実VM未実施",

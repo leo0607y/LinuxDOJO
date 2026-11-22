@@ -1,6 +1,22 @@
 # 実VMでの初回実行チェックリスト
 
-2026-11 以降に追加した VM モジュールは、開発環境に qemu も sudo も無かったため、実VMで一度も実行していません。確認できたのは `bash -n`、誤った文脈での全 action の拒否、静的な安全確認、非特権部分の単体テストだけです。このチェックリストは、実VMで最初に確かめる点を、モジュールごとにまとめたものです。
+## 2026-11-22 再開後の実VM確認
+
+追加モジュールは一律未検証ではなく、実出力の記録で区別します。
+
+| 対象 | 確認したこと | 記録 |
+|---|---|---|
+| sshd / mounts / journald / sysctl / limits | 正解・故障/抜け道拒否・reset（再起動は未確認） | docs/vm_verification/g2-system.md |
+| ftp | 認証・chroot・PASV・往復転送・不正状態拒否・reset・再setup/reset | docs/vm_verification/g8-ftp.md |
+| permissions（再確認） | 既存/新規ファイルのACL・不正状態拒否・reset・再setup/reset | docs/vm_verification/permissions-recheck.md |
+| firewall | 実nft/netns通信・確立済み接続・再読込/重複拒否・reset | docs/vm_verification/g1-firewall.md |
+
+前セッションの他担当は中断済みです。これ以外の追加モジュールは、途中変更やVMが残っていても検証済みとはしません。RHEL系の3本も未検証です。最新の根拠は `docs/vm_verification/` を参照してください。
+
+再現はリポジトリの `tools/vmtest/verify_scenario.py` と `tools/vmtest/scenarios/*.sh` を使います。ホストでシナリオのシェルを直接実行せず、専用VMに対して実行します。
+
+
+追加VMモジュールは順次検証中です。実VMで確認した範囲は下表と `docs/vm_verification/` の実出力を参照し、それ以外は初回実行待ちとして扱います。構文検査や単体テストの成功だけでは実VM検証済みにしません。
 
 使い方は次のとおりです。
 
@@ -10,7 +26,7 @@
 4. 確認項目のうち、想定と違った点を記録します。判定側の誤りであれば、モジュールを直します。
 5. 通ったら、`docs/coverage.md` の該当行を「実VM検証済み」に書き換えます。通るまでは、検証済みと書きません。
 
-「判定の実装は完了、実VM未検証」であり、実習の内容が正しいという保証ではありません。
+初回実行待ちの項目は「判定の実装は完了、実VM未検証」であり、実習の内容が正しいという保証ではありません。
 
 ## 追加パッケージ（setup が不足を検出して案内するもの）
 

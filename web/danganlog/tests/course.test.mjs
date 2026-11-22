@@ -24,7 +24,7 @@ test('search finds Japanese purposes and command names', () => {
 
 test('status badges are honest: unverified VM modules are never labelled verified', () => {
   for (const t of data.topics) for (const v of t.vm) {
-    if (['users', 'netconfig', 'firewall', 'restore', 'osupdate'].includes(v.id)) assert.match(v.status, /実VM未実施/);
+    if (['users', 'netconfig', 'restore', 'osupdate'].includes(v.id)) assert.match(v.status, /実VM未実施/);
     assert.doesNotMatch(v.status, /^ネイティブ/);
   }
 });

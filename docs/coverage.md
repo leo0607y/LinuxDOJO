@@ -1,5 +1,21 @@
 # 常用Linuxの網羅性と検証範囲
 
+## 2026-11-22 再開後の実VM確認
+
+追加モジュールは一律未検証ではなく、実出力の記録で区別します。
+
+| 対象 | 確認したこと | 記録 |
+|---|---|---|
+| sshd / mounts / journald / sysctl / limits | 正解・故障/抜け道拒否・reset（再起動は未確認） | docs/vm_verification/g2-system.md |
+| ftp | 認証・chroot・PASV・往復転送・不正状態拒否・reset・再setup/reset | docs/vm_verification/g8-ftp.md |
+| permissions（再確認） | 既存/新規ファイルのACL・不正状態拒否・reset・再setup/reset | docs/vm_verification/permissions-recheck.md |
+| firewall | 実nft/netns通信・確立済み接続・再読込/重複拒否・reset | docs/vm_verification/g1-firewall.md |
+
+前セッションの他担当は中断済みです。これ以外の追加モジュールは、途中変更やVMが残っていても検証済みとはしません。RHEL系の3本も未検証です。最新の根拠は `docs/vm_verification/` を参照してください。
+
+再現はリポジトリの `tools/vmtest/verify_scenario.py` と `tools/vmtest/scenarios/*.sh` を使います。ホストでシナリオのシェルを直接実行せず、専用VMに対して実行します。
+
+
 この表は「日常のCLI操作・開発・小規模サーバー運用」を対象にした教材の対応表です。27のコア到達目標と5つの拡張分野を分けます。全コマンド、全ディストリビューション、あらゆる業務・機器を網羅した認定ではありません。学習順と実際のコマンド例は[常用コース](LINUX_DAILY_USE.md)、検索用の正本は `curriculum/toolbox_catalog.py` です。
 
 ## 判定の読み方

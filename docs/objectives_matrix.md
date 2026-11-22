@@ -13,7 +13,7 @@
 
 ## 判定基準（第 2 版、厳格化）
 
-- **COVERED-REAL**: native 実習（ホストの実ツールで動かし成果物を検査）、または実 VM で実行済みの VM モジュール。実 VM で実行済みなのは `storage boot network performance permissions webstack packages software ssh` の 9 つだけ。
+- **COVERED-REAL**: native 実習（ホストの実ツールで動かし成果物を検査）、または実 VM で実行済みの VM モジュール。従来9モジュールに加え、`sshd mounts journald sysctl limits ftp firewall` の実出力を `docs/vm_verification/` に記録済み。再起動後の確認など各記録の未検証範囲は残る。
 - **IMPLEMENTED-UNVERIFIED**: 実状態を判定する実習がディスク上に存在するが、実 VM で一度も実行していない（`bash -n`、誤文脈拒否のガード試験、静的な内容試験しか通っていない）。判定コードの出力形式・パッケージ名・タイミングが実機で正しい保証はない。
 - **PARTIAL**: 採取済み出力や設定例を読むだけのミッション、行の一部しか判定しない実習、またはモックでしか動かない実習。
 - **MISSING**: 該当する実習・ミッションがない、または名前が出るだけ。
@@ -45,7 +45,7 @@
 | 103.8 基本編集 | COVERED-REAL | native vim、6-6、31-1〜31-20 | なし | N |
 | 104.1 パーティション・ファイルシステム作成 | PARTIAL | mounts は pvcreate/mkswap/resize2fs まで。GPT 作成と XFS/VFAT の mkfs は判定しない。（旧記述: VM storage（専用 ext4 の inode 枯渇とマウント）、26-12（mke2fs をイメージに）。GPT パーティション操作、XFS/VFAT/swap 作成の実操作なし） | ループ/VM ディスクで `sgdisk`→`mkfs.ext4/xfs/vfat`→`mkswap` | V |
 | 104.2 ファイルシステム整合性 | PARTIAL | 15-7, 26-4, 26-5, 26-14 読解。VM storage は inode のみ | 壊したループ img に `e2fsck -fn/-p`、`xfs_repair` | N(img)/V |
-| 104.3 マウント制御 | IMPLEMENTED-UNVERIFIED | UUID 指定 fstab・nofail・findmnt --verify・mount -a を実判定。ループ ext4 のみ、再起動後の自動マウントは未検証。（旧記述: VM storage（再起動後マウント確認）、11-2, 15-8, 26-20 読解。fstab 誤記→復旧の実操作なし。VM mounts は実装済み） | 実VMで mounts を初回通過させ、判定の実出力を確認 | V |
+| 104.3 マウント制御 | COVERED-REAL | UUID 指定 fstab・nofail・findmnt --verify・mount -a を実判定。ループ ext4 のみ、再起動後の自動マウントは未検証。（旧記述: VM storage（再起動後マウント確認）、11-2, 15-8, 26-20 読解。fstab 誤記→復旧の実操作なし。VM mounts は実装済み） 実出力: [g2記録](vm_verification/g2-system.md)。 | 初回通過確認済み。再起動の未検証範囲はg2記録を参照 | V |
 | 104.5 パーミッション・所有権 | COVERED-REAL | 3-1, 3-2, 16-6, VM permissions（ACL、実機検証済み） | なし | N/V |
 | 104.6 ハード/シンボリックリンク | COVERED-REAL | 3-3, 1-x, native find | なし | N |
 | 104.7 システムファイルの検索・配置 | COVERED-REAL | 19-1, 29-23, native find | なし | N |
@@ -58,9 +58,9 @@
 | 107.2 ジョブのスケジューリング | PARTIAL | native cron は crontab を自前パーサで評価し、実 cron デーモンは動かさない。at/atd は未実習。VM software の systemd timer は実機。（旧記述: 6-7, 23-15, 29-20, 19-11（cron/at の記述・読解）。VM software は systemd timer を実際に動かす（cron/at は未）。native cron は実装済み） | native cron（実装済み）、at/atd の実投入と `atq` 確認 | N/V |
 | 107.3 ローカライズ | IMPLEMENTED-UNVERIFIED | ロケール生成・localectl の実効値・locale 警告なしを判定。タイムゾーンも判定。（旧記述: 17-7, 24-16, 28-18） | 実VMで timesync を初回通過させ、判定の実出力を確認 | V |
 | 108.1 システム時刻 | IMPLEMENTED-UNVERIFIED | timesyncd の実効 NTP/Fallback と TZ を判定。chrony/ntpd は対象外。（旧記述: 17-6, 19-15, 29-24, 24-18（読解）。VM timesync は実装済み） | 実VMで timesync を初回通過させ、判定の実出力を確認 | V |
-| 108.2 システムログ | PARTIAL | journald 永続化（journald IU）と logrotate（native 実機）はあるが、rsyslog のルールと logger 経由の振り分けは判定しない。（旧記述: native logrotate（実ログ回転）、7-2, 23-14, 17-12 は読解。VM software はジャーナルから設定故障を読む。rsyslog・journald 永続化の実設定なし。VM journald は実装済み） | VM journald（実装済み）、`logger` と rsyslog ルールの実動作 | V |
+| 108.2 システムログ | PARTIAL | journald 永続化（g2実VM確認済み）と logrotate（native 実機）はあるが、rsyslog のルールと logger 経由の振り分けは判定しない。（旧記述: native logrotate（実ログ回転）、7-2, 23-14, 17-12 は読解。VM software はジャーナルから設定故障を読む。rsyslog・journald 永続化の実設定なし。VM journald は実装済み） | VM journald（実装済み）、`logger` と rsyslog ルールの実動作 | V |
 | 108.3 MTA 基礎 | IMPLEMENTED-UNVERIFIED | 専用 Postfix で実 SMTP: Maildir 配送・エイリアス・リレー拒否・滞留メール・キュー空を判定。（旧記述: 21-8, 21-9, 21-10（Postfix 設定・キュー・SPF/DKIM 読解）） | 実VMで mailserver を初回通過させ、判定の実出力を確認 | V |
-| 108.4 印刷 | MISSING | なし（`cupsd` はコーパスに出ない） | 優先度低 | V |
+| 108.4 印刷 | PARTIAL | 課題まつり desktop_hw でCUPSのキュー・受入/停止・ジョブを模擬操作。実cupsd/プリンターは未検証 | 実CUPS/印刷機器での確認 | V |
 | 109.1 インターネットプロトコルの基礎 | PARTIAL | native tcpdump は用意済み pcap を実 tcpdump で読む（実キャプチャは判定しない）。IP/TCP/UDP の基礎そのものを実測させる課題はない。（旧記述: 4-6, 13-6, 22-6, 29-7, 32-15 読解/診断） | native: loopback で `ss`/`tcpdump`（実装済み）を使い TCP/UDP/ICMP を観測 | N |
 | 109.2 永続的ネットワーク設定 | IMPLEMENTED-UNVERIFIED | networkd の .network と適用中の ip/resolvectl を両方判定。dummy NIC のみ。（旧記述: VM netconfig（VM未実行、dummy NIC のみ）、17-1, 13-1 読解） | 実VMで netconfig を初回通過させ、判定の実出力を確認 | V |
 | 109.3 ネットワーク障害の切り分け | COVERED-REAL | VM network（2 台でDNS/HTTP 切り分け、実機検証済み）、4-5, 4-6, 13-x | なし | V |
@@ -77,16 +77,16 @@
 | 200.2 将来のリソース予測 | PARTIAL | 19-6（sar/vmstat 履歴）、12-6, 23-16 | sar/`sadf` で傾向から枯渇日を算出する native 演習 | N |
 | 201.1 カーネルコンポーネント | IMPLEMENTED-UNVERIFIED | 実ビルドした .ko を insmod/rmmod/depmod/modprobe し、lsmod・dmesg・/sys パラメータで判定。（旧記述: 14-4, 14-9, 28-16 読解） | 実VMで kbuild を初回通過させ、判定の実出力を確認 | V |
 | 201.2 カーネルのコンパイル | PARTIAL | kbuild は out-of-tree モジュールのビルド。カーネル本体の config/make/導入は answers.txt のキーワード照合だけ。（旧記述: 24-13（手順の読解）。native build は gcc/make の小規模ビルドのみで、カーネル設定→ビルド→導入の実操作はない） | VM で `make localmodconfig`→`bindeb-pkg`→導入→再起動（重い。モジュール 1 個のビルドに縮小可） | V |
-| 201.3 カーネル実行時管理 | IMPLEMENTED-UNVERIFIED | sysctl --system の適用順・実行値・modprobe -c の blacklist/install を判定。（旧記述: 14-5（sysctl 恒久/一時の読解）、14-6, 19-12。VM sysctl は実装済み） | 実VMで sysctl を初回通過させ、判定の実出力を確認 | V |
+| 201.3 カーネル実行時管理 | COVERED-REAL | sysctl --system の適用順・実行値・modprobe -c の blacklist/install を判定。（旧記述: 14-5（sysctl 恒久/一時の読解）、14-6, 19-12。VM sysctl は実装済み） 実出力: [g2記録](vm_verification/g2-system.md)。 | 初回通過確認済み。再起動の未検証範囲はg2記録を参照 | V |
 | 202.1 システム起動のカスタマイズ | COVERED-REAL | VM boot, VM software（systemd unit/timer の作成・故障復旧・再起動）、28-20〜28-23。SysV init は MISSING だが現行 LPI は systemd 中心 | なし | V |
 | 202.2 システム復旧 | PARTIAL | grubrescue は GRUB 修復を判定するが、rescue/rd.break/chroot 修復は answers.txt のキーワード照合で、実際のレスキュー起動は判定対象外。（旧記述: 14-3, 14-10, 11-5, 11-8 読解、VM boot（unit 復旧のみ）。レスキュー/emergency、GRUB 復旧、chroot 修復の実操作なし） | VM でスナップショット前提の rescue 起動・fstab 修復・chroot（高リスク） | V |
 | 202.3 代替ブートローダ | MISSING | なし（syslinux、PXE、UEFI の扱いは GRUB 読解も含め未出） | 優先度低 | V |
-| 203.1 ファイルシステムの運用 | PARTIAL | storage（実機）と mounts（IU）は ext4 とループのみ。XFS/btrfs の運用は判定しない。（旧記述: VM storage、26-x, 15-x） | ループで ext4/XFS/btrfs の作成・マウント・オプション確認 | N(要root)/V |
+| 203.1 ファイルシステムの運用 | PARTIAL | storage（実機）と mounts（g2実VM確認済み）は ext4 とループのみ。XFS/btrfs の運用は判定しない。（旧記述: VM storage、26-x, 15-x） | ループで ext4/XFS/btrfs の作成・マウント・オプション確認 | N(要root)/V |
 | 203.2 ファイルシステムの保守 | PARTIAL | 15-7, 26-4〜26-8 読解（debugfs/e2image 等） | 壊した img に fsck→復旧を native で | N |
 | 203.3 ファイルシステムオプション | PARTIAL | 15-8, 23-11, 20-1（autofs・暗号化の読解） | VM autofs で自動マウント・タイムアウト確認 | V |
 | 204.1 RAID | PARTIAL | 15-5（/proc/mdstat 読解のみ） | VM で `mdadm` により loop 3 本から RAID1 を作り、1 本を fail→re-add | V |
 | 204.2 ストレージアクセス調整 | PARTIAL | 19-14（hdparm/fio 結果の読解）、23-10（multipath/iSCSI 読解）、26-18 | 優先度低 | V |
-| 204.3 LVM | IMPLEMENTED-UNVERIFIED | ループ上の PV 追加・vgextend・lvextend・resize2fs とデータ sha256 を判定。スナップショットは対象外。（旧記述: 11-4, 15-3, 15-4（手順設計・読解のみ。実 `pvcreate/lvextend` は一度も実行しない）） | 実VMで mounts を初回通過させ、判定の実出力を確認 | V |
+| 204.3 LVM | COVERED-REAL | ループ上の PV 追加・vgextend・lvextend・resize2fs とデータ sha256 を判定。スナップショットは対象外。（旧記述: 11-4, 15-3, 15-4（手順設計・読解のみ。実 `pvcreate/lvextend` は一度も実行しない）） 実出力: [g2記録](vm_verification/g2-system.md)。 | 初回通過確認済み。再起動の未検証範囲はg2記録を参照 | V |
 | 205.1 基本ネットワーク設定 | IMPLEMENTED-UNVERIFIED | IP/経路/DNS/IPv6 は netconfig、bridge/VLAN/bond は netlink。（旧記述: VM netconfig（VM未実行）、22-8（netns+veth）） | 実VMで netconfig, netlink を初回通過させ、判定の実出力を確認 | V |
 | 205.2 高度なネットワーク設定 | IMPLEMENTED-UNVERIFIED | 専用 netns 内で bridge・802.1Q VLAN・active-backup bond（フェイルオーバ実測）・ポリシールーティングを判定。永続化は構文確認のみ。（旧記述: 17-3, 17-4, 22-5, 22-7, 29-1〜29-3（読解/設定例）） | 実VMで netlink を初回通過させ、判定の実出力を確認 | V |
 | 205.3 ネットワーク障害対応 | COVERED-REAL | VM network, 13-1〜13-6, 4-5, 4-6, 32-13 | native tcpdump は実装済み | V |
@@ -110,7 +110,7 @@
 | 211.2 メール配送管理 | PARTIAL | mailserver は alias とキューまで。仮想ドメイン・procmail/sieve は対象外。（旧記述: 21-9（キュー・ログ読解）。procmail/sieve は MISSING） | VM で alias・仮想ドメイン・`postqueue` | V |
 | 211.3 メールボックスアクセス | PARTIAL | 21-11（Dovecot 設定読解） | VM Dovecot で IMAPS ログイン | V |
 | 212.1 ルータ設定 | PARTIAL | netlink は経路制御と bridge まで。ip_forward+MASQUERADE の NAT は判定しない。（旧記述: 22-5, 22-7, 22-8, 17-2（NAT・転送の読解/設定例）。VM firewall は静的） | netns で 3 ノード構成、`ip_forward`+MASQUERADE を実適用 | N(要root)/V |
-| 212.2 FTP サーバ | MISSING | なし（vsftpd/pure-ftpd はコーパスに出ない） | 優先度低 | V |
+| 212.2 FTP サーバ | COVERED-REAL | VM ftp: vsftpd専用インスタンスで認証・匿名/リスト外拒否・chroot・PASV・チェックサム付き往復転送・resetを確認。[実出力](vm_verification/g8-ftp.md) | FTPSは発展課題で判定外 | V |
 | 212.3 SSH | COVERED-REAL | native ssh, VM ssh（専用 sshd・認証・転送・権限障害を実機検証）、20-6〜20-9, 34-x。VM sshd（堅牢化）は実装済み | なし（sshd 堅牢化は実装済み） | N/V |
 | 212.4 セキュリティタスク | IMPLEMENTED-UNVERIFIED | fail2ban-regex・実際の ban/unban・findtime、auditd の auditctl/ausearch/aureport を判定。nmap は未判定。（旧記述: 16-12（fail2ban 読解）、9-x、16-1〜16-3。nmap は 4-x/32-x に名前のみ。侵入検知（auditd/ausearch は読解 19-13）） | 実VMで guard を初回通過させ、判定の実出力を確認 | V |
 | 212.5 OpenVPN | PARTIAL | 20-5（server.conf/client.ovpn 読解）、20-3, 20-4（WireGuard 読解） | VM 2 台でトンネル確立（native でも netns で可能） | V |
@@ -119,7 +119,7 @@
 
 | 目標 | 状態 | 根拠・再判定 | 昇格条件／閉じる演習 | 種別 |
 |---|---|---|---|---|
-| 運用: カーネルパラメータ（一時・恒久） | IMPLEMENTED-UNVERIFIED | sysctl の一時・恒久と適用順を判定。（旧記述: 14-5 読解、14-6。VM sysctl は実装済み） | 実VMで sysctl を初回通過させ、判定の実出力を確認 | V |
+| 運用: カーネルパラメータ（一時・恒久） | COVERED-REAL | sysctl の一時・恒久と適用順を判定。（旧記述: 14-5 読解、14-6。VM sysctl は実装済み） 実出力: [g2記録](vm_verification/g2-system.md)。 | 初回通過確認済み。再起動の未検証範囲はg2記録を参照 | V |
 | 運用: プロセスとサービスの診断・管理 | COVERED-REAL | VM software, VM boot, VM performance, 3-5, 7-1〜7-3 | なし | V |
 | 運用: コマンド実行ジョブの管理・スケジュール | COVERED-REAL | native cron（実環境で job.sh を最小環境・多重起動で実行）と VM software の systemd timer（実機）。at は未実習。（旧記述: VM software（systemd timer 実機）、6-7, 23-15 読解。cron は実装済み） | native cron（実装済み）、`at` | N |
 | 運用: パッケージ・リポジトリ | COVERED-REAL | VM packages（deb）、VM osupdate（静的、署名付きローカル repo）。RPM は MISSING（102.5 参照） | RPM 系は別途 | V |
@@ -135,17 +135,17 @@
 | ネットワーク: 静的ルーティング | IMPLEMENTED-UNVERIFIED | 静的経路 2 本と ip route get による経路選択を判定。（旧記述: VM netconfig（VM未実行）、13-1） | 実VMで netconfig を初回通過させ、判定の実出力を確認 | N(要root)/V |
 | ネットワーク: ブリッジ・ボンディング | IMPLEMENTED-UNVERIFIED | bridge と active-backup bond の切替を実測。（旧記述: 17-3, 22-8 読解/設定例） | 実VMで netlink を初回通過させ、判定の実出力を確認 | V |
 | ネットワーク: リバースプロキシ・ロードバランサ | PARTIAL | VM webstack（Nginx 実機）、21-12（HAProxy）, 21-13（keepalived）, 21-14 は読解 | VM で HAProxy 2 backend のヘルスチェック切替 | V |
-| ストレージ: LVM | IMPLEMENTED-UNVERIFIED | ループ上の LVM 拡張とデータ保持。（旧記述: 11-4, 15-3, 15-4） | 実VMで mounts を初回通過させ、判定の実出力を確認 | V |
+| ストレージ: LVM | COVERED-REAL | ループ上の LVM 拡張とデータ保持。（旧記述: 11-4, 15-3, 15-4） 実出力: [g2記録](vm_verification/g2-system.md)。 | 初回通過確認済み。再起動の未検証範囲はg2記録を参照 | V |
 | ストレージ: 仮想ファイルシステムの設定 | PARTIAL | 14-6（/proc,/sys 読解）、26-21（bind/tmpfs/overlay 読解） | native 可能: tmpfs/bind/overlay を unshare -m 内で実マウント | N(要root)/V |
 | ストレージ: FS の作成・管理・障害対応 | PARTIAL | VM storage（inode 枯渇）、15-7, 26-x。VM mounts は実装済み | 104.1 / 104.3 参照 | V |
 | ストレージ: リモート FS・ネットワークブロックデバイス | IMPLEMENTED-UNVERIFIED | NFSv4 のみ。NBD/iSCSI は対象外。（旧記述: 15-8, 17-5, 23-10 読解。実 NFS/iSCSI/NBD なし） | 実VMで fileshare を初回通過させ、判定の実出力を確認 | V |
-| ストレージ: スワップ | IMPLEMENTED-UNVERIFIED | swapfile の mkswap/swapon/fstab とサイズ判定。（旧記述: 15-6（swapfile+swappiness 設定の読解）、26-16） | 実VMで mounts を初回通過させ、判定の実出力を確認 | V |
+| ストレージ: スワップ | COVERED-REAL | swapfile の mkswap/swapon/fstab とサイズ判定。（旧記述: 15-6（swapfile+swappiness 設定の読解）、26-16） 実出力: [g2記録](vm_verification/g2-system.md)。 | 初回通過確認済み。再起動の未検証範囲はg2記録を参照 | V |
 | ストレージ: オートマウンタ | PARTIAL | 23-11（auto.master 読解） | VM autofs | V |
 | ストレージ: ストレージ性能の監視 | PARTIAL | VM performance（CPU/IO 中心）、12-3, 19-14, 32-11 | iostat/fio を VM で実行し原因特定 | V |
 | 基本コマンド: 基本 Git | COVERED-REAL | native git, 30-1〜30-28 | なし | N |
 | 基本コマンド: サービスの作成・設定・障害対応 | COVERED-REAL | VM software, VM boot, 7-3, 28-20〜28-23 | なし | V |
 | 基本コマンド: サービス・性能の監視と障害対応 | COVERED-REAL | VM performance, 12-1〜12-4, 27-x | なし | V |
-| 基本コマンド: アプリ・サービス固有の制約 | IMPLEMENTED-UNVERIFIED | systemd の MemoryMax/LimitNOFILE をドロップインで直し、実プロセスの /proc/PID/limits と cgroup memory.max で判定。（旧記述: 16-8, 16-9, 18-2, 27-13（ulimit/cgroup 読解）。VM limits は実装済み） | 実VMで limits を初回通過させ、判定の実出力を確認 | V |
+| 基本コマンド: アプリ・サービス固有の制約 | COVERED-REAL | systemd の MemoryMax/LimitNOFILE をドロップインで直し、実プロセスの /proc/PID/limits と cgroup memory.max で判定。（旧記述: 16-8, 16-9, 18-2, 27-13（ulimit/cgroup 読解）。VM limits は実装済み） 実出力: [g2記録](vm_verification/g2-system.md)。 | 初回通過確認済み。再起動の未検証範囲はg2記録を参照 | V |
 | 基本コマンド: ディスク容量の問題 | COVERED-REAL | VM storage（inode 枯渇）、11-3, 11-7, 3-8, 15-10 | なし | V |
 | 基本コマンド: SSL 証明書 | COVERED-REAL | native tls, 13-3, 20-10〜20-12, 20-16 | certbot/ACME の実動作は読解のみ | N |
 | ユーザー: ローカルユーザー・グループ | IMPLEMENTED-UNVERIFIED | ユーザー・グループ・sudoers の実状態。（旧記述: VM users（VM未実行）、7-4, 28-1〜28-5） | 実VMで users を初回通過させ、判定の実出力を確認 | V |
@@ -184,19 +184,19 @@
 | R24 プロセスのスケジューリング優先度 | PARTIAL | 27-8, 16-9 読解 | 103.6 参照 | N |
 | R25 tuned プロファイル管理 | IMPLEMENTED-UNVERIFIED | tuned-adm active/verify と実 sysctl 値。RHEL 系を前提とするが tuned は Debian でも導入可。（旧記述: `tuned` は 2 回言及（stage2）が操作課題ではない） | 実VMで tuned を初回通過させ、判定の実出力を確認 | V（RHEL 系） |
 | R26 ログとジャーナルの検索 | COVERED-REAL | 7-2, VM software（journalctl で設定故障を特定） | なし | N/V |
-| R27 ジャーナルの永続化 | IMPLEMENTED-UNVERIFIED | /var/log/journal の永続化と実書込みを判定。（旧記述: 23-14（読解）。VM journald は実装済み） | 実VMで journald を初回通過させ、判定の実出力を確認 | V |
+| R27 ジャーナルの永続化 | COVERED-REAL | /var/log/journal の永続化と実書込みを判定。（旧記述: 23-14（読解）。VM journald は実装済み） 実出力: [g2記録](vm_verification/g2-system.md)。 | 初回通過確認済み。再起動の未検証範囲はg2記録を参照 | V |
 | R28 ネットワークサービスの開始・停止・状態 | COVERED-REAL | VM software, VM webstack, 7-1 | なし | V |
 | R29 システム間の安全なファイル転送 | COVERED-REAL | native rsync, native ssh, VM ssh（scp/rsync 実機） | なし | N/V |
 | R30 GPT ディスクのパーティション作成・一覧・削除 | PARTIAL | 15-1, 26-2, 26-3 読解/dry-run | ループデバイスで `parted/sgdisk` を実操作 | N(要root)/V |
-| R31 PV の作成・削除 | IMPLEMENTED-UNVERIFIED | pvcreate（2 本目の PV）を実判定。（旧記述: 15-3, 11-4 読解） | 実VMで mounts を初回通過させ、判定の実出力を確認 | V |
-| R32 PV を VG へ割り当て | IMPLEMENTED-UNVERIFIED | vgextend を判定。（旧記述: 同上） | 実VMで mounts を初回通過させ、判定の実出力を確認 | V |
+| R31 PV の作成・削除 | COVERED-REAL | pvcreate（2 本目の PV）を実判定。（旧記述: 15-3, 11-4 読解） 実出力: [g2記録](vm_verification/g2-system.md)。 | 初回通過確認済み。再起動の未検証範囲はg2記録を参照 | V |
+| R32 PV を VG へ割り当て | COVERED-REAL | vgextend を判定。（旧記述: 同上） 実出力: [g2記録](vm_verification/g2-system.md)。 | 初回通過確認済み。再起動の未検証範囲はg2記録を参照 | V |
 | R33 LV の作成・削除 | PARTIAL | mounts は LV 拡張が中心で、LV の新規作成・削除は setup 側。。（旧記述: 同上） | 同上 | V |
-| R34 UUID/ラベルでの起動時マウント | IMPLEMENTED-UNVERIFIED | UUID 指定の fstab 行を findmnt で判定。（旧記述: 11-2, 26-9, 26-20 読解。VM mounts は実装済み） | 実VMで mounts を初回通過させ、判定の実出力を確認 | V |
-| R35 データを失わずにパーティション/LV/swap を追加 | IMPLEMENTED-UNVERIFIED | 稼働データの sha256 を保ったまま拡張。（旧記述: 15-6, 15-4 読解） | 実VMで mounts を初回通過させ、判定の実出力を確認 | V |
+| R34 UUID/ラベルでの起動時マウント | COVERED-REAL | UUID 指定の fstab 行を findmnt で判定。（旧記述: 11-2, 26-9, 26-20 読解。VM mounts は実装済み） 実出力: [g2記録](vm_verification/g2-system.md)。 | 初回通過確認済み。再起動の未検証範囲はg2記録を参照 | V |
+| R35 データを失わずにパーティション/LV/swap を追加 | COVERED-REAL | 稼働データの sha256 を保ったまま拡張。（旧記述: 15-6, 15-4 読解） 実出力: [g2記録](vm_verification/g2-system.md)。 | 初回通過確認済み。再起動の未検証範囲はg2記録を参照 | V |
 | R36 VFAT/ext4/XFS の作成・マウント・利用 | PARTIAL | ext4 のみ。XFS（mkfs.xfs/xfs_growfs）と VFAT は未実習。（旧記述: VM storage（ext4 のみ実機）。XFS（`mkfs.xfs`）と VFAT は未出） | XFS/VFAT の mkfs・mount・`xfs_growfs` | V |
 | R37 NFS 共有のマウント・アンマウント | IMPLEMENTED-UNVERIFIED | NFSv4 の実マウントと書き込み。（旧記述: 15-8, 17-5 読解） | 実VMで fileshare を初回通過させ、判定の実出力を確認 | V |
 | R38 autofs 設定 | PARTIAL | 23-11 読解 | VM autofs | V |
-| R39 既存 LV の拡張 | IMPLEMENTED-UNVERIFIED | lvextend + resize2fs（FS が LV の 95% 以上）を判定。（旧記述: 11-4, 15-4 読解） | 実VMで mounts を初回通過させ、判定の実出力を確認 | V |
+| R39 既存 LV の拡張 | COVERED-REAL | lvextend + resize2fs（FS が LV の 95% 以上）を判定。（旧記述: 11-4, 15-4 読解） 実出力: [g2記録](vm_verification/g2-system.md)。 | 初回通過確認済み。再起動の未検証範囲はg2記録を参照 | V |
 | R40 ファイルパーミッション問題の診断・修正 | COVERED-REAL | VM permissions, 3-x, 11-6, 12-7 | なし | N/V |
 | R41 at/cron/systemd timer | PARTIAL | native cron は自前パーサ、timer は VM software 実機。at は未実習。（旧記述: VM software（timer は実機）。cron/at は読解（6-7, 23-15）。native cron は実装済み） | native cron（実装済み）、at | N/V |
 | R42 サービスの起動・停止・自動起動 | COVERED-REAL | VM software, VM boot, 7-1 | なし | V |
@@ -220,23 +220,23 @@
 | R61 SELinux ポートラベル（semanage port） | PARTIAL | selinux モジュールは fcontext とブール値。semanage port は判定しない。（旧記述: 16-1 に `semanage` 名前あり、読解のみ） | RHEL 系 VM で非標準ポートの httpd を `semanage port -a` | V（RHEL 系） |
 | R62 SELinux ブール値（setsebool） | IMPLEMENTED-UNVERIFIED | httpd_can_network_connect の現在値と -P 永続化を判定。（旧記述: `setsebool` はコーパスに出ない） | 実VMで selinux を初回通過させ、判定の実出力を確認 | V（RHEL 系） |
 
-## 集計（第 2 版）
+## 集計（実VM再開後）
 
 | 試験 | 行数 | COVERED-REAL | IMPLEMENTED-UNVERIFIED | PARTIAL | MISSING |
 |---|---|---|---|---|---|
-| LPIC-1 | 42 | 15 | 8 | 15 | 4 |
-| LPIC-2 | 41 | 7 | 13 | 19 | 2 |
-| LFCS | 34 | 12 | 12 | 10 | 0 |
-| RHCSA | 61 | 22 | 18 | 19 | 2 |
-| 合計（試験間の重複行を含む） | 178 | 56 | 51 | 63 | 8 |
+| LPIC-1 | 42 | 16 | 7 | 16 | 3 |
+| LPIC-2 | 41 | 10 | 11 | 19 | 1 |
+| LFCS | 34 | 16 | 8 | 10 | 0 |
+| RHCSA | 61 | 28 | 12 | 19 | 2 |
+| 合計（試験間の重複行を含む） | 178 | 70 | 38 | 64 | 6 |
 
-第 1 版（COVERED 55 / PARTIAL 112 / MISSING 11、VM 未実行モジュールの扱いが曖昧）との比較: COVERED-REAL は 55 から 56（native cron が LFCS の 1 行を閉じた分だけ増加。他は実質据え置き）。第 1 版の PARTIAL のうち 51 行は「実装済み・実機未検証」として切り出した。MISSING は 11 から 8 に減った（RHCSA の tuned・setsebool は実習が追加されて IU、subscription は dnf のローカル repo で PARTIAL）。
+実VM通過記録のあるg2の13行とFTPを反映。印刷は模擬実習のためPARTIAL。未実行モジュールは昇格させていない。
 
 LFCS/RHCSA/LPIC は重複が大きい（シェル・ssh・パーミッション・systemd・ストレージ・ネットワーク）ので、合計を独立した目標数として扱わないこと。
 
-### モジュール別: 実 VM の初回通過で COVERED-REAL になる行数
+### モジュール別: 再開前の昇格候補（履歴）
 
-IMPLEMENTED-UNVERIFIED の行を、必要なモジュール別に数えた。複数モジュールが必要な行は、各モジュールに数える（その行は全部が通るまで昇格しない: 205.1 は netconfig と netlink）。昇格は「判定が実機で正しく動く」ことが前提で、判定の誤りが見つかればモジュールを直してから再実行になる。
+以下は第2版時点の履歴。mounts/sysctl/journald/limitsは上の現行表へ反映済み。第2版のIMPLEMENTED-UNVERIFIED の行を、必要なモジュール別に数えた。複数モジュールが必要な行は、各モジュールに数える（その行は全部が通るまで昇格しない: 205.1 は netconfig と netlink）。昇格は「判定が実機で正しく動く」ことが前提で、判定の誤りが見つかればモジュールを直してから再実行になる。
 
 | モジュール | 昇格する行数 | 行 |
 |---|---|---|
