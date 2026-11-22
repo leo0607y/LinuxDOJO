@@ -30,8 +30,14 @@
   - 引き継ぎ書をこまめに更新する。
   - 完了した小単位ごとに検証し、細かく定期的にコミットする。push は確認後。
 
+### 利用者の追加要望（Codex再開後）
+- サブエージェントとモデルを適切に使って効率化する。UI担当 Astra、VM検証担当 Sol を並列稼働中。
+- サイトは単調な色・角丸・定型AI風カードを避け、情報設計と文字組みを整える。実画面で確認してから反映する。
+- 日常Linuxで知らないと困る操作の抜けを監査し、実操作できる課題で補う。名前だけ増やさない。
+- ターミナル版のスタートは以前のペンギンとカラフルな文字を戻し、動き・表情を付ける。
+
 ### Codexでの再開チェックポイント（2026-11-22）
-- 前セッションのバックグラウンド担当は継続していない。完了報告待ちにはせず、残存ファイル・VMから再検証する。
+- 前セッションのバックグラウンド担当は継続していない。Codexでは新たに site_ui / vm_postgres / vm_podman を起動。完了報告待ちにはせず、残存ファイル・VMから再検証する。
 - 再開時HEADは `ff43122`。記録がある実VM検証は `g2-system.md` の5モジュールのみ（従来の9モジュールとは別）。g1/g3〜g8の途中修正を検証済みとは扱わない。
 - 残存VM: g1-app/client、g3-app〜g8-app。削除せず状態を確認して再利用する。
 - 周辺機器の模擬パック31問を取り込み。`python3 -m unittest discover -s tests -p test_desktop_sim.py`: 11テスト成功（初期未達成・全正解・罠拒否・ホストsubprocess禁止を含む）。実機検証ではない。
@@ -44,7 +50,10 @@
 - 対応表へg2の13行とFTPを反映。印刷は模擬のためPARTIAL。集計は生成処理で実際の目標行と照合する。
 - 前担当の途中変更: guard/libvirt/netlink/pam/podman/postgres/systemdadv/tuned。VM関連単体テスト202件は成功したが、この8本の実VM通過は未確認。作業消失防止のWIPコミットとして保存。これらは実VM未検証のままで、次に個別シナリオを追加して確認する。
 - localcaの実TLSテスト中にパイプ未closeのResourceWarningが出たため修正。ResourceWarningをerrorにした4テストが成功（33秒）。
-- lynisは正解候補でも指標59→59、BANN-7130残留で拒否。まだ完了扱いにしない。調査中。
+- lynisは短いバナーでBANN-7130が残ることを実測。Lynisログの一致語数に合わせてヒントと解答例を改善し、指標59→60・対象警告消失・誤設定拒否・resetまで通過。記録作成待ち。
+- usersもg1-appで正解・過剰sudo/管理グループ/期限切れ/モード誤りの拒否・resetを確認。記録作成待ち。
+- 講座修正後の全Python: 618件成功、skip48、192.6秒。サイトbuild、npm test7件、course node4件、E2E14件成功（その後のUI・課題追加は再検証が必要）。
+- 起動画面: ペンギン復帰・青/紫/シアンの配色復帰・短い瞬き/ウインク/笑顔を追加。NO_COLOR/非TTY/LQ_NO_ANIMATIONでは静止。レイアウト10テスト成功。
 
 ### 実装済みの範囲
 - VMモジュール: 合計 約65（`labs/vm/guest/modules/*.sh`、`ls` で数える）。既存9（packages software ssh permissions network performance storage boot webstack）は以前の実VMで検証済み。追加分は下記の実VM検証を進行中。RHEL系3本（selinux dnf firewalld）は RHEL 系 VM が必要で、`labs/vm/RHEL.md` に手動手順がある。Ubuntu VMでは常に拒否される。

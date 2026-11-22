@@ -159,6 +159,8 @@ def title_screen():
     print()
     print(ui.title_art())
     print()
+    ui.penguin_intro()
+    print()
     print("  " + c("はじめの一文字から学ぶ Linux 教材", "bold") + c(f"    v{VERSION}", "dim"))
     print(c("  " + "─" * 40, "dim"))
     lines = ["Linux が初めてでも大丈夫。文字の入力から始められます。",

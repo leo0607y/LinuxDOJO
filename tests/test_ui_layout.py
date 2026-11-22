@@ -51,9 +51,21 @@ class LayoutTests(unittest.TestCase):
         self.assertTrue(ui.strip_ansi(ui.progress_bar(0.01, 10)).startswith("█"))
         self.assertTrue(ui.strip_ansi(ui.progress_bar(0.99, 10)).endswith("░"))
 
-    def test_palette_collapses_decorative_colors_to_one_accent(self):
-        for name in ("blue", "magenta", "cyan", "bcyan", "bmagenta", "bblue"):
-            self.assertEqual(ui.CODES[name], ui.ACCENT)
+    def test_start_palette_and_penguin_have_distinct_colors_and_stable_frames(self):
+        self.assertEqual(len({ui.CODES[n] for n in ("blue", "magenta", "cyan")}), 3)
+        frames = [ui.penguin_art(mood) for mood in ("ready", "blink", "wink", "happy")]
+        self.assertEqual(len({len(ui.strip_ansi(f)) for f in frames}), 1)
+        for frame in frames:
+            self.assertEqual(len(frame.splitlines()), 7)
+            self.assertIn("HELLO, COMMAND LINE.", frame)
+
+    def test_intro_without_color_is_static_and_does_not_wait(self):
+        import io
+        output = io.StringIO()
+        with patch.object(ui, "USE_COLOR", False), patch.object(ui.sys, "stdout", output), patch.object(ui.select, "select") as wait:
+            ui.penguin_intro()
+        wait.assert_not_called()
+        self.assertNotIn("\x1b", output.getvalue())
 
     def test_no_color_output_has_no_escape_sequences(self):
         with patch.object(ui, "USE_COLOR", False):

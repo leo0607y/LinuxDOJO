@@ -7,6 +7,7 @@ import os
 import re
 import shutil
 import signal
+import select
 import sys
 import unicodedata
 
@@ -17,15 +18,15 @@ if os.environ.get("LQ_FORCE_COLOR"):
 
 # パレットはここで一度だけ定義する。
 #   アクセント: cyan（見出し・キー・コマンド） / 補助: dim / 成功: green / 失敗: red / 注意: yellow
-# 旧来の色名（blue・magenta・bcyan など）はすべてアクセントに寄せ、画面ごとに色が散らばらないようにする。
+# 見出しと起動画面は従来の青・紫・シアンを使い分ける。
 ACCENT = "36"
 CODES = {
     "reset": "0", "bold": "1", "dim": "2", "italic": "3", "under": "4", "blink": "5", "rev": "7",
     "black": "30", "red": "31", "green": "32", "yellow": "33", "white": "0",
     "gray": "2",
-    "blue": ACCENT, "magenta": ACCENT, "cyan": ACCENT,
-    "bred": "91", "bgreen": "92", "byellow": "33", "bblue": ACCENT,
-    "bmagenta": ACCENT, "bcyan": ACCENT, "bwhite": "1",
+    "blue": "34", "magenta": "35", "cyan": "36",
+    "bred": "91", "bgreen": "92", "byellow": "93", "bblue": "94",
+    "bmagenta": "95", "bcyan": "96", "bwhite": "97",
     "accent": ACCENT, "ok": "32", "ng": "31", "warn": "33",
     "on_blue": "44", "on_magenta": "45", "on_green": "42", "on_red": "41", "on_gray": "100",
 }
@@ -416,8 +417,44 @@ PENGUIN = r"""
 
 
 def title_art():
+    if term_rows() < 28:
+        return "  " + c("Linux", "bcyan", "bold") + c("DOJO", "bmagenta", "bold")
     art = TITLE_ART if term_width() >= 88 else TITLE_ART_SMALL
-    return "\n".join(c(ln, "accent") for ln in art.strip("\n").split("\n"))
+    colors = ("bmagenta", "magenta", "bblue", "blue", "bcyan", "cyan")
+    return "\n".join(c(ln, colors[i % len(colors)], "bold")
+                     for i, ln in enumerate(art.strip("\n").split("\n")))
+
+
+def penguin_art(mood="ready"):
+    """絵文字を使わず、同じ大きさのASCIIペンギンで表情を付ける。"""
+    eyes = {"ready": "o_o", "blink": "-_-", "wink": "o_-", "happy": "^_^"}.get(mood, "o_o")
+    lines = PENGUIN.strip("\n").replace("o_o", eyes).splitlines()
+    captions = ["", "HELLO, COMMAND LINE.", "", "一文字ずつ、できることを増やそう。", "", "$ _", ""]
+    return "\n".join(c(line.ljust(19), "byellow" if i == 6 else "bcyan")
+                     + c(captions[i], "bmagenta" if i == 1 else "green" if i == 5 else "white")
+                     for i, line in enumerate(lines))
+
+
+def penguin_intro():
+    """短い瞬きと笑顔。Enterは消費せず、次の入力へ渡す。"""
+    print(penguin_art())
+    if (not USE_COLOR or not sys.stdout.isatty() or not sys.stdin.isatty()
+            or os.environ.get("LQ_NO_ANIMATION") or os.environ.get("TERM") == "dumb"):
+        return
+    try:
+        sys.stdout.write("\x1b[?25l")
+        for mood in ("ready", "blink", "ready", "wink", "happy"):
+            if select.select([sys.stdin], [], [], 0.12)[0]:
+                break
+            frame = "\n".join("\x1b[2K" + row for row in penguin_art(mood).splitlines())
+            sys.stdout.write("\x1b[7A\r" + frame + "\n")
+            sys.stdout.flush()
+    except (OSError, ValueError, TypeError):
+        # Windows console and some embedded terminals cannot select() stdin.
+        pass
+    finally:
+        sys.stdout.write("\x1b[?25h")
+        sys.stdout.flush()
 
 
 CLEAR_ART = r"""
