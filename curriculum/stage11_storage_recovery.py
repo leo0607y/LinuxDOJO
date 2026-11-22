@@ -186,7 +186,7 @@ def s6(ctx):
     dump(ctx,'backup/metadata.json',meta);dump(ctx,'live/metadata.json',dict(mode='0644',owner='root',group='root',acl=[]))
     ctx.data['metadata']=meta
     ctx.write('backup/SHA256SUMS',hashlib.sha256(text.encode()).hexdigest()+'  backup/config.ini\n')
-    ctx.write('requirements.txt','バックアップのハッシュを照合。変更前のlive/config.iniをevidence/before.iniに保ち、内容とmode640を復元。live/metadata.jsonにメタデータ控えを復元する。拡張ACLがある場合modeのgroupビットはmaskに対応する。所有者/ACLは控えの比較であり、実際のchown/setfacl操作は別VM実習。\n')
+    ctx.write('requirements.txt','バックアップのハッシュを照合し、結果を verification.txt に保存。変更前のlive/config.iniをevidence/before.iniに保ち、内容とmode640を復元。live/metadata.jsonにメタデータ控えを復元する。拡張ACLがある場合modeのgroupビットはmaskに対応する。所有者/ACLは控えの比較であり、実際のchown/setfacl操作は別VM実習。\n')
     preserve(ctx,'backup/config.ini','backup/metadata.json','backup/SHA256SUMS')
 
 

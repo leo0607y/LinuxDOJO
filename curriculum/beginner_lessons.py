@@ -481,10 +481,13 @@ BASIC.extend([
            "-i の後ろには、自分が使う秘密鍵ファイルのパスを書きます。今回は2222番を使う設定の練習です。\n"
            "公開鍵は接続先への登録用、秘密鍵は自分の手元で守るものです。秘密鍵を相手やチャットへ渡しません。\n"
            "ここで使う training_key は無効な教材用ダミーで、実際の秘密鍵は作成も使用もしません。",
-           "ポート 2222、鍵 .ssh/training_key、ユーザー名 learner、接続先 training-server を指定して接続しましょう。",
+           "ポート 2222、鍵ファイル training_key（置き場所は自分で探します）、ユーザー名 learner、接続先 training-server を指定して接続しましょう。",
            "ssh -p 2222 -i .ssh/training_key learner@training-server",
            "指定した接続方法で入りました。-p は接続先のポート、-i は自分の秘密鍵の指定です。",
-           ssh_known=True, files={".ssh/training_key": _TRAINING_KEY}, modes={".ssh/training_key": 0o600}),
+           ssh_known=True, files={".ssh/training_key": _TRAINING_KEY}, modes={".ssh/training_key": 0o600},
+           hints=["鍵のファイル名は training_key ですが、置き場所は書かれていません。まず、いまいる場所（ホーム）に何があるかを調べましょう。名前がドット . で始まるものは、隠しファイルです。",
+                  "鍵は隠しフォルダの中にあるかもしれません。以前に習った ls -a で隠しファイルまで表示し、見つけたフォルダは ls フォルダ名 で中身を見ましょう。SSHの鍵は .ssh というフォルダに置くのが決まりです。",
+                  "入力例: ssh -p 2222 -i .ssh/training_key learner@training-server（-i の後ろは、見つけた鍵の場所です）"]),
     lesson("basic-44", "接続方法が違っても終了は同じ",
            "鍵やポートを指定して接続した場合も、作業を終えたら接続先で exit と入力します。\n"
            "接続したまま手元側のつもりでファイルを操作しないよう、表示を意識しましょう。",
