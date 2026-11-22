@@ -99,7 +99,7 @@
 - 起動: Node 22 が必要（この環境ではスクラッチパッドに展開したもの）。`cd web/danganlog && npm ci && npm run dev -- -p 3000`。ビルド: `npm run build`（`tools/build_web.py` が `python-source.json` を生成）。
 - テスト: `npm test`（node）、`npm run test:e2e`（Playwright、実ブラウザ。14件通過を確認済み）。
 - `/course/`: 32トピックの講座ページ（`tools/build_course_data.py` が生成）。見た目を Ubuntu 端末風に揃える作業が未確認。
-- Cloudflare: `wrangler login` 済みの前提。既存の別プロジェクトには触らない。デプロイは `web/danganlog/scripts/deploy.sh`（設定は `.env.deploy`、Git管理外。手順は `web/danganlog/README.md`）。利用者の見た目確認後に実行する。
+- Cloudflare: `wrangler login` 済みの前提。デプロイは `web/danganlog/scripts/deploy.sh`（設定は `.env.deploy`、Git管理外。手順は `web/danganlog/README.md`）。利用者の見た目確認後に実行する。
 
 ### 残りの作業（優先順）
 1. 実VM検証の結果（`docs/vm_verification/`）を、各表に反映し、`FIRST_RUN.md` を「実VMで確認した事項」に更新する。
