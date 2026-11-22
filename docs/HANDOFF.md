@@ -3,7 +3,7 @@
 最終更新: 2026-11-22 / ブランチ: `learning-expansion` / 状態を変えたら必ずこの表も更新する。
 
 ## 再開手順（別のAI／別セッションはまずここから）
-1. `git status` と `git log --oneline | head` を見る。作業は `learning-expansion` ブランチ。**未コミットの課題ファイルがディスク上に残っていることがある**（コミットはStage全体の統合テスト後にまとめて行う運用のため）。
+1. `git status` と `git log --oneline | head` を見る。作業は `learning-expansion` ブランチ。**未コミットの課題ファイルがディスク上に残っていることがある**（前セッションの中断で残存。現在は完了した小単位ごとに検証してコミットする）。
 2. `python3 tools/stage_status.py` を実行する。**この出力が正**で、下の表より優先する。
    - `STUB`（1行だけ）= 未作成。作成を割り当て直す。サブエージェントが作成中の可能性もあるので、ファイルの更新時刻（`ls -l curriculum/`）が直近なら数分待つ。
    - `WRITTEN` = 課題あり。ただし**検証済みとは限らない**。必ず `python3 tests/test_all_missions.py <ID...>` で確認。
@@ -28,11 +28,20 @@
   - サイトの**デプロイは、利用者が開発サーバーで見た目を確認してから**。それまで `wrangler deploy` や `pages deploy` を実行しない（自動許可の判定でも拒否された）。
   - 不足（未対応）を0にする方針。`docs/objectives_matrix.md` の MISSING を減らし続ける。
   - 引き継ぎ書をこまめに更新する。
+  - 完了した小単位ごとに検証し、細かく定期的にコミットする。push は確認後。
+
+### Codexでの再開チェックポイント（2026-11-22）
+- 前セッションのバックグラウンド担当は継続していない。完了報告待ちにはせず、残存ファイル・VMから再検証する。
+- 再開時HEADは `ff43122`。記録がある実VM検証は `g2-system.md` の5モジュールのみ（従来の9モジュールとは別）。g1/g3〜g8の途中修正を検証済みとは扱わない。
+- 残存VM: g1-app/client、g3-app〜g8-app。削除せず状態を確認して再利用する。
+- 周辺機器の模擬パック31問を取り込み。`python3 -m unittest discover -s tests -p test_desktop_sim.py`: 11テスト成功（初期未達成・全正解・罠拒否・ホストsubprocess禁止を含む）。実機検証ではない。
+- 全Pythonテストを実行中。ログ `/tmp/training-unittest.log` は一時保存で、結果を確認後にここへ追記する。
+- 未コミットのVMモジュール12本とFTPテストは前担当の途中変更。レビュー・検証後に別単位でコミットする。
 
 ### 実装済みの範囲
 - VMモジュール: 合計 約65（`labs/vm/guest/modules/*.sh`、`ls` で数える）。既存9（packages software ssh permissions network performance storage boot webstack）は以前の実VMで検証済み。追加分は下記の実VM検証を進行中。RHEL系3本（selinux dnf firewalld）は RHEL 系 VM が必要で、`labs/vm/RHEL.md` に手動手順がある。Ubuntu VMでは常に拒否される。
 - ネイティブ実習: 合計39（`curriculum/toolbox_labs.py` と `toolbox_labs2.py`〜`toolbox_labs5.py`）。`add` は ID の重複で例外を出す。
-- 模擬の周辺機器実習（Wi-Fi・Bluetooth・音声・印刷）: `engine/commands/desktop.py` と `curriculum/stage35_desktop_hw.py`（担当エージェントが作業中。STAGES[35] は配線済み）。模擬であり、実機の技能の証明ではない。
+- 模擬の周辺機器実習（Wi-Fi・Bluetooth・音声・印刷）: `engine/commands/desktop.py` と `curriculum/stage35_desktop_hw.py`（前担当は中断。課題まつりの `desktop_hw` パック31問として取り込み、実践Stageへの登録は行わない）。模擬であり、実機の技能の証明ではない。
 - ターミナル版のUI: `engine/ui.py` に配色・記号・共通部品（header、menu_row、footer など）を定義。ターミナル風の見た目に刷新済み。
 
 ### 実VMでの検証（重要）

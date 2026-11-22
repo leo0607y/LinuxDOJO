@@ -268,7 +268,7 @@ def mastery_areas():
         ("ユーザー・グループ・アクセス権を管理する", _expert("users"), [], []),
         ("Git で変更を記録・復旧する", _expert("git"), [], []),
         ("目的から手順を組み立てる総合演習", [],
-         _pack("drills") + _pack("scenarios") + _pack("operations") + _pack("network_ops") + _pack("scripting") + _pack("backup_ops"), []),
+         _pack("drills") + _pack("scenarios") + _pack("operations") + _pack("network_ops") + _pack("scripting") + _pack("backup_ops") + _pack("desktop_hw"), []),
         ("Web の認証・認可・設定を検証する", [], [], _practice("8-")),
         ("Linux の安全性を監査・修正する", [], [], _practice("9-")),
         ("証拠を保全して調査・報告する", [], [], _practice("10-")),
