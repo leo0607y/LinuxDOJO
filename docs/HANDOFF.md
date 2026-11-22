@@ -53,11 +53,12 @@
 - lynisは短いバナーでBANN-7130が残ることを実測。Lynisログの一致語数に合わせてヒントと解答例を改善し、指標59→60・対象警告消失・誤設定拒否・resetまで通過。記録作成待ち。
 - usersもg1-appで正解・過剰sudo/管理グループ/期限切れ/モード誤りの拒否・resetを確認。記録作成待ち。
 - 講座修正後の全Python: 618件成功、skip48、192.6秒。サイトbuild、npm test7件、course node4件、E2E14件成功（その後のUI・課題追加は再検証が必要）。
+- 常用安全操作: native `safe-cleanup` を追加（40本目）。空白/改行/タブ/先頭ハイフン・リンク非追跡・NUL一覧・tar退避・チェックサム・隔離移動・復元。実ツール3テスト成功。
 - 起動画面: ペンギン復帰・青/紫/シアンの配色復帰・短い瞬き/ウインク/笑顔を追加。NO_COLOR/非TTY/LQ_NO_ANIMATIONでは静止。レイアウト10テスト成功。
 
 ### 実装済みの範囲
-- VMモジュール: 合計 約65（`labs/vm/guest/modules/*.sh`、`ls` で数える）。既存9（packages software ssh permissions network performance storage boot webstack）は以前の実VMで検証済み。追加分は下記の実VM検証を進行中。RHEL系3本（selinux dnf firewalld）は RHEL 系 VM が必要で、`labs/vm/RHEL.md` に手動手順がある。Ubuntu VMでは常に拒否される。
-- ネイティブ実習: 合計39（`curriculum/toolbox_labs.py` と `toolbox_labs2.py`〜`toolbox_labs5.py`）。`add` は ID の重複で例外を出す。
+- VMモジュール: 合計51（`labs/vm/guest/modules/*.sh`、`ls` で数える）。既存9（packages software ssh permissions network performance storage boot webstack）は以前の実VMで検証済み。追加分は下記の実VM検証を進行中。RHEL系3本（selinux dnf firewalld）は RHEL 系 VM が必要で、`labs/vm/RHEL.md` に手動手順がある。Ubuntu VMでは常に拒否される。
+- ネイティブ実習: 合計40（`curriculum/toolbox_labs.py` と `toolbox_labs2.py`〜`toolbox_labs6.py`）。`add` は ID の重複で例外を出す。
 - 模擬の周辺機器実習（Wi-Fi・Bluetooth・音声・印刷）: `engine/commands/desktop.py` と `curriculum/stage35_desktop_hw.py`（前担当は中断。課題まつりの `desktop_hw` パック31問として取り込み、実践Stageへの登録は行わない）。模擬であり、実機の技能の証明ではない。
 - ターミナル版のUI: `engine/ui.py` に配色・記号・共通部品（header、menu_row、footer など）を定義。ターミナル風の見た目に刷新済み。
 

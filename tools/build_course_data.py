@@ -24,7 +24,7 @@ NATIVE_NEW = "ネイティブ: 追加直後、実機での検証記録は未整�
 NATIVE_STATUS = {"logrotate": ("unit", NATIVE_UNIT), "cron": ("new", NATIVE_NEW), "trap": ("new", NATIVE_NEW),
                  "tcpdump": ("new", NATIVE_NEW), "debbuild": ("new", NATIVE_NEW)}
 NATIVE_REAL = {"shell", "find", "archive", "rsync", "git", "vim", "jq", "rg", "curl", "ssh", "tmux",
-               "sqlite", "python", "build", "fzf", "tls", "incident", "release", "docker", "python-packages"}
+               "sqlite", "python", "build", "fzf", "tls", "incident", "release", "docker", "python-packages", "safe-cleanup"}
 
 # VM 実習の検証状況。追加分の実出力は docs/vm_verification/ を参照。
 VM_REAL = {"boot", "storage", "packages", "permissions", "software", "ssh", "network", "performance", "webstack",

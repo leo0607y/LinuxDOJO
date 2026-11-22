@@ -69,7 +69,7 @@ class NativeToolboxTests(unittest.TestCase):
                         LABS[id]["check"](root)
 
     def test_catalog_has_concrete_native_workflows(self):
-        self.assertEqual(len(LABS), 39)
+        self.assertEqual(len(LABS), 40)
         for id, lab in LABS.items():
             with self.subTest(id=id):
                 for field in ("title", "tools", "packages", "task", "solution", "wrong"):

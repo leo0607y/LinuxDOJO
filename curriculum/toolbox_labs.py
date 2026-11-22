@@ -1501,3 +1501,4 @@ import curriculum.toolbox_labs2  # noqa: E402,F401
 import curriculum.toolbox_labs3  # noqa: E402,F401
 import curriculum.toolbox_labs4  # noqa: E402,F401
 import curriculum.toolbox_labs5  # noqa: E402,F401
+import curriculum.toolbox_labs6  # noqa: E402,F401

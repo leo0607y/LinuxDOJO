@@ -112,9 +112,9 @@ TOPICS = [
 
 # 本物のツール実習との対応。VMが必要な管理操作はdocs/coverage.mdに分けて示す。
 _NATIVE = {
-    "shell": ["shell", "script", "dotfiles", "zsh", "fish", "stow", "manpages"], "files": ["find"], "text": ["shell", "regex"],
+    "shell": ["shell", "script", "dotfiles", "zsh", "fish", "stow", "manpages"], "files": ["find", "safe-cleanup"], "text": ["shell", "regex"],
     "search": ["find", "rg", "jq"], "editor": ["vim"],
-    "archive": ["archive", "release"], "backup": ["rsync", "archive", "backup"],
+    "archive": ["archive", "release", "safe-cleanup"], "backup": ["rsync", "archive", "backup", "safe-cleanup"],
     "process": ["incident"], "network": ["curl", "tcpdump"], "http": ["curl"],
     "tls": ["tls", "localca"], "ssh": ["ssh"], "tmux": ["tmux"],
     "git": ["git"], "python": ["python", "python-packages"], "build": ["build"],
