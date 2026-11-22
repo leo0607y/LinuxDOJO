@@ -105,6 +105,9 @@ Thumbs.db
 !/tools/vmtest/
 /tools/vmtest/*
 !/tools/vmtest/*.py
+!/tools/vmtest/scenarios/
+/tools/vmtest/scenarios/*
+!/tools/vmtest/scenarios/*.sh
 
 # Disposable-VM course sources are teaching material, not generated VM images.
 !/labs/

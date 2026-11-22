@@ -58,13 +58,13 @@ class VmFtpTests(unittest.TestCase):
             return run_bash('source "$1"; F_CONF="$2"; _ftp_policy', str(path), env={"PATH": "/usr/bin:/bin"})
 
     GOOD = ("listen_address=127.0.0.1\nlisten_port=2121\nanonymous_enable=NO\nchroot_local_user=YES\n"
-            "userlist_enable=YES\nuserlist_deny=NO\npasv_min_port=30000\npasv_max_port=30010\n")
+            "userlist_enable=YES\nuserlist_deny=NO\npasv_min_port=30000\npasv_max_port=30010\npasv_address=127.0.0.1\n")
 
     def test_policy_accepts_proper_config_and_rejects_shortcuts(self):
         self.assertEqual(self.policy(self.GOOD).returncode, 0)
         for bad in (self.GOOD + "allow_writeable_chroot=YES\n", self.GOOD.replace("anonymous_enable=NO", "anonymous_enable=YES"),
                     self.GOOD.replace("userlist_deny=NO", "userlist_deny=YES"), self.GOOD.replace("30010", "30100"),
-                    self.GOOD.replace("chroot_local_user=YES\n", "")):
+                    self.GOOD.replace("chroot_local_user=YES\n", ""), self.GOOD.replace("pasv_address=127.0.0.1\n", "")):
             with self.subTest(bad=bad):
                 self.assertEqual(self.policy(bad).returncode, 1)
 

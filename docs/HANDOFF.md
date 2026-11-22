@@ -35,8 +35,10 @@
 - 再開時HEADは `ff43122`。記録がある実VM検証は `g2-system.md` の5モジュールのみ（従来の9モジュールとは別）。g1/g3〜g8の途中修正を検証済みとは扱わない。
 - 残存VM: g1-app/client、g3-app〜g8-app。削除せず状態を確認して再利用する。
 - 周辺機器の模擬パック31問を取り込み。`python3 -m unittest discover -s tests -p test_desktop_sim.py`: 11テスト成功（初期未達成・全正解・罠拒否・ホストsubprocess禁止を含む）。実機検証ではない。
+- FTP実VM再検証完了: `docs/vm_verification/g8-ftp.md`。ACL再検証と追加修正完了: `permissions-recheck.md`。再実行スクリプトは `tools/vmtest/scenarios/`。FTPの単体6テストも成功。g8全体の完了ではない。
+- サイトの `npm test` 7テスト成功、静的ビルド成功。ブラウザE2E実行中。
 - 全Pythonテストを実行中。ログ `/tmp/training-unittest.log` は一時保存で、結果を確認後にここへ追記する。
-- 未コミットのVMモジュール12本とFTPテストは前担当の途中変更。レビュー・検証後に別単位でコミットする。
+- 未コミットのVMモジュール10本は前担当の途中変更。レビュー・検証後に別単位でコミットする。
 
 ### 実装済みの範囲
 - VMモジュール: 合計 約65（`labs/vm/guest/modules/*.sh`、`ls` で数える）。既存9（packages software ssh permissions network performance storage boot webstack）は以前の実VMで検証済み。追加分は下記の実VM検証を進行中。RHEL系3本（selinux dnf firewalld）は RHEL 系 VM が必要で、`labs/vm/RHEL.md` に手動手順がある。Ubuntu VMでは常に拒否される。

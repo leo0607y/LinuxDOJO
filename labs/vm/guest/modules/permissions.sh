@@ -75,10 +75,14 @@ lab_check() (
     [ ! -e "$fresh" ] && [ ! -L "$fresh" ] || exit 1
     trap 'rm -f -- "$fresh"' EXIT
     python3 - "$fresh" <<'PY'
-import sys
-with open(sys.argv[1], 'x', encoding='utf-8') as stream:
+import os, sys
+os.umask(0)  # mode 0640: only a default ACL (not umask/other bits) can let the reader in
+fd = os.open(sys.argv[1], os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o640)
+with os.fdopen(fd, 'w', encoding='utf-8') as stream:
     stream.write('new synthetic report\n')
 PY
+    # -d strips the default: prefix; inspect the full ACL to distinguish inheritance from access.
+    getfacl -cp "$LAB_STATE/reports" | grep -qx 'default:user:dojo-reader:r-x' || { echo 'default ACL on reports must give dojo-reader r-x' >&2; exit 1; }
     runuser -u dojo-reader -- test -r "$fresh" || { echo 'default ACL is missing or ineffective for new files' >&2; exit 1; }
     if runuser -u dojo-reader -- test -w "$fresh"; then echo 'default ACL grants unnecessary write' >&2; exit 1; fi
     if runuser -u dojo-other -- test -r "$fresh"; then echo 'new report is exposed to other user' >&2; exit 1; fi
