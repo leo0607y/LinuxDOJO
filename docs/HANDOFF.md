@@ -21,6 +21,35 @@
 - Python 側は `tests.test_lesson_self_contained tests.test_guided_ssh tests.test_guided tests.test_learning_integration`（64件）が通っている。全体（`test_all_missions` を除く625件）は、課題文を直す前の時点で通過。直した後の全体再実行は未実施。
 - サイト版の `ls` 不具合は、公開中の danganlog.com にまだ残っている（最新のビルドを `scripts/deploy.sh` で反映するまで）。
 
+### 1.6 サイト版（web/danganlog）の修正まとめ（Claude 担当分。全てコミット済み。公開は最初の版のまま）
+
+**公開の状態**: Cloudflare Pages のプロジェクト `danganlog`（`https://danganlog.pages.dev/` と `danganlog.com`）には、**最初のデザインの版**が公開されている。以下の修正はすべて未公開。公開は `cd web/danganlog && scripts/deploy.sh`（利用者が実画面を見てから）。
+
+**A. 不具合の修正（教材の動作）**
+1. `ls` が道場の「レッスン一覧」に横取りされ、ファイル一覧を使うレッスンが進めなかった。`components/Dojo.jsx` の `case 'menu': case 'ls': ...` から `ls` を削除（一覧は `menu` / `lessons`）。e2e に「レッスン04で `ls` を実行するとファイル名が出て達成になる」テストを追加。サイト独自コマンド（help clear theme simple data course modes progress goto open next prev hint answer reset check menu lessons）が、基礎・応用・ミッションの正解コマンドと衝突しないことは確認済み（`21-12` の `mode http` は別コマンドの引数なので無関係）。新しい別名を足したら必ず再確認する。
+2. 課題を達成した後、**何も入力せず Enter で次の問題へ進む**（`submit` で空入力かつ `hasNext` のとき `runLocal('next')`）。達成前の空Enterは何もしない。案内文は「達成済み。Enter で次の問題へ進めます。」。
+3. プロンプトの色分け: `Ps` の正規表現が `learner@dojo-local:~` のコロン区切りに合わず全体が緑になっていた。`user@host` を太字の緑、パスを太字の青にする（`:` と `$` は通常色）。
+4. 説明文は段落ごとに `<p>` に分割して描画（以前は1つのブロックで `white-space: pre-wrap`）。
+
+**B. デザイン（最終版 `ead16d7`。これが現在のソース）**
+- 方針: 実際の Ubuntu 24.04 の GNOME Terminal を基準にする（利用者の指示）。この環境の実設定を読み取って寄せた: フォント Ubuntu Sans Mono 13pt、プロンプトは `01;32m`（緑）の `user@host` と `01;34m`（青）のパス、GNOME のパレット。角丸・装飾・定型AI風カードは使わない。行間は1.25、段落の余白と見出し・太字なし。出力の直後に入力行が続き、ナビとステータスは画面下の小さな文字。
+- フォント: `public/fonts/ubuntu-sans-mono-latin.woff2`（Latin のみ、可変ウェイト）と `UFL-Ubuntu.txt`（ライセンス）を同梱。`@font-face` は `local("Ubuntu Sans Mono")` を先に試す。日本語は `Noto Sans Mono CJK JP`（このPCの `fc-match` が端末で実際に選ぶフォント）。`.gitignore` は `public/fonts/*.woff2` と `UFL-*.txt` を許可済み。
+- 配色（`app/globals.css` の `:root`、`light-dark()`）: ダーク = 背景 `#300a24`、文字 `#ffffff`、緑 `#33da7a`、青 `#62a0ea`、黄 `#e9ad0c`、赤 `#f66151`。ライトは白地。**背景 `#300a24` は推定**（テーマ連動のため端末の設定から読めなかった）。実際の端末と見比べて、違えば `--bg` `--panel` `--raise` `--line` を直す。既定は `color-scheme: dark`（利用者の端末が Yaru-dark のため）。
+- 一画面に収める: PC幅（1280×720）ではページのスクロールが出ない。幅が狭いと、説明ペインの中だけがスクロールする。
+- 検証: スクリーンショットは、1280×720（ライト/ダーク）と 375×700 で目視。e2e 15件（旧14 + `ls` 1件）が、最終デザインで通過していた。
+
+**C. 経緯と、作り直しの背景（無駄を繰り返さないため）**
+- 利用者は、最初の版（茶色・紫・クリーム色の混在、左右分割、色付きボタン）を「ダサい」と言い、ミニマル、AIチャット風、ゲーム風、ハッカー風などを試した末、「実際のLinuxのターミナルをそのまま」と指示した。**色や雰囲気を推測して変えても外れる。実際の端末（この環境で `gsettings` と `fc-match` が読める）を基準にすること。** 「ダサい」の正体は、行間が広い・Markdown風の見出し/太字・角丸・ボタン・帯などの Web ページらしさだった。
+- 利用者の最後の指摘: 「日本語のフォントにもAI感が強い」「色やフォントも実際の端末に似ていない」。後者は、色の読み取り（上のB）とフォント同梱で対処したが、**利用者による再確認は未了**。前者は未対応（現在の日本語は本物の端末と同じ Noto Sans Mono CJK JP）。
+
+**D. 既知の宿題・技術的負債（優先順）**
+1. **`app/globals.css`（325行）が上書きの積み重ね**になっている。元の基本ルール → 「Plain terminal」（204行付近）→ 「Fidelity to GNOME Terminal」（283行付近）→ 末尾の追記、の順に後勝ちで上書きしている。最終的な見た目は正しいが、1つの整理されたスタイルシートに書き直す（見た目を変えずに。スクリーンショットとe2eで差分を確認）。
+2. **アクセシビリティ検査（axe、light/dark × 375/1280）の制約**: 文字色のコントラスト 4.5:1 以上。これまでに落ちた例は、ライトのバッジ文字、ダークの Enter ボタン文字。配色を変えると必ず再実行する。また、キーボード操作のテストは `.field:focus-within` に **`box-shadow` が `none` でない**ことを要求する（現在は薄い下線）。
+3. 新デザインで**未確認**の画面: `/course/` 以下の講座ページ（グローバルCSSの影響で文字サイズ・余白が変わっている可能性）、シンプル表示（`.tw.simple`）、`dialog`（学習データの書き出し）、スマホの入力ボタン列（Tab/↑/↓/Enter）、ライトテーマ全体。
+4. 狭い幅（375px）では、説明ペインが画面の約半分を占め、最後の行が切れる。説明を折りたたむなどの改善余地がある。
+5. 左右の広告枠を入れる場合は、`.workbench > *` の `max-width: 110ch` の外側（左右の余白）に置く。端末の入力欄・操作ボタンの近くには置かない。
+6. 公開前に必ず `cd web/danganlog && npm run build && npm test && npm run test:e2e`。教材（`curriculum/`・`engine/`）を変えたら、サイトのバンドル（`tools/build_web.py`）が変わるので同じく再実行。
+
 ### 2. 利用者の指摘と、残りの作業（優先順）
 1. **「正しい答えなのに次へ進まない」問題の洗い出し**: 判定は `engine/guided.py` の `matches()` が、入力を `shlex.split` した語の並びを、`command` と `accept` のどれかと**完全一致**で比べている（`goal` がある課題は状態で判定）。そのため、オプションの順序違い（例: `ssh -i 鍵 -p 2222 ...` と `ssh -p 2222 -i 鍵 ...`）や、等価な書き方が不正解になる。
    - 基礎66問と応用46問を見直し、順序が入れ替わっても正しい入力は `accept` に追加するか、`goal`（結果で判定）に切り替える。特に ssh / scp / chmod / grep / sort などの複数オプション。
