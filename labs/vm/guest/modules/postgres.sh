@@ -22,7 +22,7 @@ _pg_tools() {
     for t in pg_createcluster pg_dropcluster pg_ctlcluster pg_lsclusters runuser; do
         command -v "$t" >/dev/null || missing+=("$t")
     done
-    for t in psql pg_dump pg_restore pg_basebackup pg_verifybackup; do
+    for t in psql pg_dump pg_restore pg_basebackup pg_verifybackup pg_controldata; do
         [[ -x $PG_BIN/$t ]] || missing+=("$t")
     done
     if ((${#missing[@]})); then
@@ -34,14 +34,16 @@ _pg_tools() {
 }
 
 # Real SQL against the dedicated cluster over the unix socket as OS user postgres (peer).
-_pg_sql() { # $1=db $2=sql
-    runuser -u postgres -- "$PG_BIN/psql" -X -v ON_ERROR_STOP=1 -qAt -p "$PG_PORT" -d "$1" -c "$2"
+_pg_psql() {
+    runuser -u postgres -- "$PG_BIN/psql" -X -v ON_ERROR_STOP=1 -qAt -h /var/run/postgresql -U postgres -p "$PG_PORT" "$@"
 }
+_pg_sql() { _pg_psql -d "$1" -c "$2"; }
 
 # $1=role $2=db $3=sql ; runs inside a rolled-back transaction as that role. Returns psql status.
 _pg_as() {
-    runuser -u postgres -- "$PG_BIN/psql" -X -v ON_ERROR_STOP=1 -qAt -p "$PG_PORT" -d "$2" -f - <<SQL 2>"$LAB_STATE/last-err"
+    _pg_psql -d "$2" -f - <<SQL 2>"$LAB_STATE/last-err"
 BEGIN;
+SET LOCAL lc_messages = 'C';
 SET LOCAL ROLE $1;
 $3;
 ROLLBACK;
@@ -61,14 +63,15 @@ _pg_fingerprint() { # $1=db -> "count:md5"
     _pg_sql "$1" "select count(*) || ':' || md5(string_agg(id || '/' || item || '/' || qty, ',' order by id)) from shop.orders"
 }
 
-# Connection attempts without any credential; success means the server is open to anonymous access.
-_pg_noauth_connect() { # $1=user $2=host
+# Connection attempts without any credential. An optional third argument restricts the auth method.
+_pg_noauth_connect() { # $1=user $2=host $3=require_auth
     runuser -u postgres -- env -i PATH=/usr/bin:/bin PGPASSFILE=/dev/null PGCONNECT_TIMEOUT=3 \
-        "$PG_BIN/psql" -X -w -qAt -h "$2" -p "$PG_PORT" -U "$1" -d shopdb -c 'select 1' >/dev/null 2>&1
+        ${3:+PGREQUIREAUTH="$3"} LC_ALL=C \
+        "$PG_BIN/psql" -X -w -qAt -h "$2" -p "$PG_PORT" -U "$1" -d shopdb -c 'select 1'
 }
 
 _pg_verify() {
-    local v bad want got sysid
+    local v conn bad want got sysid backup_sysid u
     pg_lsclusters -h | awk -v n="$PG_NAME" -v ver="$PG_VER" '$1==ver && $2==n {print $3, $4}' | grep -qx "$PG_PORT online" \
         || { echo "クラスタ $PG_VER/$PG_NAME がポート$PG_PORTでonlineではありません。pg_lsclustersとpg_ctlclusterを確認します。"; return 1; }
     # active (not just file) settings: restart-only settings must really be applied
@@ -81,22 +84,32 @@ _pg_verify() {
     bad=$(_pg_sql postgres "select count(*) from pg_hba_file_rules where error is not null") || return 1
     [[ $bad == 0 ]] || { echo 'pg_hba.confに構文エラーがあります。'; return 1; }
     [[ $(_pg_sql postgres "select count(*) from pg_hba_file_rules where auth_method = 'trust'") == 0 ]] || { echo 'pg_hba.confにtrustが残っています。'; return 1; }
-    [[ $(_pg_sql postgres "select count(*) from pg_hba_file_rules where type like 'host%' and (address is null or address not in ('127.0.0.1','::1'))") == 0 ]] || { echo 'ループバック以外を許可するhost行があります。'; return 1; }
+    [[ $(_pg_sql postgres "select count(*) from pg_hba_file_rules where type like 'host%' and not coalesce((address = '127.0.0.1' and netmask = '255.255.255.255') or (address = '::1' and netmask = 'ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff'), false)") == 0 ]] || { echo 'ループバック以外を許可するhost行があります。'; return 1; }
+    [[ $(_pg_sql postgres "select count(*) from pg_hba_file_rules where type like 'host%' and auth_method <> 'scram-sha-256'") == 0 ]] || { echo 'host行の認証方式をscram-sha-256にします。'; return 1; }
     [[ $(_pg_sql postgres "select count(*) from pg_hba_file_rules where type like 'host%' and address = '127.0.0.1' and auth_method = 'scram-sha-256'") -ge 1 ]] || { echo '127.0.0.1のhost行をscram-sha-256にします。'; return 1; }
     for u in shop_app shop_ro postgres; do
-        if _pg_noauth_connect "$u" 127.0.0.1; then echo "パスワード無しでTCP接続できます($u)。pg_hba.confを直し、reloadします。"; return 1; fi
+        if _pg_noauth_connect "$u" 127.0.0.1 >/dev/null 2>&1; then echo "パスワード無しでTCP接続できます($u)。pg_hba.confを直し、reloadします。"; return 1; fi
     done
-    if _pg_noauth_connect shop_app /var/run/postgresql; then echo 'shop_appがパスワード無しでソケット接続できます。'; return 1; fi
+    for u in shop_app shop_ro; do
+        if _pg_noauth_connect "$u" /var/run/postgresql >/dev/null 2>&1; then echo "$uがパスワード無しでソケット接続できます。"; return 1; fi
+    done
     # roles
-    v=$(_pg_sql postgres "select rolname || ':' || rolsuper || rolcreatedb || rolcreaterole || rolreplication || rolbypassrls || rolcanlogin || ':' || coalesce(left(rolpassword,14),'none') from pg_authid where rolname in ('shop_app','shop_ro') order by 1") || return 1
-    [[ $(wc -l <<<"$v") == 2 ]] || { echo 'ロールshop_appとshop_roを作ります。'; return 1; }
-    grep -qx 'shop_app:fffffft:SCRAM-SHA-256' <<<"$v" || { echo 'shop_appはログイン可・非superuser・パスワードはSCRAM保存にします。password_encryptionを直してから設定し直します。'; return 1; }
-    grep -qx 'shop_ro:fffffft:SCRAM-SHA-256' <<<"$v" || { echo 'shop_roもログイン可・非superuser・SCRAM保存にします。'; return 1; }
+    v=$(_pg_sql postgres "select rolname from pg_authid where rolname in ('shop_app','shop_ro')
+        and rolcanlogin and not (rolsuper or rolcreatedb or rolcreaterole or rolreplication or rolbypassrls)
+        and rolpassword like 'SCRAM-SHA-256$%'") || return 1
+    for u in shop_app shop_ro; do
+        grep -qx "$u" <<<"$v" || { echo "$uはログイン可・最小権限・パスワードはSCRAM保存にします。"; return 1; }
+        if conn=$(_pg_noauth_connect "$u" 127.0.0.1 scram-sha-256 2>&1) || ! grep -q 'fe_sendauth: no password supplied' <<<"$conn"; then
+            echo "$u のループバック接続に有効なSCRAM認証設定がありません。pg_hba.confを確認し、reloadします。"
+            return 1
+        fi
+    done
     # least privilege, tested by acting as the roles
     _pg_allowed shop_app shopdb "select count(*) from shop.orders; insert into shop.orders(item, qty) values ('probe', 1); update shop.orders set qty = qty where id = 1" 'shop_appはshop.ordersを読み書きできる必要があります(シーケンス権限も)。' || return 1
     _pg_denied shop_app shopdb 'select * from private.secrets' 'shop_appがprivateスキーマを読めます。' || return 1
     _pg_denied shop_app shopdb 'drop table shop.orders' 'shop_appがテーブルを削除できます。' || return 1
     _pg_denied shop_app shopdb 'truncate shop.orders' 'shop_appがTRUNCATEできます。' || return 1
+    _pg_denied shop_app shopdb 'delete from shop.orders' 'shop_appがDELETEできます。' || return 1
     _pg_denied shop_app shopdb 'create table shop.evil(x int)' 'shop_appがshopスキーマにテーブルを作れます。' || return 1
     _pg_denied shop_app shopdb 'create table public.evil(x int)' 'shop_appがpublicスキーマに作れます。' || return 1
     _pg_allowed shop_ro shopdb 'select count(*) from shop.orders' 'shop_roがshop.ordersを読めません。' || return 1
@@ -104,18 +117,21 @@ _pg_verify() {
     _pg_denied shop_ro shopdb 'update shop.orders set qty = 0' 'shop_roがUPDATEできます。' || return 1
     _pg_denied shop_ro shopdb 'delete from shop.orders' 'shop_roがDELETEできます。' || return 1
     _pg_denied shop_ro shopdb 'select * from private.secrets' 'shop_roがprivateスキーマを読めます。' || return 1
-    # default privileges: a table created later by the owner is readable by shop_ro but not writable
-    _pg_allowed shop_ro shopdb 'select 1' 'shop_roに切り替えられません。' || return 1
-    runuser -u postgres -- "$PG_BIN/psql" -X -v ON_ERROR_STOP=1 -qAt -p "$PG_PORT" -d shopdb -f - >/dev/null 2>"$LAB_STATE/last-err" <<'SQL' || { echo 'ALTER DEFAULT PRIVILEGESで、今後作る表もshop_roが読めるようにします。'; return 1; }
+    # Check the effective default grants on a table created by the fixture owner.
+    v=$(_pg_psql -d shopdb -f - 2>"$LAB_STATE/last-err" <<'SQL'
 BEGIN;
 CREATE TABLE shop.dp_probe(x int);
-SET LOCAL ROLE shop_ro;
-SELECT * FROM shop.dp_probe;
+SELECT has_table_privilege('shop_ro', 'shop.dp_probe', 'SELECT')
+   AND NOT has_table_privilege('shop_ro', 'shop.dp_probe', 'INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER');
 ROLLBACK;
 SQL
+    ) || return 1
+    [[ $v == t ]] || { echo 'ALTER DEFAULT PRIVILEGESで、今後作る表にもshop_roのSELECT権限だけを付与します。'; return 1; }
     # logical backup + restore into a NEW database
     [[ -f $PG_DUMP ]] || { echo "$PG_DUMP にpg_dump -Fcのダンプがありません。"; return 1; }
-    runuser -u postgres -- "$PG_BIN/pg_restore" --list "$PG_DUMP" 2>/dev/null | grep -q 'TABLE DATA shop orders' || { echo 'ダンプがカスタム形式でshop.ordersのデータを含みません。'; return 1; }
+    v=$(runuser -u postgres -- "$PG_BIN/pg_restore" --list "$PG_DUMP" 2>/dev/null) || { echo 'ダンプがpg_dump -Fcのカスタム形式ではありません。'; return 1; }
+    grep -q 'TABLE DATA shop orders' <<<"$v" || { echo 'ダンプがshop.ordersのデータを含みません。'; return 1; }
+    runuser -u postgres -- "$PG_BIN/pg_restore" --file=/dev/null "$PG_DUMP" 2>/dev/null || { echo 'ダンプを最後まで読み取れません。pg_dumpをやり直します。'; return 1; }
     want=$(cat "$LAB_STATE/fixture.txt")
     got=$(_pg_fingerprint shopdb) || return 1
     [[ $got == "$want" ]] || { echo "元のshopdbのデータが変わっています($got)。"; return 1; }
@@ -126,8 +142,10 @@ SQL
     # physical base backup
     [[ -f $PG_BASE/backup_manifest && -f $PG_BASE/PG_VERSION ]] || { echo "$PG_BASE にpg_basebackup(-Fp)のバックアップがありません。"; return 1; }
     sysid=$(_pg_sql postgres 'select system_identifier from pg_control_system()') || return 1
-    grep -q "\"System-Identifier\": $sysid" "$PG_BASE/backup_manifest" || { echo 'バックアップがこのクラスタのものではありません。'; return 1; }
     runuser -u postgres -- "$PG_BIN/pg_verifybackup" "$PG_BASE" >"$LAB_STATE/verifybackup.txt" 2>&1 || { echo 'pg_verifybackupが失敗します:'; cat "$LAB_STATE/verifybackup.txt"; return 1; }
+    # PostgreSQL 16's version-1 manifest contains no cluster system identifier.
+    backup_sysid=$(runuser -u postgres -- env LC_ALL=C "$PG_BIN/pg_controldata" "$PG_BASE" | awk -F ': *' '$1 == "Database system identifier" {print $2}') || return 1
+    [[ -n $sysid && $backup_sysid == "$sysid" ]] || { echo 'バックアップがこのクラスタのものではありません。'; return 1; }
 }
 
 lab_setup() {
@@ -194,7 +212,8 @@ lab_break() {
     _pg_sql postgres 'alter role shop_app superuser' || return 1
     pg_ctlcluster "$PG_VER" "$PG_NAME" reload || return 1
     _pg_sql postgres 'drop database shop_restore' || return 1
-    runuser -u postgres -- "$PG_BIN/pg_restore" -p "$PG_PORT" -d postgres --no-owner "$PG_DUMP" >/dev/null 2>&1 || true
+    runuser -u postgres -- "$PG_BIN/pg_restore" -h /var/run/postgresql -U postgres -p "$PG_PORT" -d postgres \
+        --no-owner --single-transaction "$PG_DUMP" || return 1
     touch "$LAB_STATE/fault"
     echo '故障を入れました: pg_hbaがtrust、shop_appがsuperuser、ダンプが管理DB(postgres)に復元され、shop_restoreが無い。見つけて直します(元のpg_hbaに丸ごと戻すだけでなく原因を理解すること)。'
 }

@@ -19,6 +19,7 @@
 - localca: `045a20b`。実TLSテストのpipe未closeを修正。ResourceWarningをerrorにして4テスト成功。
 - 前担当の途中修正保存: `5e93b15`。guard/libvirt/netlink/pam/podman/postgres/systemdadv/tunedは、この時点では**実VM未検証**。その後の個別完了記録を優先する。
 - ターミナル起動: `b91a92f`。ペンギンと青/紫/シアン、瞬き・ウインク・笑顔。`LQ_NO_ANIMATION=1`で静止。NO_COLOR/非TTYでも静止。PTYで起動とEnter終了を確認。関連10テスト成功。
+- PostgreSQL: 実VM検証と修正を取り込み。ロール属性・SCRAM・実効HBA/再起動設定・最小権限・論理復元・物理backupの由来を確認。`g6-postgres.md`に公式runner実出力。
 - 常用の安全操作: `ffed7f8`。native `safe-cleanup`（40本目）、NUL区切り・特殊ファイル名・リンク非追跡・退避・隔離移動・復元。実ツール3テスト成功。toolbox関連42テスト成功/skip14。
 - users/lynis: `aabd59d`。最小sudo復旧、Lynis実監査59→60・対象警告消失・誤設定拒否・reset。実出力は `g1-users.md`, `g8-lynis.md`。
 - 全体テスト直近: 618件成功/skip48（192.6秒）、サイトbuild成功、npm7件、講座Node4件、E2E14件成功。**その後のUI・新課題は再実行が必要**。
@@ -27,7 +28,7 @@
 | 担当 | 所有ファイル | 再開地点 |
 |---|---|---|
 | site_ui (Astra) | web/danganlog/app と components | 端末/講座の直線的な2ペイン・多色アクセントUI。dev 3106、1280/375/320幅の確認済み。最終axeと親によるbuild/E2E、画像確認、コミットが残る |
-| vm_postgres (Sol) | postgres.sh / test_vm_postgres.py / scenarios/postgres.sh / g6-postgres.md | g6-appで正常/不正/backup/復元/resetの実検証。PostgreSQL16のbool連結とSCRAM接頭辞、manifestの版差を修正中。最終公式runner実行待ち |
+| vm_postgres (Sol) | postgres.sh / scenarios/postgres.sh / g6-postgres.md | 完了。公式runner exit0、親で単体4件成功。標準mainを保ち2周の専用資源撤去を確認。物理復元からの起動/OS再起動は未検証 |
 | vm_podman (Sol) | podman.sh / test_vm_podman.py / scenarios/podman.sh / g7-podman.md | g7-appでrootless Quadlet。UIDマッピング・生成unit・localhost公開・実bind mount検証、root所有.config親によるreset残骸を修正中。最終再実行待ち |
 
 ### 次に着手する順
@@ -35,6 +36,8 @@
 2. `docs/DAILY_USE_AUDIT.md` の常用時の抜けを実操作課題で補う（単なるコマンド名追加にしない）。
 3. 未完了VMモジュールの再検証。guard/libvirt/netlink/pam/systemdadv/tunedなどはWIP保存済みでも通過扱いにしない。RHEL3本はRHEL VM未用意。
 4. 変更が止まったら全Python、サイトbuild/npm/course/E2Eを1回通し、結果とskipを記録。見た目の利用者確認前にデプロイしない。
+
+- daily_cron担当は制限残25%のため設計確認だけで停止。リポジトリ/VM変更なし。実装は未着手で、次回はDAILY_USE_AUDITの方針から開始する。
 
 ### 環境とログの場所
 - Node 22: `<node-dir>/bin` をPATHへ追加。消えていれば別途用意する。
@@ -61,7 +64,7 @@
   - 完了した小単位ごとに検証し、細かく定期的にコミットする。push は確認後。
 
 ### 利用者の追加要望（Codex再開後）
-- サブエージェントとモデルを適切に使って効率化する。UI担当 Astra、VM検証担当 Sol を並列稼働中。
+- サブエージェントとモデルを適切に使って効率化する。UI担当 Astra、VM検証担当 Sol で分担。
 - サイトは単調な色・角丸・定型AI風カードを避け、情報設計と文字組みを整える。実画面で確認してから反映する。
 - 日常Linuxで知らないと困る操作の抜けを監査し、実操作できる課題で補う。名前だけ増やさない。
 - ターミナル版のスタートは以前のペンギンとカラフルな文字を戻し、動き・表情を付ける。
