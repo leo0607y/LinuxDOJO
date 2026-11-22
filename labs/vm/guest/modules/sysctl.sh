@@ -84,15 +84,31 @@ lab_check() {
     out=$(sysctl --system 2>&1) || true
     printf '%s\n' "$out" > "$LAB_STATE/check-apply.log"
     grep -q 'swapiness' <<<"$out" && { echo 'sysctl --system に綴り違いのキーのエラーが残っています。'; return 1; }
+    # sysctl --system does not always print an error for an unknown key, so judge the files themselves.
+    local f line key
+    for f in "$SC_CONF" "$SC_OVERRIDE" /etc/sysctl.d/*dojo*.conf; do
+        [[ -f $f ]] || continue
+        while IFS= read -r line; do
+            line="${line%%#*}"; line="${line%%;*}"
+            [[ $line == *=* ]] || continue
+            key="${line%%=*}"; key="${key//[[:space:]]/}"; key="${key#-}"
+            [[ -n $key ]] || continue
+            [[ -e /proc/sys/${key//.//} ]] || { echo "$f に存在しないキー($key)があります。綴りを確認してください。"; return 1; }
+        done < "$f"
+    done
     local n60 n99
-    n60=$(grep -n -F -- '/etc/sysctl.d/60-dojo.conf' <<<"$out" | head -1 | cut -d: -f1)
+    # `|| true`: no match (e.g. the learner deleted the override) must not abort via set -e/pipefail
+    n60=$(grep -n -F -- '/etc/sysctl.d/60-dojo.conf' <<<"$out" | head -1 | cut -d: -f1 || true)
     [[ -n $n60 ]] || { echo 'sysctl --system が 60-dojo.conf を適用していません。'; return 1; }
-    n99=$(grep -n -F -- "$SC_OVERRIDE" <<<"$out" | head -1 | cut -d: -f1)
+    n99=$(grep -n -F -- "$SC_OVERRIDE" <<<"$out" | head -1 | cut -d: -f1 || true)
     if [[ -n $n99 && $n99 -lt $n60 ]]; then echo '適用順が不正です。'; return 1; fi
     [[ $(sysctl -n vm.swappiness) == "$SC_WANT_SWAPPINESS" ]] || { echo "再適用後の vm.swappiness が $SC_WANT_SWAPPINESS ではありません。"; return 1; }
     [[ $(sysctl -n vm.vfs_cache_pressure) == "$SC_WANT_CACHE" ]] || { echo "再適用後の vm.vfs_cache_pressure が $SC_WANT_CACHE ではありません。"; return 1; }
     [[ -f $SC_BLACKLIST && ! -L $SC_BLACKLIST ]] || { echo "$SC_BLACKLIST が必要です。"; return 1; }
     local conf
+    # Ubuntu's kernel packages already blacklist softdog, so require the learner's own file to carry the line.
+    grep -Eq "^[[:space:]]*blacklist[[:space:]]+${SC_MOD}[[:space:]]*\$" "$SC_BLACKLIST" || { echo "$SC_BLACKLIST 自身に blacklist $SC_MOD の行が必要です。"; return 1; }
+    grep -Eq "^[[:space:]]*install[[:space:]]+${SC_MOD}[[:space:]]+/bin/(false|true)" "$SC_BLACKLIST" || { echo "$SC_BLACKLIST 自身に install $SC_MOD /bin/false の行が必要です。"; return 1; }
     conf=$(modprobe -c 2>/dev/null) || return 1
     grep -Eq "^blacklist[[:space:]]+${SC_MOD}\$" <<<"$conf" || { echo 'modprobe -c に blacklist softdog がありません。'; return 1; }
     grep -Eq "^install[[:space:]]+${SC_MOD}[[:space:]]+/bin/(false|true)" <<<"$conf" || { echo 'modprobe -c に softdog の install リダイレクトがありません。'; return 1; }

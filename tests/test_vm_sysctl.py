@@ -36,6 +36,15 @@ class VmSysctlTests(unittest.TestCase):
         for needle in ("sysctl --system", "sysctl -n vm.swappiness", "modprobe -c", "modprobe -n -v", "lsmod"):
             self.assertIn(needle, text)
 
+    def test_check_survives_no_match_pipelines_and_judges_own_files(self):
+        text = self.module.read_text()
+        # the dispatcher runs with pipefail: a grep with no match inside $(...) must not abort check silently
+        self.assertIn("cut -d: -f1 || true)", text)
+        self.assertEqual(text.count("cut -d: -f1 || true)"), 2)
+        # Ubuntu kernels already blacklist softdog: the learner's own file must carry both lines
+        self.assertIn('"$SC_BLACKLIST"', text)
+        self.assertIn("/proc/sys/", text)
+
 
 if __name__ == "__main__":
     unittest.main()

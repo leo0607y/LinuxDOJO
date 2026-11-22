@@ -38,6 +38,13 @@ class VmJournaldTests(unittest.TestCase):
         self.assertNotIn("> /etc/systemd/journald.conf\n", text)
         self.assertIn("50-dojo.conf", text)
 
+    def test_no_sigpipe_pipeline_and_probe_has_no_token(self):
+        text = self.module.read_text()
+        # dispatcher runs with pipefail: `tr ... < /dev/urandom | head` dies with 141 and silently aborts setup
+        self.assertNotIn("/dev/urandom | head", text)
+        # check's probe line must not contain the token or repeated checks inflate the learner's counts
+        self.assertIn('probe="dojo-probe-', text)
+
 
 if __name__ == "__main__":
     unittest.main()
