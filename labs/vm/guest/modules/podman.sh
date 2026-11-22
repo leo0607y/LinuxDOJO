@@ -21,14 +21,11 @@ _pod_run() {
         DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" "$@" )
 }
 
-_pod_subuid_start() { awk -F: -v u="$POD_USER" '$1==u {print $2; exit}' /etc/subuid; }
-_pod_subuid_count() { awk -F: -v u="$POD_USER" '$1==u {print $3; exit}' /etc/subuid; }
-
 lab_setup() {
     _pod_paths || return 1
     if ! command -v podman >/dev/null; then
         echo 'podmanが入っていません。次を実行してから、もう一度setupしてください:'
-        echo '  sudo apt-get install -y podman'
+        echo '  sudo apt-get install -y podman uidmap busybox-static'
         return 1
     fi
     local bb='' c lddout applets
@@ -40,7 +37,7 @@ lab_setup() {
     done
     [[ -n $bb ]] || { echo '静的busybox(httpd付き)がありません: sudo apt-get install -y busybox-static'; return 1; }
     local need
-    for need in newuidmap runuser loginctl curl tar; do
+    for need in newuidmap newgidmap runuser loginctl curl tar; do
         command -v "$need" >/dev/null || { echo "$need が必要です (uidmap等を導入)。"; return 1; }
     done
     [[ ! -e $POD_HOME ]] && ! getent passwd "$POD_USER" >/dev/null || { echo '専用ユーザーまたはホームが既にあります。既存データは上書きしません。'; return 1; }
@@ -51,7 +48,8 @@ lab_setup() {
     loginctl enable-linger "$POD_USER" || return 1
     local uid i
     uid=$(id -u "$POD_USER")
-    for i in $(seq 1 30); do [[ -S /run/user/$uid/bus || -d /run/user/$uid ]] && break; sleep 1; done
+    for i in $(seq 1 30); do [[ -S /run/user/$uid/bus ]] && break; sleep 1; done
+    [[ -S /run/user/$uid/bus ]] || { echo 'ユーザーsystemdのバスに接続できません。'; return 1; }
     # Pull-free image source: a tiny rootfs with a static busybox, no shell in /bin beyond busybox itself.
     local token root=$LAB_STATE/rootfs
     token=$(cat /proc/sys/kernel/random/uuid)
@@ -62,29 +60,31 @@ lab_setup() {
     cat > "$root/start.sh" <<'APP'
 #!/bin/busybox sh
 # Writes a heartbeat into /data (the bind-mounted volume) and serves /www on :8080.
+trap 'exit 0' TERM INT
 ( while :; do /bin/busybox date +%s > /data/heartbeat || echo 'ERROR: cannot write /data' >&2; /bin/busybox sleep 2; done ) &
 echo 'dojo app started' >&2
-exec /bin/busybox httpd -f -p 8080 -h /www
+/bin/busybox httpd -f -p 8080 -h /www &
+wait "$!"
 APP
     chmod 0755 "$root/start.sh"
-    install -d -o "$POD_USER" -g "$POD_USER" -m 0755 "$POD_IMG"
-    tar --numeric-owner --owner=0 --group=0 -C "$root" -cf "$POD_IMG/rootfs.tar" . || return 1
-    chown "$POD_USER:$POD_USER" "$POD_IMG/rootfs.tar"
+    _pod_run install -d -m 0755 "$POD_IMG"
+    tar --numeric-owner --owner=0 --group=0 -C "$root" -cf - . |
+        _pod_run tee "$POD_IMG/rootfs.tar" >/dev/null || return 1
     rm -rf -- "$root"
-    install -d -o "$POD_USER" -g "$POD_USER" -m 0755 "$POD_DATA"
-    install -d -o "$POD_USER" -g "$POD_USER" -m 0755 "$POD_HOME/.config/containers/systemd"
-    cat > "$POD_HOME/TASKS.txt" <<TASK
+    _pod_run install -d -m 0755 "$POD_DATA" "$POD_HOME/.config/containers/systemd"
+    cat > "$LAB_STATE/TASKS.txt" <<TASK
 専用ユーザー dojo-pod のrootless Podman課題。レジストリには接続しない(pull不要)。
 入る: sudo -iu dojo-pod ; export XDG_RUNTIME_DIR=/run/user/\$(id -u)
 1. 前提を確認: podman info (rootless, graphRoot) / grep dojo-pod /etc/subuid /etc/subgid
    loginctl show-user dojo-pod -p Linger / podman unshare cat /proc/self/uid_map
 2. ~/dojo-image/rootfs.tar からイメージを作る(importでCMDを指定。CMDは /bin/busybox sh /start.sh)。
    名前は localhost/dojo-app:1
-3. まず手で試す: podman run -d --name t -p 127.0.0.1:18080:8080 -v ~/dojo-data:/data localhost/dojo-app:1
-   curl 127.0.0.1:18080 / podman ps / logs / inspect / exec t /bin/busybox cat /data/heartbeat (イメージにはbusybox以外のコマンドがありません)
+3. まず手で試す: podman run -d --pull=never --name t -p 127.0.0.1:18080:8080 -v ~/dojo-data:/data localhost/dojo-app:1
+   curl http://127.0.0.1:18080/ と podman ps / logs / inspect で動作を確認。
+   podman exec t /bin/busybox cat /data/heartbeat で書き込みを確認 (イメージにはbusybox以外のコマンドがありません)。
    試し用コンテナは podman rm -f t で消す(system pruneは専用環境内でのみ使う)。
 4. Quadlet化: ~/.config/containers/systemd/dojo-app.container を作る
-   ([Container] ContainerName=dojo-app / Image / PublishPort=127.0.0.1:18080:8080 / Volume=%h/dojo-data:/data、
+   ([Container] ContainerName=dojo-app / Image / Pull=never / PublishPort=127.0.0.1:18080:8080 / Volume=%h/dojo-data:/data、
     [Install] WantedBy=default.target)。systemctl --user daemon-reload && systemctl --user start dojo-app.service
    生成されたunitの確認: systemctl --user cat dojo-app.service。:Zや--privilegedは使わない。
 5. sudo dojo-vm-lab podman break  (別のsudoシェルから)
@@ -92,8 +92,7 @@ APP
    ボリュームはホストuidとコンテナ内uidの対応(podman unshare ls -ldn ~/dojo-data)で考える。chmod 777は不正解。
 6. sudo dojo-vm-lab podman check   終了後 sudo dojo-vm-lab podman reset
 TASK
-    chown "$POD_USER:$POD_USER" "$POD_HOME/TASKS.txt"
-    cp "$POD_HOME/TASKS.txt" "$LAB_STATE/TASKS.txt"
+    _pod_run tee "$POD_HOME/TASKS.txt" < "$LAB_STATE/TASKS.txt" >/dev/null || return 1
     echo "手順: $POD_HOME/TASKS.txt (sudo -iu dojo-pod で操作)"
 }
 
@@ -105,69 +104,81 @@ lab_break() {
     [[ -f $POD_QUADLET && ! -L $POD_QUADLET ]] || { echo 'まず dojo-app.container を作って常駐させます。'; return 1; }
     _pod_run systemctl --user is-active --quiet dojo-app.service || { echo 'dojo-app.service を起動してから break します。'; return 1; }
     [[ $(curl -fsS --max-time 3 "http://127.0.0.1:$POD_PORT/") == "dojo-pod-ok $(cat "$LAB_STATE/token")" ]] || { echo 'まず公開ポートで応答させます。'; return 1; }
-    local start
-    start=$(_pod_subuid_start)
-    [[ -n $start && $(_pod_subuid_count) -ge 65536 ]] || { echo 'subuid範囲が不足しています。'; return 1; }
-    cat > "$POD_QUADLET" <<'Q'
+    [[ -d $POD_DATA && ! -L $POD_DATA ]] || { echo '専用ボリュームがありません。'; return 1; }
+    # Change ownership in the user namespace, using the mapped subuid and subgid.
+    _pod_run podman unshare chown -R 1000:1000 "$POD_DATA" || return 1
+    _pod_run tee "$POD_QUADLET" >/dev/null <<'Q' || return 1
 [Unit]
 Description=dojo app (broken)
 
 [Container]
 ContainerName=dojo-app
 Image=localhost/dojo-app:9
+Pull=never
 PublishPort=127.0.0.1:18081:8080
 Volume=%h/dojo-data:/data
 
 [Install]
 WantedBy=default.target
 Q
-    chown "$POD_USER:$POD_USER" "$POD_QUADLET"
-    # A container uid 1000 owner => host uid subuid_start+999; container root cannot write.
-    chown -R "$((start + 999)):$((start + 999))" "$POD_DATA"
-    touch "$LAB_STATE/fault"
-    _pod_run systemctl --user daemon-reload || true
+    _pod_run systemctl --user daemon-reload || return 1
     _pod_run systemctl --user restart dojo-app.service >/dev/null 2>&1 || true
     if curl -fsS --max-time 3 "http://127.0.0.1:$POD_PORT/" >/dev/null 2>&1; then
-        echo '故障を確認できません。'; rm -f "$LAB_STATE/fault"; return 1
+        echo '故障を確認できません。'; return 1
     fi
+    touch "$LAB_STATE/fault"
     echo '障害を入れました。unitが起動せず、直しても書き込めない状態です。原因を調べてください。'
 }
 
 lab_check() {
     _pod_paths || return 1
     [[ -f $LAB_STATE/fault ]] || { echo 'まずQuadlet常駐を成功させ、breakで障害を作ります。'; return 1; }
-    local uid token
+    local uid token wanted
     uid=$(id -u "$POD_USER") || return 1
     token=$(cat "$LAB_STATE/token")
     [[ -f $POD_QUADLET && ! -L $POD_QUADLET ]] || { echo 'Quadletファイルがありません。'; return 1; }
-    grep -Eq '^WantedBy=(default|multi-user)\.target' "$POD_QUADLET" || { echo '[Install] WantedBy=default.target が必要です(再ログイン後も起動するため)。'; return 1; }
     [[ $(loginctl show-user "$POD_USER" -p Linger --value 2>/dev/null) == yes ]] || { echo 'lingerが無効です。'; return 1; }
     # Data directory: container root must map to dojo-pod; no world-writable shortcut.
+    [[ -d $POD_DATA && ! -L $POD_DATA ]] || { echo '専用ボリュームがありません。'; return 1; }
     [[ $(stat -c %u "$POD_DATA") == "$uid" ]] || { echo "ボリュームの所有者が dojo-pod ではありません: $(stat -c %u "$POD_DATA")"; return 1; }
     [[ $(( 8#$(stat -c %a "$POD_DATA") & 8#002 )) == 0 ]] || { echo '全員書き込み可は解決ではありません。'; return 1; }
     [[ $(_pod_run podman unshare stat -c '%u:%g' "$POD_DATA") == 0:0 ]] || { echo 'podman unshare で見たボリュームがコンテナ内root(0:0)になっていません。'; return 1; }
-    # Reload from files and restart so we judge what survives a restart, not a lucky leftover.
+    # Check the generated unit and its startup dependency before restarting it.
     _pod_run systemctl --user daemon-reload || return 1
+    [[ $(_pod_run systemctl --user show -p UnitFileState --value dojo-app.service) == generated &&
+       $(_pod_run systemctl --user show -p SourcePath --value dojo-app.service) == "$POD_QUADLET" ]] ||
+        { echo 'dojo-app.container から生成されたunitが必要です。'; return 1; }
+    wanted=$(_pod_run systemctl --user show -p Wants --value default.target) || return 1
+    [[ " $wanted " == *' dojo-app.service '* ]] ||
+        { echo '[Install] WantedBy=default.target を設定します。'; return 1; }
     _pod_run systemctl --user restart dojo-app.service || { echo 'dojo-app.service を起動できません。'; return 1; }
+    _pod_run systemctl --user is-active --quiet dojo-app.service || return 1
+    [[ $(_pod_ctr_field '{{.State.Running}}') == true ]] || return 1
+    [[ $(_pod_ctr_field '{{.ImageName}}') == localhost/dojo-app:1 ]] || { echo 'イメージは localhost/dojo-app:1 を使います。'; return 1; }
+    [[ $(_pod_ctr_field '{{.HostConfig.Privileged}}') == false ]] || { echo '--privilegedは使いません。'; return 1; }
+    [[ $(_pod_run podman port dojo-app) == "8080/tcp -> 127.0.0.1:$POD_PORT" ]] ||
+        { echo '8080/tcp は 127.0.0.1 の指定ポートだけに公開します。'; return 1; }
+    [[ $(_pod_ctr_field '{{range .Mounts}}{{if eq .Destination "/data"}}{{.Type}}:{{.Source}}:{{.RW}}{{end}}{{end}}') == "bind:$POD_DATA:true" ]] ||
+        { echo '専用ボリュームを /data に読み書き可能でbind mountします。'; return 1; }
     local i ok=
     for i in 1 2 3 4 5 6 7 8; do
         if [[ $(curl -fsS --max-time 2 "http://127.0.0.1:$POD_PORT/" 2>/dev/null) == "dojo-pod-ok $token" ]]; then ok=1; break; fi
         sleep 1
     done
-    [[ -n $ok ]] || { echo "127.0.0.1:$POD_PORT が応答しません。Image名とPublishPortを確認します。"; return 1; }
-    _pod_run systemctl --user is-active --quiet dojo-app.service || return 1
-    [[ $(_pod_ctr_field '{{.State.Running}}') == true ]] || return 1
-    [[ $(_pod_ctr_field '{{.ImageName}}') == localhost/dojo-app:1 ]] || { echo 'イメージは localhost/dojo-app:1 を使います。'; return 1; }
-    [[ $(_pod_ctr_field '{{.HostConfig.Privileged}}') == false ]] || { echo '--privilegedは使いません。'; return 1; }
-    [[ $(_pod_run podman ps --filter name=dojo-app --format '{{.Names}}') == dojo-app ]] || return 1
+    [[ -n $ok ]] || { echo "127.0.0.1:$POD_PORT が正しい内容を返しません。"; return 1; }
     # The app must actually write a fresh heartbeat into the volume.
     local before after
-    rm -f -- "$POD_DATA/heartbeat" 2>/dev/null || true
+    _pod_run rm -f -- "$POD_DATA/heartbeat" || return 1
     sleep 4
-    [[ -f $POD_DATA/heartbeat ]] || { echo 'コンテナがボリュームに書き込めていません(podman logs dojo-app)。'; return 1; }
-    before=$(cat "$POD_DATA/heartbeat"); sleep 3; after=$(cat "$POD_DATA/heartbeat")
-    [[ $before =~ ^[0-9]+$ && $after =~ ^[0-9]+$ && $after -gt $before ]] || { echo 'heartbeatが更新されていません。'; return 1; }
-    (( $(date +%s) - after < 10 )) || return 1
+    [[ -f $POD_DATA/heartbeat && ! -L $POD_DATA/heartbeat ]] ||
+        { echo 'コンテナがボリュームに書き込めていません(podman logs dojo-app)。'; return 1; }
+    before=$(_pod_run cat "$POD_DATA/heartbeat") || return 1
+    sleep 3
+    after=$(_pod_run cat "$POD_DATA/heartbeat") || return 1
+    [[ $before =~ ^[1-9][0-9]{9}$ && $after =~ ^[1-9][0-9]{9}$ && $after -gt $before ]] || { echo 'heartbeatが更新されていません。'; return 1; }
+    local age
+    age=$(( $(date +%s) - after ))
+    (( age >= 0 && age < 10 )) || return 1
     [[ $(stat -c %u "$POD_DATA/heartbeat") == "$uid" ]] || return 1
     echo 'PASS: rootless Quadlet常駐・公開ポート応答・再起動後の復帰・subuid所有権の修復・実書き込みを確認しました。'
 }
@@ -178,7 +189,7 @@ lab_reset() {
     if getent passwd "$POD_USER" >/dev/null; then
         [[ $(getent passwd "$POD_USER" | cut -d: -f6) == "$POD_HOME" ]] || return 1
         _pod_run systemctl --user stop dojo-app.service >/dev/null 2>&1 || true
-        rm -f -- "$POD_QUADLET"
+        _pod_run rm -f -- "$POD_QUADLET" || true
         _pod_run podman rm -f -a >/dev/null 2>&1 || true
         _pod_run podman system reset --force >/dev/null 2>&1 || true
         loginctl disable-linger "$POD_USER" 2>/dev/null || true

@@ -19,6 +19,7 @@
 - localca: `045a20b`。実TLSテストのpipe未closeを修正。ResourceWarningをerrorにして4テスト成功。
 - 前担当の途中修正保存: `5e93b15`。guard/libvirt/netlink/pam/podman/postgres/systemdadv/tunedは、この時点では**実VM未検証**。その後の個別完了記録を優先する。
 - ターミナル起動: `b91a92f`。ペンギンと青/紫/シアン、瞬き・ウインク・笑顔。`LQ_NO_ANIMATION=1`で静止。NO_COLOR/非TTYでも静止。PTYで起動とEnter終了を確認。関連10テスト成功。
+- Podman: rootless Quadlet、公開範囲・実bind mount/heartbeat、UID/GID対応・起動失敗修復・user manager再起動・2周の専用資源撤去を確認。実出力 `g7-podman.md`。
 - PostgreSQL: 実VM検証と修正を取り込み。ロール属性・SCRAM・実効HBA/再起動設定・最小権限・論理復元・物理backupの由来を確認。`g6-postgres.md`に公式runner実出力。
 - 常用の安全操作: `ffed7f8`。native `safe-cleanup`（40本目）、NUL区切り・特殊ファイル名・リンク非追跡・退避・隔離移動・復元。実ツール3テスト成功。toolbox関連42テスト成功/skip14。
 - users/lynis: `aabd59d`。最小sudo復旧、Lynis実監査59→60・対象警告消失・誤設定拒否・reset。実出力は `g1-users.md`, `g8-lynis.md`。
@@ -29,7 +30,7 @@
 |---|---|---|
 | site_ui (Astra) | web/danganlog/app と components | 端末/講座の直線的な2ペイン・多色アクセントUI。dev 3106、1280/375/320幅の確認済み。最終axeと親によるbuild/E2E、画像確認、コミットが残る |
 | vm_postgres (Sol) | postgres.sh / scenarios/postgres.sh / g6-postgres.md | 完了。公式runner exit0、親で単体4件成功。標準mainを保ち2周の専用資源撤去を確認。物理復元からの起動/OS再起動は未検証 |
-| vm_podman (Sol) | podman.sh / test_vm_podman.py / scenarios/podman.sh / g7-podman.md | g7-appでrootless Quadlet。UIDマッピング・生成unit・localhost公開・実bind mount検証、root所有.config親によるreset残骸を修正中。最終再実行待ち |
+| vm_podman (Sol) | podman.sh / test_vm_podman.py / scenarios/podman.sh / g7-podman.md | 完了。公式runner exit0、親で単体4件成功。ユーザーsystemd再起動後に自動復帰、2周の残骸なし。OS再起動は未検証 |
 
 ### 次に着手する順
 1. 上の3担当の結果を確認して、実VMログ・単体テスト・UI実画面を親でも確認し、各担当ごとにコミットする。

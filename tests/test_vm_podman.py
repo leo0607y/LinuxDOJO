@@ -39,7 +39,7 @@ class VmPodmanTests(unittest.TestCase):
                                     "LAB_STATE": "/var/lib/linuxdojo-vm-lab/state/podman"},
                                capture_output=True, text=True, timeout=10)
             self.assertNotEqual(r.returncode, 0)
-            self.assertIn("sudo apt-get install -y podman", r.stdout)
+            self.assertIn("sudo apt-get install -y podman uidmap busybox-static", r.stdout)
 
     def test_static_invariants(self):
         text = MODULE.read_text()
