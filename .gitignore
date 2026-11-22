@@ -143,6 +143,10 @@ Thumbs.db
 /web/danganlog/public/*
 !/web/danganlog/public/worker.js
 !/web/danganlog/public/_headers
+!/web/danganlog/public/fonts/
+/web/danganlog/public/fonts/*
+!/web/danganlog/public/fonts/*.woff2
+!/web/danganlog/public/fonts/UFL-*.txt
 node_modules/
 .next/
 out/

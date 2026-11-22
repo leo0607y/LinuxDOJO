@@ -39,7 +39,7 @@ function bar(ratio, width) {
 
 /* bash の既定 PS1 と同じ配色: 緑の太字 user@host、青の太字 パス、白い $。engine のプロンプト ('練習 learner@dojo-local /home/learner $') を分解する */
 function Ps({ prompt }) {
-  const m = /^(?:\S+\s+)?(\S+@\S+)\s+(\S+)\s*\$?\s*$/.exec(prompt || '');
+  const m = /^(?:\S+\s+)?(\S+@[^\s:]+)(?::|\s+)(\S+?)\s*\$?\s*$/.exec(prompt || '');
   if (!m) return <span className="ps-user">{prompt}</span>;
   const path = m[2] === '/home/learner' ? '~' : m[2].replace(/^\/home\/learner\//, '~/');
   return <span className="ps"><b className="ps-user">{m[1]}</b>:<b className="ps-path">{path}</b>$</span>;
@@ -284,7 +284,11 @@ export default function Dojo() {
   const submit = async (event) => {
     if (event && event.preventDefault) event.preventDefault();
     const text = line;
-    if (!text.trim() || !ready || busy) return;
+    if (!text.trim()) {
+      if (ready && !busy && hasNext) { await runLocal('next'); if (inputRef.current) inputRef.current.focus(); }
+      return;
+    }
+    if (!ready || busy) return;
     setLine('');
     const promptShown = (view && view.prompt) || '$';
     const wasDone = !!(view && view.completed);
@@ -494,7 +498,7 @@ export default function Dojo() {
             <button type="button" className="nav-prev" disabled={off || !hasPrev} onClick={act('prev')}>← 前の問題</button>
             <div className="nav-status" aria-live="polite">
               <span>{course ? course.name + '　' : ''}問題 {lessonNo} / {pad2(total || 0)}</span>
-              <small>{view?.completed ? '達成済み。次へ進めます。' : '課題を達成すると次の問題へ進めます。'}</small>
+              <small>{view?.completed ? '達成済み。Enter で次の問題へ進めます。' : '課題を達成すると次の問題へ進めます。'}</small>
             </div>
             <button type="button" className="nav-next" disabled={off || !hasNext} onClick={act('next')}>
               {view?.completed && view.index + 1 >= total ? 'コース達成' : '次の問題へ →'}
