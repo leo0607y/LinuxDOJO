@@ -1,4 +1,13 @@
+/*
+ * DANGAN LOG のスタイル。実際の Ubuntu 24.04 の GNOME Terminal (Yaru-dark) を基準にした見た目。
+ * - フォント: Ubuntu Sans Mono 13pt 相当 (Latin は同梱、日本語は Noto Sans Mono CJK JP)
+ * - 色: GNOME のパレット。背景 #300a24 は推定値 (端末のテーマ連動で設定から読めなかった)
+ * - 行間 1.25、段落の余白・見出し・太字・角丸・ボタンの枠は使わない
+ * 変更したら、実画面と npm run test:e2e (axe のコントラスト検査を含む) で必ず確かめる。
+ */
 @font-face { font-family: "Ubuntu Sans Mono"; font-style: normal; font-weight: 100 800; font-display: swap; src: local("Ubuntu Sans Mono"), url("/fonts/ubuntu-sans-mono-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+
+/* ---------- 色とフォント ---------- */
 :root {
   color-scheme: dark;
   --bg: light-dark(#ffffff, #300a24);
@@ -22,10 +31,12 @@
 }
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"] { color-scheme: dark; }
+
+/* ---------- 基本 ---------- */
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--fg); }
-body { font: 1rem/1.7 var(--sans); }
-::selection { background: #863d29; color: #fff; }
+body { font: 17.33px/1.25 var(--mono); }
+::selection { background: var(--fg); color: var(--bg); }
 button, input { font: inherit; color: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .55; }
@@ -35,93 +46,111 @@ a, button { text-underline-offset: .22em; }
 code { font-family: var(--mono); }
 .dim { color: var(--dim); }
 
-.masthead { flex: none; background: var(--mast); color: var(--mast-fg); }
-.masthead-inner { min-height: 3.6rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0 clamp(1rem, 3.2vw, 3rem); }
-.wordmark { display: inline-flex; gap: .7rem; align-items: center; color: inherit; text-decoration: none; font: 750 1.15rem/1 var(--mono); letter-spacing: -.055em; white-space: nowrap; }
-.shell-mark { display: grid; place-items: center; width: 1.85rem; height: 1.65rem; background: var(--brand); color: #262226; font: 700 1rem/1 var(--mono); letter-spacing: -.14em; padding-right: .16em; }
-.masthead-nav { display: flex; align-items: stretch; align-self: stretch; gap: clamp(.8rem, 2vw, 2rem); font-size: .875rem; }
-.masthead-nav > * { display: inline-flex; align-items: center; padding: .3rem 0; text-underline-offset: .35em; }
-.masthead-nav [aria-current] { box-shadow: inset 0 -3px var(--brand); font-weight: 700; }
-.masthead a:hover { color: var(--brand); }
-.masthead :focus-visible { outline-color: var(--brand); outline-offset: -2px; }
+/* ---------- ヘッダー (画面の最下段に出す。flex の order で末尾へ) ---------- */
+.masthead { flex: none; order: 99; background: var(--bg); color: var(--mast-fg); border: 0; }
+.masthead-inner { min-height: 1.7rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0 1.25rem; }
+.wordmark { display: inline-flex; gap: .5rem; align-items: center; color: var(--dim); text-decoration: none; font: 400 .8rem/1 var(--mono); letter-spacing: 0; white-space: nowrap; }
+.shell-mark { display: none; }
+.masthead-nav { display: flex; align-items: stretch; align-self: stretch; gap: 1.2rem; font-size: .8rem; }
+.masthead-nav > * { display: inline-flex; align-items: center; padding: .3rem 0; text-underline-offset: .35em; text-decoration: none; color: var(--dim); }
+.masthead-nav [aria-current] { color: var(--fg); font-weight: 400; box-shadow: none; }
+.masthead a:hover { color: var(--user); }
+.masthead :focus-visible { outline-color: var(--focus); outline-offset: -2px; }
 
+/* ---------- 画面全体: 説明 → 端末の出力 → 課題 → 入力行 → 前後の移動 ---------- */
 html.app-lock, html.app-lock body { height: 100%; overflow: hidden; overscroll-behavior: none; }
-.tw { height: var(--app-h, 100dvh); display: flex; flex-direction: column; overflow: hidden; }
-.screen {
-  --gutter: clamp(1.1rem, 2.6vw, 2.8rem);
-  flex: 1; min-height: 0; display: grid;
-  grid-template-columns: minmax(20rem, .82fr) minmax(0, 1.25fr);
-  grid-template-rows: minmax(0, 1fr) auto auto auto;
-  grid-template-areas: "notes console" "notes mission" "notes prompt" "notes actions";
-  background: var(--panel);
-}
-.workbench { display: contents; }
-.motd { grid-area: notes; min-width: 0; overflow: auto; padding: clamp(1.8rem, 4.5vw, 4.5rem) var(--gutter); border-right: 1px solid var(--line); background: var(--panel); }
+.tw { height: var(--app-h, 100dvh); display: flex; flex-direction: column; overflow: hidden; background: var(--bg); }
+.screen { --gutter: 1.25rem; flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: flex-start; background: var(--bg); }
+.workbench { display: block; flex: 0 1 auto; min-height: 0; overflow: auto; scrollbar-width: thin; }
+.workbench > * { max-width: 110ch; }
+.workbench:focus-visible { outline-offset: -3px; }
+
+/* 説明 (レッスンの題と本文) */
+.motd { min-width: 0; overflow: visible; padding: .5rem var(--gutter) 0; border: 0; background: transparent; }
 .motd:focus-visible { outline-offset: -3px; }
-.lesson-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: .4rem 1.1rem; margin: 0 0 1.1rem; color: var(--dim); font-size: .875rem; font-weight: 600; }
-.lesson-meta span { color: var(--accent); font: .82rem/1.4 var(--mono); }
-.lesson-meta b { font-weight: 700; }
-.motd h1 { word-break: auto-phrase; margin: 0 0 1.25rem; font: 750 clamp(1.5rem, 2.4vw, 2.5rem)/1.4 var(--sans); letter-spacing: -.045em; overflow-wrap: anywhere; text-wrap: balance; }
-.motd-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.85; }
-.course-progress { max-width: 20rem; margin-top: 2.25rem; color: var(--dim); }
-.course-progress label { display: flex; justify-content: space-between; align-items: baseline; font-size: .8rem; }
+.lesson-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: .4rem 1.1rem; margin: 0; color: var(--accent); font-size: 1rem; font-weight: 400; }
+.lesson-meta span { color: var(--accent); font: inherit; font-weight: 400; }
+.lesson-meta b { font-weight: 400; }
+.motd h1 { word-break: auto-phrase; margin: 0 0 .6em; max-width: none; color: var(--fg); font: inherit; font-weight: 400; letter-spacing: 0; overflow-wrap: anywhere; text-wrap: balance; }
+.motd-text { white-space: normal; overflow-wrap: anywhere; max-width: none; color: var(--fg); font-size: 1rem; line-height: 1.25; }
+.motd-text p, .motd-text p:first-child { margin: 0; padding: 0; border: 0; color: var(--fg); font-weight: 400; }
+/* 進み具合の progress は読み上げ用に残し、見た目では出さない */
+.course-progress { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); margin: 0; max-width: 20rem; color: var(--dim); }
+.course-progress label { display: flex; justify-content: space-between; align-items: baseline; font-size: .72rem; }
 .course-progress b { font: .8rem var(--mono); color: var(--fg); }
-.course-progress progress { display: block; width: 100%; height: 4px; margin-top: .5rem; border: 0; appearance: none; background: var(--line); color: var(--user); }
-.course-progress progress::-webkit-progress-bar { background: var(--line); }
-.course-progress progress::-webkit-progress-value { background: var(--user); }
+.course-progress progress { display: block; width: 100%; height: 2px; margin-top: .5rem; border: 0; border-radius: 0; appearance: none; background: var(--line); color: var(--user); }
+.course-progress progress::-webkit-progress-bar { background: var(--line); border-radius: 0; }
+.course-progress progress::-webkit-progress-value { background: var(--user); border-radius: 0; }
 .course-progress progress::-moz-progress-bar { background: var(--user); }
-.console { grid-area: console; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-.console-tools { display: flex; align-items: center; justify-content: space-between; gap: .7rem; margin: 0 var(--gutter); min-height: 3.5rem; border-bottom: 1px solid var(--line); }
-.console-tools h2 { margin: 0; font-size: .9rem; letter-spacing: .04em; }
-.help-button, .foot button { border: 0; padding: .5rem 0; background: transparent; color: inherit; text-decoration: underline; font-size: .875rem; }
-.help-button:hover, .foot button:hover { color: var(--accent); }
-.starter-commands { display: grid; gap: .28rem; align-self: start; padding: 1rem var(--gutter) .65rem; border-bottom: 1px solid var(--line); }
-.starter-commands > p { display: flex; flex-wrap: wrap; gap: .25rem .8rem; margin: 0 0 .35rem; color: var(--fg); font-size: .82rem; font-weight: 700; }
+
+/* 端末の出力 */
+.console { display: block; min-width: 0; min-height: 0; padding: 0 var(--gutter); background: transparent; }
+.console-tools { display: flex; align-items: center; justify-content: flex-start; gap: .7rem; margin: 0; padding: .3rem 0 0; min-height: 0; border: 0; background: transparent; }
+.console-tools h2 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); margin: 0; font-size: .9rem; letter-spacing: .04em; }
+.help-button, .foot button { border: 0; border-radius: 0; padding: 0; background: transparent; color: var(--dim); text-decoration: none; font-size: .8rem; }
+.help-button:hover, .foot button:hover { color: var(--user); }
+.starter-commands { display: grid; gap: 0; align-self: start; padding: 0 0 .3rem; margin: .6em 0 0; border: 0; }
+.starter-commands > p { display: flex; flex-wrap: wrap; gap: .25rem .8rem; margin: 0; color: var(--dim); font-size: 1rem; font-weight: 700; }
 .starter-commands > p span { color: var(--dim); font-size: .78rem; font-weight: 400; }
-.starter-commands button { display: flex; align-items: baseline; gap: 1rem; padding: .25rem 0; background: transparent; border: 0; text-align: left; }
-.starter-commands code { min-width: 5ch; color: var(--user); font-weight: 700; }
-.starter-commands span { color: var(--dim); font-size: .9rem; }
-.starter-commands button:hover span { color: var(--fg); text-decoration: underline; }
-.term-out { flex: 1; min-height: 0; overflow: auto; padding: .7rem var(--gutter); overflow-wrap: anywhere; scrollbar-width: thin; }
-.term-out:focus-visible, .workbench:focus-visible { outline-offset: -3px; }
-.term-out, .prompt { font: 1rem/1.6 var(--mono); }
+.starter-commands button { display: flex; align-items: baseline; gap: 1ch; padding: 0; margin: 0; border: 0; border-radius: 0; background: transparent; text-align: left; }
+.starter-commands button:hover { background: transparent; }
+.starter-commands code { min-width: 8ch; color: var(--user); font-weight: 700; }
+.starter-commands span { color: var(--dim); font-size: 1rem; }
+.starter-commands button:hover span { color: var(--fg); text-decoration: none; }
+.term-out { overflow: visible; padding: .3rem 0; overflow-wrap: anywhere; scrollbar-width: thin; }
+.term-out:focus-visible { outline-offset: -3px; }
+.term-out, .prompt { font: 1rem/1.25 var(--mono); }
 .entry { margin: .45rem 0; }
 .ps, .tag { font-weight: 700; }
 .ps-user, .tag-ok { color: var(--user); }
 .ps-path, .tag-info { color: var(--path); }
+.ps-user, .ps-path { font-weight: 700; }
 .tag-ng, .tag-error, .entry.error .out { color: var(--err); }
 .tag-hint { color: var(--hint); }
 .out { margin: 0; white-space: pre-wrap; font: inherit; }
 .boot, .runtime-notice { display: grid; gap: .35rem; justify-items: start; }
 
-.mission { grid-area: mission; display: flex; align-items: baseline; gap: .85rem; max-height: 6.4em; overflow: auto; padding: .7rem var(--gutter); background: var(--raise); border-block: 1px solid var(--line); }
-.mission-label { flex: none; color: var(--accent); font: 700 .875rem var(--mono); }
+/* 課題 (1行) と入力行 */
+.mission, .prompt, .actions { width: 100%; max-width: 110ch; flex: none; }
+.mission { display: flex; align-items: baseline; gap: .85rem; max-height: 5.2rem; overflow: auto; padding: .6em var(--gutter) .2em; background: transparent; border: 0; font-size: 1rem; line-height: 1.25; }
+.mission-label { flex: none; color: var(--accent); font: inherit; font-weight: 400; }
+.mission-label::after { content: ":"; }
 #mission-text { white-space: pre-wrap; overflow-wrap: anywhere; }
-.prompt { grid-area: prompt; display: flex; align-items: center; gap: .6rem; padding: .6rem var(--gutter); }
+.prompt { display: flex; align-items: center; gap: .6rem; padding: 0 var(--gutter) .3rem; background: transparent; border: 0; }
 .prompt label { max-width: 55%; overflow-wrap: anywhere; }
 .field { position: relative; flex: 1; min-width: 0; }
 .prompt input { width: 100%; min-height: 2.4rem; padding: 0; background: transparent; border: 0; border-radius: 0; outline: 0; font: inherit; caret-color: var(--fg); }
 .prompt input::placeholder { color: var(--dim); }
-.field:focus-within { box-shadow: 0 2px 0 var(--focus); }
+/* キーボード操作の目印。e2e が box-shadow が none でないことを確認する */
+.field:focus-within { box-shadow: 0 1px 0 color-mix(in srgb, var(--fg) 22%, transparent); }
 .caret { position: absolute; left: 0; top: 50%; width: .6em; height: 1.2em; margin-top: -.6em; background: var(--fg); animation: blink 1.1s steps(1) infinite; pointer-events: none; }
 @keyframes blink { 50% { opacity: 0; } }
+
+/* 入力補助キー (スマホ/シンプル表示) と、前後の移動 */
 .keys { display: none; gap: .35rem; }
-.kbtn { display: inline-flex; align-items: center; justify-content: center; min-height: 2.5rem; padding: 0 .65rem; background: var(--panel); border: 1px solid var(--line); border-radius: 0; color: var(--fg); font-size: .9rem; }
-.kbtn:hover:not(:disabled) { border-color: var(--fg); }
-.kbtn.enter { background: var(--fg); color: var(--panel); border-color: var(--fg); font-weight: 700; }
-.actions { grid-area: actions; display: flex; align-items: center; gap: .7rem; padding: .55rem var(--gutter) .7rem; border-top: 1px solid var(--line); background: var(--bg); }
+.kbtn { display: inline-flex; align-items: center; justify-content: center; min-height: 1.8rem; padding: 0 .6rem 0 0; background: transparent; border: 0; border-radius: 0; color: var(--dim); font-size: .85rem; font-weight: 400; text-align: left; }
+.keys .kbtn, .tw.simple .kbtn { border: 1px solid var(--line); padding: 0 .7rem; text-align: center; }
+.kbtn:hover:not(:disabled) { color: var(--user); background: transparent; border: 0; }
+.kbtn.enter { background: transparent; color: var(--user); border-color: var(--user); font-weight: 700; }
+.actions { display: flex; align-items: center; gap: .7rem; padding: 0 var(--gutter) .4rem; border: 0; background: transparent; }
 .quick-actions { display: flex; flex-wrap: wrap; gap: .35rem; }
 .lesson-nav { display: grid; grid-template-columns: auto minmax(10rem, 1fr) auto auto; align-items: center; gap: .6rem; width: 100%; }
-.lesson-nav button { min-height: 2.55rem; padding: .35rem .7rem; border: 1px solid var(--line); border-radius: 0; background: var(--panel); color: var(--fg); font-size: .88rem; font-weight: 650; white-space: nowrap; }
-.lesson-nav button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-.lesson-nav .nav-next { border-color: #a84b27; background: #a84b27; color: #fffaf3; }
-.lesson-nav .nav-next:hover:not(:disabled) { border-color: #78371f; background: #78371f; color: #fffaf3; }
-.lesson-nav .nav-next:disabled { border-color: var(--line); background: var(--raise); color: var(--dim); opacity: 1; }
-.nav-status { display: grid; gap: .05rem; min-width: 0; color: var(--fg); font-size: .82rem; font-weight: 700; }
+.lesson-nav button { min-height: 1.8rem; padding: 0 .6rem 0 0; border: 0; border-radius: 0; background: transparent; color: var(--dim); font-size: .85rem; font-weight: 400; text-align: left; white-space: nowrap; }
+.lesson-nav button:hover:not(:disabled) { color: var(--user); background: transparent; border: 0; }
+.lesson-nav .nav-next { color: var(--user); font-weight: 700; background: transparent; border: 0; }
+.lesson-nav .nav-next::before { content: "["; }
+.lesson-nav .nav-next::after { content: "]"; }
+.lesson-nav .nav-next:hover:not(:disabled) { color: var(--fg); background: transparent; }
+.lesson-nav .nav-next:disabled { border-color: var(--line); background: transparent; color: var(--dim); opacity: .7; }
+.lesson-nav .nav-next:disabled::before, .lesson-nav .nav-next:disabled::after { content: ""; }
+.lesson-nav .nav-list { border: 0; background: transparent; }
+.nav-status { display: grid; gap: .05rem; min-width: 0; color: var(--dim); font-size: .8rem; font-weight: 700; }
 .nav-status span, .nav-status small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nav-status small { color: var(--dim); font-size: .74rem; font-weight: 400; }
-.lesson-nav .nav-list { border-style: dashed; background: transparent; }
-.foot { flex: none; min-height: 2.4rem; padding: 0 var(--gutter, 1.5rem); display: flex; justify-content: space-between; align-items: center; gap: .75rem; background: var(--bg); color: var(--dim); border-top: 1px solid var(--line); font: .8rem/1.4 var(--mono); }
+.nav-status span { color: var(--fg); }
+.nav-status small { color: var(--dim); font-size: .8rem; font-weight: 400; }
+
+/* ステータス行 */
+.foot { flex: none; min-height: 1.8rem; padding: 0 var(--gutter, 1.5rem); display: flex; justify-content: space-between; align-items: center; gap: .75rem; background: var(--bg); color: var(--dim); border: 0; font: .8rem/1.4 var(--mono); }
 .foot-r { display: flex; align-items: center; gap: 1.2rem; }
 .foot [aria-pressed="true"] { font-weight: 700; color: var(--fg); }
 .rt { font-weight: 700; }
@@ -129,7 +158,8 @@ html.app-lock, html.app-lock body { height: 100%; overflow: hidden; overscroll-b
 .rt.ready { color: var(--ok); }
 .rt.error { color: var(--err); }
 
-dialog { max-width: 32rem; width: calc(100% - 2rem); padding: 1.25rem 1.5rem; background: var(--panel); color: var(--fg); border: 1px solid var(--fg); border-top: 4px solid var(--accent); font: 1rem/1.7 var(--sans); }
+/* ダイアログ (学習データ) */
+dialog { max-width: 32rem; width: calc(100% - 2rem); padding: 1.25rem 1.5rem; background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 0; font: 1rem/1.7 var(--sans); }
 dialog::backdrop { background: rgb(0 0 0 / 65%); }
 .dialog-heading { display: flex; justify-content: space-between; align-items: center; }
 .dialog-heading h2 { margin: 0; font-size: 1.25rem; }
@@ -139,24 +169,12 @@ dialog::backdrop { background: rgb(0 0 0 / 65%); }
 .import-button:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
 #data-message { min-height: 1.6em; }
 
+/* ---------- 狭い画面・タッチ端末 ---------- */
 @media (max-width: 55rem) {
-  .screen { --gutter: 1rem; display: flex; flex-direction: column; }
-  .workbench { display: block; flex: 1; min-height: 0; overflow: auto; }
-  .motd { padding: 1.1rem var(--gutter); border-right: 0; border-bottom: 1px solid var(--line); }
-  .lesson-meta { margin-bottom: .55rem; }
-  .motd h1 { word-break: auto-phrase; margin-bottom: .65rem; font-size: 1.5rem; }
-  .motd-text { line-height: 1.7; }
-  .course-progress { margin-top: 1rem; }
-  .console-tools { min-height: 2.7rem; }
-  .term-out { overflow: visible; }
-  .mission, .prompt, .actions { flex: none; }
-  .actions { display: block; padding: .45rem var(--gutter) .55rem; }
+  .actions { display: block; }
   .quick-actions { margin-bottom: .4rem; }
   .lesson-nav { grid-template-columns: auto 1fr auto; gap: .4rem; }
-  .lesson-nav button { min-height: 2.7rem; padding-inline: .5rem; font-size: .8rem; }
-  .lesson-nav .nav-list { grid-column: 1 / -1; min-height: 2.2rem; border: 0; border-top: 1px dashed var(--line); background: transparent; }
-  .nav-status { font-size: .73rem; }
-  .nav-status small { font-size: .68rem; }
+  .lesson-nav .nav-list { grid-column: 1 / -1; min-height: 2.2rem; }
 }
 @media (max-width: 42.5rem), (hover: none) and (pointer: coarse) {
   .prompt { flex-wrap: wrap; gap: .2rem .5rem; }
@@ -165,161 +183,29 @@ dialog::backdrop { background: rgb(0 0 0 / 65%); }
   .keys .kbtn { flex: 1; }
 }
 @media (max-width: 42.5rem) {
-  .masthead-inner { min-height: 3rem; }
-  .wordmark { font-size: 1rem; gap: .45rem; }
-  .masthead-nav { font-size: .8rem; }
-  .mission { max-height: 5.5em; gap: .55rem; padding-block: .45rem; }
-  .prompt { padding-block: .3rem; }
+  .mission { gap: .55rem; }
   .foot { padding-inline: var(--gutter, 1rem); }
   .foot-keys { display: none; }
   .foot-r { width: 100%; }
   .rt { margin-left: auto; }
 }
+@media (max-width: 26rem) {
+  .masthead-inner { gap: .5rem; flex-wrap: wrap; }
+}
+@media (max-width: 22rem) {
+  .masthead-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+}
+
+/* ---------- シンプル表示 (大きな文字とボタン) ---------- */
 .tw.simple .term-out, .tw.simple .prompt, .tw.simple .motd-text { font: 1.125rem/1.65 var(--sans); }
 .tw.simple .keys { flex: 1 0 100%; display: flex; }
 .tw.simple .keys .kbtn { flex: 1; }
 .tw.simple .prompt { flex-wrap: wrap; }
 .tw.simple .kbtn { min-height: 2.8rem; font-size: 1rem; }
 @media (max-height: 32rem) {
-  .masthead-inner { min-height: 2.5rem; }
-  .mission { max-height: 3.6em; }
   .tw.simple .actions { flex-wrap: nowrap; overflow: auto; }
   .tw.simple .actions .kbtn { flex-shrink: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
-@media (max-width: 26rem) {
-  .masthead-inner { padding-inline: .75rem; gap: .5rem; flex-wrap: wrap; }
-  .masthead-nav { gap: .7rem; }
-}
-@media (max-width: 22rem) {
-  .masthead-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-}
-
-
-
-
-
-/* ===== Plain terminal: no chrome, just text. One screen, no page scroll. ===== */
-body { font: 16px/1.6 var(--mono); }
-::selection { background: var(--fg); color: var(--bg); }
-.masthead { background: var(--bg); border: 0; }
-.masthead-inner { min-height: 2.2rem; padding-inline: 1.25rem; }
-.wordmark { font: 700 .85rem/1 var(--mono); letter-spacing: 0; color: var(--fg); gap: .5rem; }
-.shell-mark { width: auto; height: auto; padding: 0; background: transparent; color: var(--user); font-size: .85rem; }
-.masthead-nav { font-size: .78rem; gap: 1.2rem; }
-.masthead-nav > * { text-decoration: none; color: var(--dim); }
-.masthead-nav [aria-current] { color: var(--fg); font-weight: 700; box-shadow: none; }
-.masthead a:hover { color: var(--user); }
-.masthead :focus-visible { outline-color: var(--focus); }
-
-.screen { --gutter: 1.25rem; display: flex; flex-direction: column; background: var(--bg); }
-.workbench { display: block; flex: 1; min-height: 0; overflow: auto; scrollbar-width: thin; }
-.workbench > * { max-width: 110ch; }
-.motd { border: 0; background: transparent; overflow: visible; padding: .6rem var(--gutter) 0; }
-.lesson-meta { margin: 0 0 .15rem; font-size: .8rem; font-weight: 400; color: var(--dim); }
-.lesson-meta span { color: var(--accent); font: 700 .8rem/1.4 var(--mono); }
-.lesson-meta b { font-weight: 700; }
-.motd h1 { font: 700 1.05rem/1.5 var(--mono); letter-spacing: 0; margin: 0 0 .5rem; max-width: none; color: var(--user); }
-.motd h1::before { content: "# "; }
-.motd-text { white-space: normal; max-width: none; font-size: .9rem; line-height: 1.7; color: var(--fg); }
-.motd-text p { margin: 0 0 .15em; padding: 0; border: 0; }
-.motd-text p:first-child { color: var(--fg); font-weight: 700; margin-bottom: .45em; }
-.course-progress { max-width: 24rem; margin-top: .5rem; }
-.course-progress label { font-size: .72rem; }
-.course-progress progress { height: 2px; border-radius: 0; background: var(--line); color: var(--user); }
-.course-progress progress::-webkit-progress-bar { background: var(--line); border-radius: 0; }
-.course-progress progress::-webkit-progress-value { background: var(--user); border-radius: 0; }
-.course-progress progress::-moz-progress-bar { background: var(--user); }
-
-.console { display: block; background: transparent; padding: 0 var(--gutter); }
-.console-tools { margin: 0; padding: .15rem 0; min-height: 0; border: 0; background: transparent; justify-content: flex-end; }
-.console-tools h2 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-.help-button, .foot button { text-decoration: none; padding: 0; border: 0; border-radius: 0; background: transparent; font-size: .78rem; color: var(--dim); }
-.help-button:hover, .foot button:hover { color: var(--user); }
-.starter-commands { display: grid; padding: 0 0 .3rem; margin: 0; border: 0; gap: 0; }
-.starter-commands > p { margin: 0; font-size: .78rem; color: var(--dim); }
-.starter-commands button { padding: 0; margin: 0; border-radius: 0; gap: 1ch; }
-.starter-commands button:hover { background: transparent; }
-.starter-commands button:hover span { color: var(--fg); text-decoration: none; }
-.starter-commands code { color: var(--user); min-width: 8ch; }
-.starter-commands span { font-size: .85rem; }
-.term-out { overflow: visible; padding: .3rem 0; font-size: .95rem; }
-
-.mission, .prompt, .actions { width: 100%; max-width: 110ch; flex: none; }
-.mission { background: transparent; border: 0; padding: .3rem var(--gutter); font-size: .9rem; max-height: 5.2rem; }
-.mission-label { color: var(--accent); font: 700 .85rem var(--mono); }
-.mission-label::before { content: "> "; }
-.prompt { background: transparent; border: 0; padding: .2rem var(--gutter) .4rem; font-size: .95rem; }
-.field:focus-within { box-shadow: 0 1px 0 var(--user); }
-.caret { background: var(--user); }
-.actions { background: transparent; border: 0; padding: .2rem var(--gutter) .4rem; }
-.kbtn, .lesson-nav button { border: 0; border-radius: 0; background: transparent; color: var(--dim); font-weight: 400; min-height: 1.8rem; padding: 0 .6rem 0 0; font-size: .82rem; text-align: left; }
-.lesson-nav button:hover:not(:disabled), .kbtn:hover:not(:disabled) { color: var(--user); background: transparent; border: 0; }
-.lesson-nav .nav-next { color: var(--user); font-weight: 700; background: transparent; border: 0; }
-.lesson-nav .nav-next::before { content: "["; } .lesson-nav .nav-next::after { content: "]"; }
-.lesson-nav .nav-next:hover:not(:disabled) { color: var(--fg); background: transparent; }
-.lesson-nav .nav-next:disabled { background: transparent; color: var(--dim); opacity: .7; }
-.lesson-nav .nav-next:disabled::before, .lesson-nav .nav-next:disabled::after { content: ""; }
-.lesson-nav .nav-list { border: 0; background: transparent; }
-.nav-status { font-size: .74rem; color: var(--dim); }
-.nav-status span { color: var(--fg); }
-.keys .kbtn, .tw.simple .kbtn { border: 1px solid var(--line); padding: 0 .7rem; text-align: center; }
-.kbtn.enter { background: transparent; color: var(--user); border-color: var(--user); font-weight: 700; }
-.foot { background: var(--bg); color: var(--dim); border: 0; min-height: 1.8rem; font-size: .75rem; }
-.foot [aria-pressed="true"] { color: var(--fg); }
-dialog { border-radius: 0; border: 1px solid var(--line); border-top-width: 1px; }
-@media (max-width: 55rem) { .motd { border: 0; } .actions { display: block; } }
-.console-tools { justify-content: flex-start; padding: .5rem 0 .2rem; }
-.help-button { color: var(--accent); }
-.help-button::before { content: "? "; }
-
-.caret { background: var(--fg); }
-.motd-text { font-size: 1rem; }
-.term-out, .prompt { font-size: 1.05rem; }
-.ps-user, .ps-path { font-weight: 700; }
-
-/* ===== Fidelity to GNOME Terminal (Ubuntu 24.04): 13pt Ubuntu Sans Mono, tight 1.25 rows, no markup feel ===== */
-body { font: 17.33px/1.25 var(--mono); }
-.tw { background: var(--bg); }
-.masthead { order: 99; background: var(--bg); }
-.masthead-inner { min-height: 1.7rem; }
-.wordmark, .masthead-nav { font-size: .8rem; font-weight: 400; }
-.wordmark { color: var(--dim); }
-.shell-mark { display: none; }
-.masthead-nav [aria-current] { font-weight: 400; color: var(--fg); }
-.masthead-nav [aria-current]::before, .masthead-nav [aria-current]::after { content: none; }
-.screen { justify-content: flex-start; }
-.workbench { flex: 0 1 auto; }
-.motd { padding: .5rem var(--gutter) 0; }
-.lesson-meta { margin: 0; font-size: 1rem; color: var(--accent); }
-.lesson-meta span { font: inherit; font-weight: 400; }
-.lesson-meta b { font-weight: 400; }
-.motd h1 { font: inherit; font-weight: 400; color: var(--fg); margin: 0 0 .6em; }
-.motd h1::before { content: none; }
-.motd-text { font-size: 1rem; line-height: 1.25; color: var(--fg); }
-.motd-text p, .motd-text p:first-child { margin: 0; padding: 0; border: 0; font-weight: 400; color: var(--fg); margin-bottom: 0; }
-.course-progress { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); margin: 0; }
-.console-tools { padding: .3rem 0 0; }
-.help-button, .foot button { font-size: .8rem; color: var(--dim); }
-.help-button { color: var(--dim); }
-.help-button::before { content: none; }
-.starter-commands { margin-top: .6em; }
-.starter-commands > p, .starter-commands span { font-size: 1rem; }
-.starter-commands code { color: var(--user); }
-.term-out, .prompt { font-size: 1rem; line-height: 1.25; }
-.mission { font-size: 1rem; line-height: 1.25; padding-block: .6em .2em; }
-.mission-label { font: inherit; font-weight: 400; color: var(--accent); }
-.mission-label::before { content: none; }
-.mission-label::after { content: ":"; }
-.prompt { padding-block: 0 .3rem; }
-.ps-user, .ps-path { font-weight: 700; }
-.ps-user { color: var(--user); }
-.ps-path { color: var(--path); }
-.caret { background: var(--fg); }
-.actions { padding-top: 0; }
-.kbtn, .lesson-nav button { font-size: .85rem; }
-.nav-status, .nav-status small { font-size: .8rem; }
-.foot { font-size: .8rem; }
-.field:focus-within { box-shadow: 0 1px 0 color-mix(in srgb, var(--fg) 22%, transparent); }
