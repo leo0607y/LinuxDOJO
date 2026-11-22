@@ -5,33 +5,35 @@
 ## Codexへ: いますぐやること（2026-11-22 最新・最優先。ここだけ読めば再開できる）
 
 ### 0. 最初に確認する
-- `git status --short`（未コミットの変更が2ファイルある。下の1を参照）と `git log -12 --oneline`。ブランチ `learning-expansion`。
+- `git status --short`（この引き継ぎ書を書いた時点では全てコミット済み）と `git log -12 --oneline`。ブランチ `learning-expansion`。
 - Node 22.12 以上が必要（wrangler の要件）。`~/.local/node22/bin` に入れて PATH を通す。無ければ公式の tarball を取得し、チェックサムを検証して展開する。
 - サイトのプレビュー: `cd web/danganlog && npm run build && python3 -m http.server 3107 -d out`。ブラウザは `Ctrl+Shift+R` で強制再読み込み。
 - テストの実行方法: `tests/` に `__init__.py` は無い。`python3 -m unittest tests.test_xxx ...` と名前を並べる（`discover` は使えない）。`test_all_missions` は長いので別実行。サイトは `cd web/danganlog && npm test` と `npm run test:e2e`（14件）。バックグラウンド実行時に `pkill -f` を使うと自分のシェルも落ちるので使わない。
 
-### 1. 作業途中の未コミット変更（先に仕上げる）
-- `curriculum/beginner_lessons.py` の basic-43「ポートと秘密鍵を指定する」: 課題文から鍵の場所（`.ssh/`）を外し、「鍵ファイル training_key（置き場所は自分で探します）」にした。
-  - **未完**: ヒントは問題ごとに `_HINTS`（辞書、約714行目付近）が使われ、`lesson(..., hints=[...])` は上書きされる。追加した `hints=` は不要なので削除し、`_HINTS["basic-43"]` を次の方針で書き換える。
-    - 1つ目: 鍵の置き場所は書かれていない。ホームに何があるか調べる。ドットで始まる名前は隠しファイル。
-    - 2つ目: 以前習った `ls -a` で隠しフォルダまで表示し、見つけた `.ssh` は `ls .ssh` で中身を見る。
-    - 3つ目（答え）は今まで通り。
-  - 実際の端末で `ls` では見えず、`ls -a` で `.ssh/` と `.memo`、`ls .ssh` で `training_key` が見えることは確認済み。
-- `curriculum/stage11_storage_recovery.py` の 11-6: requirements.txt に「結果を verification.txt に保存」を追記した（判定が verification.txt を読むのに、課題文に名前が無かった）。
-- 完了したら `tests.test_lesson_self_contained tests.test_guided_ssh tests.test_guided tests.test_learning_integration` を実行してコミット。
+### 1. 課題文の書き方の原則（利用者の明確な方針。新規・修正のすべてで守る）
+- **書かない**: 既習の道具（`ls`、`ls -a`、`cd`、`cat` など）で見つけられること。例: 鍵が隠しフォルダ `.ssh` にあること、既に存在するファイル・フォルダの名前や場所。見つけさせるのが練習になるので、課題文には書かない。迷ったときの導線は、`_HINTS`（基礎）のヒント1・2で、既習の道具を名指しして示す。
+- **必ず書く**: 調べても分からないこと。接続先のサーバー名、ユーザー名、ポート番号、保存先として自分で決める名前（出力ファイル名）、作る物の名前など。途中から再開した人が、課題文だけで答えを組み立てられること。
+- 実施済み: basic-43（課題文から鍵の場所・名前を外し、ヒントを `ls -a` 誘導に変更）、SSH系（basic-36〜48 の接続先・ユーザー・ポート）、11-6（保存先 verification.txt）。`tests/test_lesson_self_contained.py` が、`user@host`・`-p` のポート・リダイレクト先/`-o` の出力名を検査する（既存ファイルの名前は検査しない）。
+- 残り: 全レッスンの課題文・説明を同じ原則で見直す。既習の応用でできることが課題文に書かれていたら削る（候補の洗い出しは正規表現では足りない。人が1問ずつ読むこと）。
+
+### 1.5 最後に確認できていないこと（先に実行して確かめる）
+- 最後の教材修正（basic-43 の課題文・ヒント、names.txt などの課題文の差し戻し）の後、**サイトの `npm test` と `npm run test:e2e` は再実行していない**。サイトは教材を `tools/build_web.py` でバンドルするため、`cd web/danganlog && npm run build && npm test && npm run test:e2e`（e2e は15件のはず）で必ず確かめる。
+- Python 側は `tests.test_lesson_self_contained tests.test_guided_ssh tests.test_guided tests.test_learning_integration`（64件）が通っている。全体（`test_all_missions` を除く625件）は、課題文を直す前の時点で通過。直した後の全体再実行は未実施。
+- サイト版の `ls` 不具合は、公開中の danganlog.com にまだ残っている（最新のビルドを `scripts/deploy.sh` で反映するまで）。
 
 ### 2. 利用者の指摘と、残りの作業（優先順）
 1. **「正しい答えなのに次へ進まない」問題の洗い出し**: 判定は `engine/guided.py` の `matches()` が、入力を `shlex.split` した語の並びを、`command` と `accept` のどれかと**完全一致**で比べている（`goal` がある課題は状態で判定）。そのため、オプションの順序違い（例: `ssh -i 鍵 -p 2222 ...` と `ssh -p 2222 -i 鍵 ...`）や、等価な書き方が不正解になる。
    - 基礎66問と応用46問を見直し、順序が入れ替わっても正しい入力は `accept` に追加するか、`goal`（結果で判定）に切り替える。特に ssh / scp / chmod / grep / sort などの複数オプション。
    - 実際に起きた例: 利用者が接続先を `training-serve`（r抜け）と入力して先へ進めなかった。課題文に接続先が無かったため（修正済み）。エラー文は入力値を示す形に改善済み。
-2. **「場所が書かれていない」「前に習った道具で探させる」問題**: 利用者の要望は、答えに必要な場所を課題文で教えすぎず、ヒント1・2で `ls -a` や `ls` フォルダ名 など既習の道具へ誘導すること。basic-43 以外の候補は `basic-18`（notes/archive.txt）、`intro-07`（.memo）、`adv-38`（logs/old-*.log）。ほかにも似た構造の問題があるはず。全問の `_HINTS`（基礎）と応用の hints を見直し、1つ目は考え方、2つ目は使う道具、3つ目で答え、の段階を守る。
+2. **既習の道具で探させる問題の見直し**: 上の原則1に沿って、課題文で場所を教えすぎている問題を削り、ヒント1・2で `ls -a` や `ls` フォルダ名 など既習の道具へ誘導する。候補は `basic-18`（notes/archive.txt）、`intro-07`（.memo）、`adv-38`（logs/old-*.log）。全問の `_HINTS`（基礎）と応用の hints を見直し、1つ目は考え方、2つ目は使う道具、3つ目で答え、の段階を守る。
 3. **課題文だけで再開できること**（実施済みの範囲と、残り）:
-   - 基礎・応用136問の監査と修正は完了（SSH系7問、names.txt・access.log・app.conf）。再発防止に `tests/test_lesson_self_contained.py`（答えのユーザー名@接続先、ファイル名、`-p` のポートが課題文・説明文・題名に書かれているか）を追加済み。
+   - 基礎・応用136問の監査は完了（SSH系の接続先・ユーザー・ポート、11-6の保存先）。再発防止のテストは上の原則1のとおり。
    - ミッション形式（stage系、501問）も同じ観点で調べた。本当に不足していたのは 11-6 のみ（上の1）。検出された他の16件は、一時ファイル名、gitの設定キー、SQLの別名などの誤検出だった。監査の方法: 各ミッションを `runner.prepare` で用意し、問題文・達成条件・作業フォルダ内のテキストに、想定解の `user@host`・IP・`-p` のポート・ファイル名が出てくるかを見る。その後、名前を別の名前に置き換えて想定解を実行し、判定が落ちるかで必須かどうかを判定する（置き換えは疑似的に壊れることがあるので、判定コードも読んで確認する）。このスクリプトは作業用の場所にあり、リポジトリには未収録。必要なら `tools/` に再作成する。
 4. **サイトのデザイン**（コミット済み、未公開）:
    - 現在の版（`ead16d7`）は、実際の Ubuntu 24.04 の GNOME Terminal の設定を読み取って寄せたもの。フォントは Ubuntu Sans Mono（`web/danganlog/public/fonts/` に同梱、ライセンス文書つき）、色は GNOME のパレット、行間は1.25、プロンプトの `user@host` は太字の緑、パスは太字の青。ナビとステータスは画面下部の小さな文字。
    - **未確認の仮定**: 背景色は Ubuntu 標準の `#300a24` と推定（テーマ連動のため設定から読めなかった）。利用者に実際の端末の色と見比べてもらう。
    - 利用者の最後の指摘は「日本語フォントにAI感が強い」。現在の日本語は Noto Sans Mono CJK JP（fc-match が実際の端末で選ぶフォントと同じ）。別の日本語等幅フォント（IPAゴシック系、BIZ UDゴシック、ドットフォントなど）を試すなら、サイト同梱（OFLなど再配布可能なもの）で、`unicode-range` で分割して容量を抑える。
+   - **サイト版で `ls` が道場のメニューに横取りされていた不具合を修正済み**（`components/Dojo.jsx` の別名から `ls` を削除、e2eテスト追加）。サイト独自のコマンド名（help、clear、theme、simple、data、course、modes、progress、goto、open、next、prev、hint、answer、reset、check、menu、lessons）が、レッスンの正解コマンドと衝突しないことを、基礎・応用・ミッションの全問で確認済み（衝突は ミッション 21-12 の `mode http` のみで、これは別のコマンドの引数なので問題なし）。新しい別名を足すときは必ず再確認する。
    - Enter で次の問題へ進む機能は実装・確認済み（課題を達成した後、空のEnterで進む。`components/Dojo.jsx` の `submit`）。
    - 利用者は、角丸・定型のAI風カード・グラデーションを嫌う。実際の端末の見た目を基準にする。
 5. **デプロイ**: `cd web/danganlog && scripts/deploy.sh`（`--dry-run` あり）。設定は `.env.deploy`（Git管理外）。Pages のプロジェクト `danganlog` は作成済みで、`https://danganlog.pages.dev/` に最初の版が公開済み。独自ドメイン `danganlog.com` はこのプロジェクトに割り当て済み（以前そこにあった別のサイトは外した）。**最新のデザインと教材修正は未公開**。利用者が見た目に満足してから実行する。

@@ -245,7 +245,7 @@ export default function Dojo() {
         addEntry('', null, courses.map((c) => bar(c.total ? c.done / c.total : 0, 20) + ' ' + String(c.done).padStart(3) + '/' + String(c.total).padEnd(3) + ' ' + c.name).join('\n') + '\n合計 ' + totalDone + ' 達成 (このブラウザーに保存)', '');
         return true;
       }
-      case 'menu': case 'ls': case 'lessons': {
+      case 'menu': case 'lessons': {
         echo();
         if (!course) return true;
         const q = args.join(' ').toLowerCase();

@@ -163,3 +163,16 @@ for (const scheme of ['dark', 'light']) for (const [w, h] of [[1280, 720], [375,
     await context.close();
   });
 }
+
+test('ls は本物のファイル一覧として動く (道場のメニューに横取りされない) → 課題が達成になる', async () => {
+  const { context, page } = await openApp(env.browser, env.url);
+  await page.waitForFunction(() => document.querySelector('#lesson-title').textContent.includes('お願いする'));
+  await run(page, 'goto 4');
+  await page.waitForFunction(() => document.querySelector('#lesson-title').textContent.includes('今あるものを一覧'));
+  await run(page, 'ls');
+  await page.waitForSelector('.tag-ok');
+  const out = await page.textContent('.term-out');
+  assert.ok(out.includes('welcome.txt'), 'ls の出力にファイル名が出る');
+  assert.ok(!out.includes('[x]') && !out.includes('番号を入力すると開きます'), 'レッスン一覧は出ない');
+  await context.close();
+});

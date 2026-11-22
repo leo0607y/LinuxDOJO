@@ -1,7 +1,9 @@
 """基礎・応用レッスンは、途中から再開しても答えを組み立てられること。
 
-正解の入力に出てくる「ユーザー名@接続先」「ファイル名」「ポート番号」が、
-課題文・説明文・題名のどれかに書かれているかを確認する。
+調べても分からないもの（ユーザー名@接続先、ポート番号、保存先として自分で決める名前）は、
+課題文・説明文・題名のどれかに書く。
+一方、既に存在するファイルやフォルダの名前・場所は、ls や ls -a など既習の道具で見つけられるので、
+課題文に書かなくてよい（書いてしまうと、道具を使う練習の機会を奪う）。
 """
 import re
 import shlex
@@ -43,7 +45,7 @@ class LessonSelfContained(unittest.TestCase):
                     user = token.split("@", 1)[0]
                     if host not in text or user not in text:
                         problems.append((item["id"], token))
-                elif FILE.match(token) and index > 0 and token not in text:
+                elif FILE.match(token) and index > 0 and tokens[index - 1] in (">", ">>", "-o") and token not in text:
                     problems.append((item["id"], token))
             for flag, value in zip(tokens, tokens[1:]):
                 if flag in ("-p", "-P") and value.isdigit() and value not in text:
