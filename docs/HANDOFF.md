@@ -18,6 +18,7 @@
 - firewall: `381b0bc`。実nft/netns、HTTP部分受信の誤判定を修正。通信・抜け道拒否・再読込・専用資源の撤去を確認。
 - localca: `045a20b`。実TLSテストのpipe未closeを修正。ResourceWarningをerrorにして4テスト成功。
 - 前担当の途中修正保存: `5e93b15`。guard/libvirt/netlink/pam/podman/postgres/systemdadv/tunedは、この時点では**実VM未検証**。その後の個別完了記録を優先する。
+- Vim31-17: ERROR行をFIXマーカーで上書きした際の期待件数を修正。生成後の実内容で集計。ERROR行/INFO行の両ケースの回帰テストと実Vim操作31-17成功。
 - ターミナル起動: `b91a92f`。ペンギンと青/紫/シアン、瞬き・ウインク・笑顔。`LQ_NO_ANIMATION=1`で静止。NO_COLOR/非TTYでも静止。PTYで起動とEnter終了を確認。関連10テスト成功。
 - Podman: `170ae81`。rootless Quadlet、公開範囲・実bind mount/heartbeat、UID/GID対応・起動失敗修復・user manager再起動・2周の専用資源撤去を確認。実出力 `g7-podman.md`。
 - PostgreSQL: `1b1704c`。実VM検証と修正を取り込み。ロール属性・SCRAM・実効HBA/再起動設定・最小権限・論理復元・物理backupの由来を確認。`g6-postgres.md`に公式runner実出力。
@@ -34,7 +35,7 @@
 | vm_podman (Sol) | podman.sh / test_vm_podman.py / scenarios/podman.sh / g7-podman.md | 完了。公式runner exit0、親で単体4件成功。ユーザーsystemd再起動後に自動復帰、2周の残骸なし。OS再起動は未検証 |
 
 ### 次に着手する順
-1. 上の3担当は完了・親で取り込み確認済み。実行中の最終Python/501問結果を記録してコミットする（ログ `/tmp/training-accepted-{unittest,missions}.log`）。
+1. 上の3担当は完了・親で取り込み確認済み。最終623 unittest成功/skip48（175.7秒）。501問は500成功、31-17のランダムfixtureの件数誤りを発見して修正。回帰テストと31-17実Vim操作は成功。修正後の全体を再実行中: `/tmp/training-final-python.log`, `/tmp/training-final-missions.log`。結果を確認し保存する。
 2. `docs/DAILY_USE_AUDIT.md` の常用時の抜けを実操作課題で補う（単なるコマンド名追加にしない）。
 3. 未完了VMモジュールの再検証。guard/libvirt/netlink/pam/systemdadv/tunedなどはWIP保存済みでも通過扱いにしない。RHEL3本はRHEL VM未用意。
 4. 変更が止まったら全Python、サイトbuild/npm/course/E2Eを1回通し、結果とskipを記録。見た目の利用者確認前にデプロイしない。

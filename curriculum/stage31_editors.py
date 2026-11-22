@@ -625,6 +625,8 @@ def s17(ctx):
         else:
             rows.append(f'{i} INFO ok')
     rows[pos] = f'{pos} INFO FIX_{tg}'
+    # The marker can replace an ERROR row; count the final fixture, not the pre-edit rows.
+    errs = sum(' ERROR ' in row for row in rows)
     text = '\n'.join(rows) + '\n'
     ctx.write('big.log', text)
     ctx.data.update(tg=tg, orig=sha(text), errs=errs)

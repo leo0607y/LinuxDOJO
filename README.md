@@ -57,6 +57,7 @@ bash install-start.sh --uninstall  # 登録の解除(教材と進捗は残る)
 | `./start.sh` | ゲームを起動 |
 | `./start.sh --check` | 必要なコマンドが入っているか確認 |
 | `./start.sh --test` | 実践モードの全ミッションを自動テスト |
+| `LQ_NO_ANIMATION=1 ./start.sh` | 起動ペンギンを静止表示（NO_COLOR・非TTYでも静止） |
 
 ## 使い方
 
