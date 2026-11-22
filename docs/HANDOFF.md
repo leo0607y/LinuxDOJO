@@ -9,7 +9,7 @@
 4. `python3 -m engine.toolbox audit`。全体検証は `python3 -m unittest discover -s tests`。NodeがPATHになければ下のNodeパスを追加してからサイトのbuild/test/E2Eを実行する。未導入によるskipを合格に数えない。
 5. 機能単位の確認後、担当ファイルとこの文書だけを追加してコミット。検証前の作業保存は `WIP` と明記し、実VM未検証を維持する。
 
-## 最新チェックポイント（2026-11-22 / 利用上限に備えた保存）
+## 最新チェックポイント（2026-11-22 / 全変更コミット・最終検証完了）
 
 ### 確定しているもの
 - 周辺機器の模擬31問: `2ce3477`。初期未達成・正解・罠拒否・ホスト操作禁止の11テスト成功。実機の証明ではない。
@@ -18,7 +18,7 @@
 - firewall: `381b0bc`。実nft/netns、HTTP部分受信の誤判定を修正。通信・抜け道拒否・再読込・専用資源の撤去を確認。
 - localca: `045a20b`。実TLSテストのpipe未closeを修正。ResourceWarningをerrorにして4テスト成功。
 - 前担当の途中修正保存: `5e93b15`。guard/libvirt/netlink/pam/podman/postgres/systemdadv/tunedは、この時点では**実VM未検証**。その後の個別完了記録を優先する。
-- Git30-13: 固定HEAD~5を誤答としていたが、ランダムな故障位置と一致する場合があった。誤答を必ず正常なgoodタグへ変更（採点条件は変更なし）。個別検証後、全501問を再実行: `/tmp/training-release-missions.log`。
+- Git30-13: 固定HEAD~5を誤答としていたが、ランダムな故障位置と一致する場合があった。誤答を必ず正常なgoodタグへ変更（採点条件は変更なし）。個別検証後、全501問PASS: `/tmp/training-release-missions.log`。
 - Vim31-17: ERROR行をFIXマーカーで上書きした際の期待件数を修正。生成後の実内容で集計。ERROR行/INFO行の両ケースの回帰テストと実Vim操作31-17成功。
 - ターミナル起動: `b91a92f`。ペンギンと青/紫/シアン、瞬き・ウインク・笑顔。`LQ_NO_ANIMATION=1`で静止。NO_COLOR/非TTYでも静止。PTYで起動とEnter終了を確認。関連10テスト成功。
 - Podman: `170ae81`。rootless Quadlet、公開範囲・実bind mount/heartbeat、UID/GID対応・起動失敗修復・user manager再起動・2周の専用資源撤去を確認。実出力 `g7-podman.md`。
@@ -26,9 +26,9 @@
 - 常用の安全操作: `ffed7f8`。native `safe-cleanup`（40本目）、NUL区切り・特殊ファイル名・リンク非追跡・退避・隔離移動・復元。実ツール3テスト成功。toolbox関連42テスト成功/skip14。
 - users/lynis: `aabd59d`。最小sudo復旧、Lynis実監査59→60・対象警告消失・誤設定拒否・reset。実出力は `g1-users.md`, `g8-lynis.md`。
 - サイトUI: `4497b0f`。`docs/UI_REVIEW.md`に設計と実画面確認を記録。単調な配色・角丸カード・偽ウィンドウ操作を廃し、説明/端末の2ペインと索引へ。デプロイは未実行。
-- 全体テスト直近: 618件成功/skip48（192.6秒）、サイトbuild成功、npm7件、講座Node4件、E2E14件成功。**その後のUI・新課題は再実行が必要**。
+- 最終検証: Python624件成功/skip48（181.446秒）、実践501/501 PASS（135.5秒）、サイトbuild/npm7件/course4件/E2E14件成功。`docs/VALIDATION_2026-11-22.md`。
 
-### いま進行中・取り込み待ち
+### 担当別の完了記録（すべて取り込み済み）
 | 担当 | 所有ファイル | 再開地点 |
 |---|---|---|
 | site_ui (Astra) | web/danganlog/app と components | 完了。4ページ×3幅の実画面確認、axe8画面0件。親も画像確認、build/npm7件/course4件/E2E14件成功。利用者の見た目確認待ち。dev3106 |
@@ -36,10 +36,10 @@
 | vm_podman (Sol) | podman.sh / test_vm_podman.py / scenarios/podman.sh / g7-podman.md | 完了。公式runner exit0、親で単体4件成功。ユーザーsystemd再起動後に自動復帰、2周の残骸なし。OS再起動は未検証 |
 
 ### 次に着手する順
-1. 上の3担当は完了・親で取り込み確認済み。最終623 unittest成功/skip48（175.7秒）。501問は500成功、31-17のランダムfixtureの件数誤りを発見して修正。回帰テストと31-17実Vim操作は成功。修正後の全体を再実行中: `/tmp/training-final-python.log`, `/tmp/training-final-missions.log`。結果を確認し保存する。
+1. **最終検証は完了**: Python624件成功/skip48、実践501/501 PASS、サイトbuild/npm7件/course4件/E2E14件成功。`docs/VALIDATION_2026-11-22.md` を参照。次は利用者のUI確認と、下記未完了項目から始める。
 2. `docs/DAILY_USE_AUDIT.md` の常用時の抜けを実操作課題で補う（単なるコマンド名追加にしない）。
 3. 未完了VMモジュールの再検証。guard/libvirt/netlink/pam/systemdadv/tunedなどはWIP保存済みでも通過扱いにしない。RHEL3本はRHEL VM未用意。
-4. 変更が止まったら全Python、サイトbuild/npm/course/E2Eを1回通し、結果とskipを記録。見た目の利用者確認前にデプロイしない。
+4. 今回の最終テストは上記のとおり完了。今後新たに変更した範囲の検証を行い、必要な時に全体を再実行する。見た目の利用者確認前にデプロイしない。
 
 - daily_cron担当は制限残25%のため設計確認だけで停止。リポジトリ/VM変更なし。実装は未着手で、次回はDAILY_USE_AUDITの方針から開始する。
 
@@ -48,7 +48,7 @@
 - VM: `~/.cache/linuxdojo-vm/vms/`。g1-app/client、g3-app〜g8-appを保持。`up NAME` で停止済みを再開できる。g6/g7の担当作業は完了し、専用資源は撤去済み。記録を確認して再利用する。
 - `vmtest.py install` は共有 `bundle/` を書き換えるため並列実行しない。VM内の試験自体は別VMなら並列可。
 - 一時ログ: `/tmp/training-*.log`。**実VM通過ログはdocsへ保存するまで完了としない**。画像: `/tmp/dangan-{terminal,course,detail,coverage}-{1280,375,320}.png`。
-- サイトdev `http://127.0.0.1:3106` はUI担当用。既存3000は変更しない。開発サーバーは公開デプロイではない。
+- サイトdev `http://127.0.0.1:3106` は親担当で起動しHTTP200確認済み。既存3000は変更しない。開発サーバーは公開デプロイではない。
 
 ### サブエージェントの使い方（今回のやり方）
 - 1Stage = 1エージェント。担当ファイル以外は編集させない（配線は親が先に済ませる）。
