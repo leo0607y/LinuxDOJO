@@ -46,7 +46,9 @@ test('未完了の課題・選択中のレッスン・作業ファイルをリ�
   await run(page, 'goto 5');
   await page.waitForFunction(() => document.querySelector('#lesson-title').textContent.includes('表示した文字をファイルに保存する'));
   await run(page, 'echo partial > memo.txt');
-  assert.ok(await page.evaluate(() => localStorage.getItem('dangan-log:state:v1')));
+  await run(page, 'cat memo.txt');
+  await page.waitForFunction(() => [...document.querySelectorAll('.out')].some((el) => el.textContent.includes('partial')));
+  await page.waitForFunction(() => localStorage.getItem('dangan-log:state:v1')?.includes('cGFydGlhbAo='));
 
   await page.close();
   const resumed = await context.newPage();
@@ -84,12 +86,14 @@ test('学習データの書き出しと読み込み', async () => {
   await context.close();
 });
 
-test('実Linux環境ガイドからWSL導入手順と練習経路を確認できる', async () => {
+test('Windows・Mac両方のLinux環境ガイドと練習経路を確認できる', async () => {
   const page = await env.browser.newPage();
   await page.goto(env.url + '/course/real-linux/');
   await page.waitForSelector('h1');
   assert.match(await page.locator('main').textContent(), /WSL 2 と Ubuntu/);
   assert.match(await page.locator('main').textContent(), /wsl --install/);
+  assert.match(await page.locator('main').textContent(), /UTMでUbuntuを仮想マシンに入れる/);
+  assert.match(await page.locator('main').textContent(), /uname -s/);
   assert.match(await page.locator('main').textContent(), /専用VM/);
   assert.ok(await page.locator('a[href="/course/"]').count());
   await page.close();

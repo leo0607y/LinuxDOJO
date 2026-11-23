@@ -8,6 +8,7 @@
 .main a { color: var(--path); text-decoration-thickness: 1px; text-underline-offset: .22em; }
 .main a:hover { color: var(--accent); text-decoration-thickness: 2px; }
 .lead { color: var(--dim); line-height: 1.85; max-width: 52rem; }
+.links { display: flex; flex-wrap: wrap; gap: .5rem 1.4rem; margin: .8rem 0 0; }
 .intro { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(18rem, 1fr); align-items: start; gap: clamp(2rem, 6vw, 7rem); }
 .intro .lead { margin: 1rem 0 .6rem; }
 .searchPanel { min-width: 0; padding: 1rem 0 0 1.4rem; border-left: 2px solid var(--accent); }

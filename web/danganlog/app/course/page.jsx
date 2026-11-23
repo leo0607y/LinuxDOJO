@@ -22,7 +22,7 @@ export default function CourseIndex() {
             各トピックでコマンド、練習ミッション、実機実習と検証状況を確認できます。
           </p>
           <p className={styles.links}>
-            <Link href="/course/real-linux/">模擬端末から実Linuxへ進む</Link>
+            <Link href="/course/real-linux/">模擬ターミナルから実際のLinux環境へ進む</Link>
             <Link href="/course/coverage/">資格試験の目標との対応と未達</Link>
           </p>
         </div>

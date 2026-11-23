@@ -15,7 +15,7 @@
 ## 2026-11-23 アプリ不足の確認と次の作業
 
 - 保存の実証範囲: 既存E2Eは達成数のリロード保持だけを確認していた。`web/danganlog/tests/e2e/app.test.mjs` に追加し、同じbrowser context（同じlocalStorageプロファイル）でタブを閉じて新しいページを開き直し、選択中レッスン・未完了状態・作業ファイル `memo.txt` の復元を確認。実ブラウザーで成功。`localStorage`のため別端末・別ブラウザープロファイルとの自動同期はない。学習データのJSON export/importは別E2Eで成功。
-- 実Linux導線: `/course/real-linux/` を新設し、Windows 10 2004/build 19041以降またはWindows 11向けのWSL 2 + Ubuntu手順、確認コマンド、Linux側の作業場所、模擬/WSL/専用VMの使い分けを記載。Microsoft公式リンクを付け、常用コースから移動可能。初心者・日常CLI・開発・サーバー運用の静的な学習経路も記載。
+- 実Linux導線: `/course/real-linux/` を新設。Windows 10 2004/build 19041以降またはWindows 11向けのWSL 2 + Ubuntu手順と、Macの標準Terminal/UTM + Ubuntu Server仮想マシン手順を同じ見出し・敬体・手順形式で記載。Windows・Mac・模擬/実Linux/専用VMの使い分け、公式リンクを付け、常用コースから移動可能。初心者・日常CLI・開発・サーバー運用の学習経路も記載。
 - **残る学習推薦の課題**: 上記の経路は目標別の案内であり、現在の進捗や復習履歴から個人ごとに「次にこれ」を選ぶ推薦機能はまだない。既存データの完了/復習状態のどれを習熟の根拠にするか、到達目標・前提関係と既存レッスン/ネイティブ/VM課題の対応を整理してから実装する。
 - 実環境カバレッジの監査: `docs/vm_verification/` にあるVM実証記録とcoverage表の確認は可能。この開発環境には `/dev/kvm` は見えるが、`multipass`、`qemu-system-x86_64`、`virt-install` が見つからず、現状はVMを立ち上げて新しい実動確認を実施できない。実証記録がない項目は引き続き未確認として扱う。
 - 追加検証: Web build成功、npm test 8件成功、E2E 19件成功。新規の「閉じて再オープン」永続化テストとWSL案内ページE2Eも、更新後に個別で再実行し2件成功。
