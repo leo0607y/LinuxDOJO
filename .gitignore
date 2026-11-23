@@ -146,6 +146,7 @@ Thumbs.db
 !/web/danganlog/public/fonts/
 /web/danganlog/public/fonts/*
 !/web/danganlog/public/fonts/*.woff2
+!/web/danganlog/public/fonts/*.ttf
 !/web/danganlog/public/fonts/UFL-*.txt
 node_modules/
 .next/

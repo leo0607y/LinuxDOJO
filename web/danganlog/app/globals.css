@@ -1,11 +1,11 @@
 /*
  * DANGAN LOG のスタイル。実際の Ubuntu 24.04 の GNOME Terminal (Yaru-dark) を基準にした見た目。
- * - フォント: Ubuntu Sans Mono 13pt 相当 (Latin は同梱、日本語は Noto Sans Mono CJK JP)
+ * - フォント: Ubuntu Mono 13pt 相当 (Ubuntu Mono は同梱、日本語は端末の等幅フォントへフォールバック)
  * - 色: GNOME のパレット。背景 #300a24 は推定値 (端末のテーマ連動で設定から読めなかった)
  * - 行間 1.25、段落の余白・見出し・太字・角丸・ボタンの枠は使わない
  * 変更したら、実画面と npm run test:e2e (axe のコントラスト検査を含む) で必ず確かめる。
  */
-@font-face { font-family: "Ubuntu Sans Mono"; font-style: normal; font-weight: 100 800; font-display: swap; src: local("Ubuntu Sans Mono"), url("/fonts/ubuntu-sans-mono-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Ubuntu Mono"; font-style: normal; font-weight: 300 700; font-display: swap; src: local("Ubuntu Mono"), url("/fonts/ubuntu-mono-variable.ttf") format("truetype"); }
 
 /* ---------- 色とフォント ---------- */
 :root {
@@ -26,7 +26,7 @@
   --mast: var(--bg);
   --mast-fg: var(--fg);
   --brand: var(--user);
-  --mono: "Ubuntu Sans Mono", "Noto Sans Mono CJK JP", "DejaVu Sans Mono", monospace;
+  --mono: "Ubuntu Mono", "Noto Sans Mono CJK JP", "DejaVu Sans Mono", monospace;
   --sans: var(--mono);
 }
 :root[data-theme="light"] { color-scheme: light; }
