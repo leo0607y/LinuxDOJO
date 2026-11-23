@@ -77,8 +77,9 @@ html.app-lock, html.app-lock body { height: 100%; overflow: hidden; overscroll-b
   .ad-unit { min-width: 0; }
   .ad-label { display: block; margin-bottom: .35rem; }
   .ad-placeholder { min-height: 250px; display: grid; place-content: center; border: 1px dashed var(--line); text-align: center; }
-  .coffee-link { color: var(--user); text-decoration: underline; text-underline-offset: .2em; }
-  .coffee-link:hover { color: var(--fg); text-decoration: underline; }
+  .coffee-link { display: flex; justify-content: center; align-items: center; gap: .45rem; min-height: 3.1rem; padding: .45rem .5rem; border: 1px solid var(--user); background: var(--user); color: var(--bg); font-weight: 700; text-align: center; text-decoration: none; }
+  .coffee-link svg { width: 1.45rem; height: 1.45rem; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .coffee-link:hover { background: transparent; color: var(--user); text-decoration: underline; }
 }
 
 /* 説明 (レッスンの題と本文) */
