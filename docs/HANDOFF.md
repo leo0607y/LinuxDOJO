@@ -4,7 +4,7 @@
 
 ## 2026-11-23 最新チェックポイント（この節を優先）
 
-- 利用者の最新指示: 作業を続け、進捗ごとにコミットしてpushする。コミット `6a0f7f1 Add answer review flow and flexible hints` と `30b0fa5 Review lesson wording across curriculum` は作成済み。pushは拒否された。fetch後、origin/learning-expansion が `a7458d6` から `aabd59d` に更新され、ローカルにない18コミットとローカル固有42コミットがあり、通常のmergeは大規模な競合になった。mergeは中止し作業ツリーを復元済み。新コミット後も通常pushはnon-fast-forwardで拒否。force pushは許可されていないため実行しない。最新変更はローカルブランチにある。
+- 利用者の最新指示: 作業を続け、進捗ごとにコミットしてpushする。`learning-expansion` は origin と分岐しており、現在52コミットahead / 18 behind。通常pushはnon-fast-forwardで拒否される。force pushは行わない。現在のHEAD（最新 `da5c835`、その前 `b733aed`）を新しいリモートブランチ `codex/adsense-coffee-rail-20261123` に通常push済み。PR作成URL: `https://github.com/leo0607y/LinuxDOJO/pull/new/codex/adsense-coffee-rail-20261123`。以後このブランチへ通常pushできる。作業ツリーはクリーン。
 - 以前依頼された05:00 JSTのタイマーは起動したが、この会話スレッドが動作中でresumeに失敗した。run.logにthread-store競合が記録され、タイマーによる作業再開は行われていない。
 - **レッスン全体の逐読監査は完了**: intro/basic、practice stages 1–34とExtra、advanced/readiness/festivalを分担して確認し、発見箇所を修正。既習コマンドで調べられる既存ファイル名・隠し場所・手順は課題文や事前説明から外してヒントへ。接続先、ユーザー、ポート、新規出力名、要件値は課題文に残す。新概念の説明は維持する。basic18、readiness07、Stage15-3/9など監査中に見つかった個別の問題も修正。
 - `engine/guidance.py` で、説明文に埋め込まれた完全解答（複数コマンド列を含む）をヒントから除外。guided/practice/readinessで共有し、静的走査では完全解答の漏れ0件。
@@ -33,7 +33,8 @@
 - `/privacy/` に運営者情報、localStorage保存、外部送信、AdSenseおよびBuy Me a Coffeeの説明を追加。Mastheadの「サイト情報」から移動可能。BMC支援者の情報がクリエイターにも共有される点を追記。AdSenseは未有効、Coffeeリンクは未設定。
 - `NEXT_PUBLIC_ADSENSE_PREVIEW=true` は広告通信なしの枠レイアウト確認専用。本番用AdSenseコードはCMPの同意連携を確認してから別途実装する。設定・審査・ads.txt・CMPの手順は `docs/ADSENSE_SETUP.md`。
 - 運営者が受け取る支援者情報に関する非公開問い合わせ先（メール等）は未設定。プライバシー案内をデプロイする前に専用窓口を追記する。
-- 未デプロイ。pushは過去からのoriginとの履歴分岐により拒否されている。通常pushのみ試し、force pushは行わない。
+- build成功。プレビュー設定を一時使用して幅境界と配置を確認し、その後通常設定で再build済み。AdSense実通信は行っていない。
+- `b733aed` と `da5c835` を含む現在のHEADは `codex/adsense-coffee-rail-20261123` へpush済み。`learning-expansion` へはnon-fast-forwardで拒否。未デプロイ。
 
 ## 2026-11-22 夜・利用者指示で一時停止（ここを最優先）
 
