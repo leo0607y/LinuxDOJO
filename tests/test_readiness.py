@@ -154,6 +154,86 @@ class ReadinessTests(unittest.TestCase):
         self.assertEqual(state["active"], scenario["id"])
         self.assertIn(scenario["id"], state["sessions"])
 
+    def play_commands(self, scenario, commands):
+        output = io.StringIO()
+        with patch.object(runner, "WORKSPACE", self.root), \
+             patch.object(readiness.ui, "clear"), \
+             patch("builtins.input", side_effect=commands), \
+             contextlib.redirect_stdout(output):
+            readiness.play(scenario)
+        return output.getvalue()
+
+    def test_answer_marks_unfinished_scenario_for_review_immediately(self):
+        scenario = self.scenario("ready-01")
+
+        def answer_then_interrupt(prompt):
+            if not save.load().get("review"):
+                return "answer"
+            data = save.load()
+            self.assertIn("festival:ready-01", data["review"])
+            self.assertNotIn("ready-01", data["learning"]["readiness"]["completed"])
+            raise EOFError
+
+        with patch.object(runner, "WORKSPACE", self.root), \
+             patch("builtins.input", side_effect=answer_then_interrupt), \
+             contextlib.redirect_stdout(io.StringIO()):
+            readiness.play(scenario)
+        self.assertIn("festival:ready-01", save.load()["review"])
+
+    def test_assistance_survives_resume_and_only_independent_retry_clears_review(self):
+        scenario = self.scenario("ready-01")
+        self.play_commands(scenario, ["answer", "menu"])
+        self.play_commands(scenario, [*scenario["solution"], "check", "menu"])
+        self.assertIn("festival:ready-01", save.load()["review"])
+        self.play_commands(scenario, ["reset", "hint", *scenario["solution"], "check", "menu"])
+        self.assertIn("festival:ready-01", save.load()["review"])
+        self.play_commands(scenario, ["reset", *scenario["solution"], "check", "menu"])
+        data = save.load()
+        self.assertNotIn("festival:ready-01", data["review"])
+        self.assertFalse(data["learning"]["readiness"]["completed"]["ready-01"]["assisted"])
+
+    def test_hints_support_five_stages_and_stop_before_the_full_solution(self):
+        scenario = {**self.scenario("ready-01"),
+                    "hints": [f"助言その{i}" for i in range(1, 6)]}
+        scenario["hints"].append("入力例: " + " → ".join(scenario["solution"]))
+        output = self.play_commands(scenario, ["hint"] * 7 + ["menu"])
+        for number in range(1, 6):
+            self.assertEqual(output.count(f"助言その{number}"), 1)
+        self.assertIn("助言はここまで", output)
+        self.assertNotIn("入力例:", output)
+        self.assertNotIn("festival:ready-01", save.load()["review"])
+
+    def test_empty_hints_offer_answer_without_marking_assistance(self):
+        scenario = {**self.scenario("ready-01"), "hints": []}
+        output = self.play_commands(scenario, ["hint", "menu"])
+        self.assertIn("助言はここまで", output)
+        session = save.load()["learning"]["readiness"]["sessions"]["ready-01"]
+        self.assertFalse(session["assisted"])
+
+    def test_partial_solution_examples_remain_available_as_advice(self):
+        scenario = self.scenario("ready-01")
+        partial = "まず " + scenario["solution"][0] + " で保存先を作れます。"
+        self.assertEqual(readiness.advice_hints({**scenario, "hints": [partial]}), [partial])
+
+    def test_wrapped_complete_solution_is_removed_from_hints(self):
+        scenario = self.scenario("ready-01")
+        wrapped = "入力例（実行前に確認）:\n" + "\n".join(f"`{line}`" for line in scenario["solution"])
+        self.assertEqual(readiness.advice_hints({**scenario, "hints": [wrapped]}), [])
+
+    def test_review_list_selects_unfinished_scenario_and_ignores_other_modes(self):
+        scenario = self.scenario("ready-01")
+        self.play_commands(scenario, ["answer", "menu"])
+        data = save.load()
+        save.mark_review(data, "basic", "basic-01")
+        save.store(data)
+        self.assertEqual([s["id"] for s in readiness.review_scenarios(data)], ["ready-01"])
+        with patch("builtins.input", side_effect=["r", "1", "b", "b"]), \
+             patch.object(readiness, "play") as play, \
+             patch.object(readiness.ui, "clear"), \
+             contextlib.redirect_stdout(io.StringIO()):
+            readiness.run()
+        play.assert_called_once_with(scenario)
+
     def test_ssh_confirmation_and_work_resume_from_saved_session(self):
         scenario = self.scenario("ready-06")
         with patch.object(runner, "WORKSPACE", self.root), \

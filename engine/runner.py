@@ -20,6 +20,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, List, Optional
 
+from engine.guidance import advice_only
+
 ROOT = Path(__file__).resolve().parent.parent
 WORKSPACE = Path(os.environ.get("LQ_WORKSPACE", ROOT / "workspace"))
 STATE = WORKSPACE / ".lq_state"
@@ -92,7 +94,7 @@ class Mission:
     title: str
     story: str
     objectives: List[str]
-    hints: List[str]            # 3段階: 考え方 → 使うコマンド → 具体的なオプション例
+    hints: List[str]            # 考え方から順に示す。段階数は課題ごとに自由。
     answer: str                 # 模範解答コマンド
     explanation: str            # 模範解答の徹底解説
     tip: str                    # クリア時の実務ワンポイント
@@ -108,6 +110,11 @@ class Mission:
         for k, v in (data or {}).items():
             text = text.replace(f"<<{k}>>", str(v))
         return text
+
+
+def hint_steps(mission):
+    """入力例そのものは answer にまとめ、助言だけを順に返す。"""
+    return advice_only(mission.hints, (mission.answer, mission.solution))
 
 
 REGISTRY: List[Mission] = []

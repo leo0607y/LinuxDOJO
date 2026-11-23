@@ -308,7 +308,7 @@ def stage_select():
                   f"{ui.pad(name, 9)}{ui.pad(ui.clip(desc, desc_w), desc_w)}  "
                   f"{ui.progress_bar(done / total if total else 0, 8)} {pct:>3}%  {c(f'{done}/{total}', 'dim')}")
         print()
-        keys = [("番号", "開く"), ("b", "戻る")]
+        keys = [("番号", "開く"), ("r", "復習対象"), ("b", "戻る")]
         if pages > 1:
             keys.insert(1, ("n / p", "ページ送り"))
         print(ui.footer(*keys))
@@ -321,6 +321,10 @@ def stage_select():
             continue
         if k == "p" and pages > 1:
             page = (page - 1) % pages
+            continue
+        if k == "r":
+            if review_select() == "menu":
+                return "menu"
             continue
         s = runner.EXTRA if k == "x" else (int(k) if k.isdigit() else None)
         if s in runner.STAGES:
@@ -338,6 +342,7 @@ def mission_select(stage):
         name, desc = runner.STAGES[stage]
         print(header(name))
         ms = runner.missions_of(stage)
+        reviews = set(save.review_ids(d, "practice"))
         nxt = next((m for m in ms if m.id not in d["cleared"]), None)
         done = len([m for m in ms if m.id in d["cleared"]])
         size = page_size(11)
@@ -354,10 +359,12 @@ def mission_select(stage):
             mark = c(ui.DONE, "green", "bold") if cl else (c(ui.NEXT, "bold", "accent") if m is nxt else c(ui.TODO, "dim"))
             score = f"{cl['score']:>3}pt" if cl else c("  ---", "dim")
             dk = c(" Docker", "dim") if m.docker else ""
+            if m.id in reviews:
+                dk += c(" 復習", "yellow")
             print(f" {mark} {ui.pad(c(f'[{i}]', 'bold', 'accent'), 5)}{ui.pad(c(m.id, 'dim'), 6)}"
                   f"{ui.pad(ui.clip(m.title, ttl_w), ttl_w)} {score}{dk}")
         print()
-        keys = [("番号", "開始"), ("Enter", "次の未クリアから"), ("b", "戻る")]
+        keys = [("番号", "開始"), ("Enter", "次の未クリアから"), ("r", "復習対象"), ("b", "戻る")]
         if pages > 1:
             keys.insert(2, ("n / p", "ページ送り"))
         print(ui.footer(*keys))
@@ -371,10 +378,55 @@ def mission_select(stage):
         if k == "p" and pages > 1:
             page = (page - 1) % pages
             continue
+        if k == "r":
+            if review_select(stage) == "menu":
+                return "menu"
+            continue
         if k == "":
             todo = [m for m in ms if m.id not in d["cleared"]] or ms
             if play(todo[0]) == "menu":
                 return "menu"
+            continue
+        if k.isdigit() and 1 <= int(k) <= len(ms):
+            if play(ms[int(k) - 1]) == "menu":
+                return "menu"
+        else:
+            ui.invalid_choice(k, f"1〜{len(ms)} の番号か b")
+
+
+def review_select(stage=None):
+    """解答を見た実践問題を、未クリアも含めて再開する。"""
+    page = 0
+    while True:
+        d = save.load()
+        ids = set(save.review_ids(d, "practice"))
+        ms = [m for m in all_missions() if m.id in ids and (stage is None or m.stage == stage)]
+        ui.clear()
+        print(header("復習対象"))
+        if not ms:
+            print("\n  復習対象はありません。")
+            pause()
+            return
+        size = page_size(12)
+        pages = max(1, -(-len(ms) // size))
+        page = max(0, min(page, pages - 1))
+        print(f"\n  解答を見た問題  {len(ms)}問   " + pager_line(page, pages))
+        print(c("  ヒント・解答なしで達成すると、この一覧から外れます。", "dim"))
+        print()
+        for i, m in enumerate(ms, 1):
+            if page * size < i <= (page + 1) * size:
+                title = ui.clip(m.title, max(12, ui.term_width() - 22))
+                print(f"  {ui.pad(c(f'[{i}]', 'bold', 'accent'), 5)}{ui.pad(m.id, 7)}{title}")
+        print()
+        keys = [("番号", "復習を開始"), ("b", "戻る")]
+        if pages > 1:
+            keys.insert(1, ("n / p", "ページ送り"))
+        print(ui.footer(*keys))
+        k = ask("\n  > ").lower()
+        if k in ("b", "q", ""):
+            return
+        if k in ("n", "p") and pages > 1:
+            page = (page + (1 if k == "n" else -1)) % pages
             continue
         if k.isdigit() and 1 <= int(k) <= len(ms):
             if play(ms[int(k) - 1]) == "menu":
@@ -492,7 +544,7 @@ def how_to_play():
         "   問題文の「達成条件」を満たすように実際にコマンドを実行します。判定エンジンが、ファイルの中身・パーミッション・リンク・プロセス・環境変数・履歴などの実際の状態を検査します。", "",
         c("3. ゲーム内コマンド（サブシェル内でいつでも使えます）", "bold"),
         cmd("mission", "問題文・達成条件を再表示"),
-        cmd("hint", "段階的ヒント（1:考え方 → 2:使うコマンド → 3:具体例）"),
+        cmd("hint", "段階的ヒント（考え方から順に。段階数は問題ごとに変わります）"),
         cmd("answer", "模範解答と徹底解説（スコア半減）"),
         cmd("check", "達成判定。クリアなら解説を表示して次の問題へ"),
         cmd("submit <答え>", "調べた値（合言葉・ポート番号など）を提出"),

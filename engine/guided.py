@@ -9,6 +9,7 @@ import shutil
 import stat
 
 from engine import commands, runner, save, textcmd, ui, vim_sim
+from engine.guidance import advice_only
 
 MODE_NAMES = {"intro": "はじめてモード", "basic": "基礎練習モード", "advanced": "応用練習モード",
               "expert": "達人モード", "practice": "実践モード"}
@@ -678,7 +679,7 @@ class Terminal:
                 return Result("\n".join(f"{i:>6}\t{x}" for i, x in enumerate(lines, 1)))
             return Result(text.rstrip("\n"))
         if cmd == "grep":
-            flags, _, rest = textcmd.split_flags(rest, "ivcnE")
+            flags, _, rest = textcmd.split_flags(rest, "ivcnEl")
             if not rest:
                 raise TrainingError("grep の後ろに探す文字を書きます。例: grep ERROR app.log")
             pattern, files = rest[0], rest[1:]
@@ -690,7 +691,9 @@ class Terminal:
                         outputs.append(out)
                     code = min(code, found)
                 return Result("\n".join(outputs), code)
-            out, code = textcmd.grep(flags, pattern, self._read_input(cmd, files, stdin).splitlines())
+            else:
+                out, code = textcmd.grep(flags, pattern, self._read_input(cmd, files, stdin).splitlines(),
+                                         label=files[0] if files and "l" in flags else None)
             return Result(out, code)
         if cmd in ("head", "tail"):
             count, from_start, files = textcmd.line_count(rest)
@@ -1117,20 +1120,33 @@ def matches(line, step):
         return False
 
 
-def hint_text(step, level):
-    """ヒントを段階的に返す。level は 0 から。課題に hints があればそれを使い、なければ自動で作る。
-
-    1段階目は考え方、2段階目は使う道具、3段階目は入力例（答え）。
-    """
+def guidance_hints(step):
+    """助言は任意の段階数。完成した入力例は answer で別に表示する。"""
     hints = step.get("hints")
     if hints is None:
         words = shlex.split(step["command"]) if step["command"] else []
         head = words[0] if words else ""
         hints = ["「やってみよう」をもう一度読みましょう。何を実現したいか → どの道具（コマンド）が合うか、の順に考えます。"
                  "lesson で説明を読み直せます。",
-                 f"使う道具は「{head}」です。{len(words)} 個の言葉（道具の名前と、その対象や指定）を並べます。",
-                 "入力例: " + step["command"]]
+                 f"使う道具は「{head}」です。対象や指定を課題の目的に合わせて考えましょう。"]
+    return advice_only(hints, answers(step))
+
+
+def hint_text(step, level):
+    """任意長のヒントと、最後の段階かどうかを返す。level は 0 から。"""
+    hints = guidance_hints(step)
+    if not hints:
+        return "追加のヒントはありません。answer で入力例を確認できます（復習対象に追加されます）。", True
     return hints[min(level, len(hints) - 1)], min(level, len(hints) - 1) == len(hints) - 1
+
+
+def record_assistance(mode, progress, step, answer=False):
+    progress.setdefault("assisted", {})[step["id"]] = True
+    data = save.load()
+    data["learning"][mode] = progress
+    if answer:
+        save.mark_review(data, mode, step["id"])
+    save.store(data)
 
 
 def expected_code(step):
@@ -1159,6 +1175,8 @@ def prepare_step(terminal, step, fresh=False):
     editor に continue がある課題は、前の課題から続けて開いている vim の画面（学習者が書いた文）を
     引き継ぐ。reset（fresh=True）では必ず用意し直す。
     """
+    if fresh:
+        terminal.progress["command_events"] = []
     for key in ("remote", "ssh_known", "ssh_pending", "last_status"):
         if key in step:
             terminal.progress[key] = step[key]
@@ -1226,6 +1244,7 @@ def play(mode, start=None):
         progress["reviewing"] = True
         # 復習でも同じ開始位置で練習できるよう、課題側の開始場所を使う。
         progress["cwd"] = "."
+        progress.setdefault("assisted", {}).pop(course[start]["id"], None)
     terminal = Terminal(runner.WORKSPACE / ("learning_" + mode), progress)
     step = current_step(mode, progress)
     index = course.index(step)
@@ -1262,20 +1281,24 @@ def play(mode, start=None):
                     remember(mode, progress)
                     return
                 if line == "hint" or (not in_editor and line == "help"):
+                    record_assistance(mode, progress, step)
                     text, last = hint_text(step, hint_level)
                     print(f"  {ui.c(ui.HINT, 'bold', 'accent')} {hint_level + 1}: {text}")
-                    print("  （もう一度 hint で次のヒント）" if not last else "  （これが最後のヒントです）")
+                    print("  （もう一度 hint で次のヒント）" if not last else "  （最後のヒントです。answer で入力例を見ると復習対象に追加されます）")
                     hint_level += 1
                     continue
-                if not in_editor and line == "answer":
+                if line == "answer":
+                    record_assistance(mode, progress, step, answer=True)
                     print("  入力例: " + " / ".join(answers(step)[:3]))
-                    print("  見ても減点はありません。答えを見たら、何も見ずにもう一度打ってみましょう。")
+                    print("  復習対象に追加しました。reset 後、ヒントや答えを使わずに解くと復習対象から外れます。")
                     continue
                 if line == "lesson" or (not in_editor and line == "mission"):
                     print(step["explanation"] + "\nやってみよう: " + step["task"])
                     continue
                 if line == "reset":
                     prepare_step(terminal, step, fresh=True)
+                    progress.setdefault("assisted", {}).pop(step["id"], None)
+                    remember(mode, progress)
                     print("課題のファイルと開始場所を復元しました。もう一度試せます。")
                     continue
                 # vim の入力モードでは先頭の空白も文字として残す。
@@ -1285,7 +1308,7 @@ def play(mode, start=None):
                 remember(mode, progress)
                 if not accepted(line, result, step, terminal):
                     if result.code == 0 and not in_editor:
-                        print("  実行できました。今回の課題も試しましょう。hint で入力例を見られます。")
+                        print("  実行できました。今回の課題も試しましょう。hint で手がかりを見られます。")
                     continue
                 print("\n" + ui.status_line("ok", "できました！", step["success"]))
                 others = [answer for answer in answers(step) if not matches(line, {"command": answer})]
@@ -1300,6 +1323,7 @@ def play(mode, start=None):
                     progress["reviewing"] = False
                 remember(mode, progress)
                 d = save.load()
+                save.finish_review(d, mode, step["id"], assisted=progress.get("assisted", {}).get(step["id"], False))
                 reward = save.record_activity(d, mode + ":" + step["id"])
                 save.store(d)
                 if reward["earned"]:
@@ -1324,11 +1348,13 @@ def play(mode, start=None):
 
 def lesson_select(mode):
     page = 0
+    review_only = False
     while True:
         ui.clear()
         progress = progress_for(mode)
         course = lessons(mode)
         completed = set(progress.get("completed", []))
+        review = set(save.review_ids(save.load(), mode))
         nxt = next((s["id"] for s in course if s["id"] not in completed), None)
         print(ui.header([MODE_NAMES[mode], "レッスン選択"],
                         f"{ui.progress_bar(len(completed & {s['id'] for s in course}) / len(course), 8)} "
@@ -1336,6 +1362,8 @@ def lesson_select(mode):
         print("\n  " + ui.c("復習に減点はありません。", "dim"))
         rows, unit = [], None
         for index, step in enumerate(course, 1):
+            if review_only and step["id"] not in review:
+                continue
             if step.get("unit") and step["unit"] != unit:
                 unit = step["unit"]
                 members = [s["id"] for s in course if s.get("unit") == unit]
@@ -1343,7 +1371,10 @@ def lesson_select(mode):
                 rows.append(ui.rule(f"{unit}  {done}/{len(members)}"))
             mark = (ui.c(ui.DONE, "green", "bold") if step["id"] in completed
                     else ui.c(ui.NEXT, "bold", "accent") if step["id"] == nxt else ui.c(ui.TODO, "dim"))
-            rows.append(f" {mark} {ui.pad(ui.c(f'[{index}]', 'bold', 'accent'), 5)}{ui.clip(step['title'], ui.term_width() - 14)}")
+            label = step["title"] + (" [復習対象]" if step["id"] in review else "")
+            rows.append(f" {mark} {ui.pad(ui.c(f'[{index}]', 'bold', 'accent'), 5)}{ui.clip(label, ui.term_width() - 14)}")
+        if review_only and not rows:
+            rows.append("  復習対象はありません。")
         size = max(6, ui.term_rows() - 9)
         pages = -(-len(rows) // size)
         page = max(0, min(page, pages - 1))
@@ -1351,7 +1382,7 @@ def lesson_select(mode):
         for row in rows[page * size:(page + 1) * size]:
             print(row)
         print()
-        keys = [("番号", "復習"), ("Enter", "続きから"), ("b", "戻る")]
+        keys = [("番号", "復習"), ("r", "全件表示" if review_only else f"復習対象 ({len(review)})"), ("Enter", "復習を始める" if review_only else "続きから"), ("b", "戻る")]
         if pages > 1:
             keys.insert(2, (f"n / p", f"ページ送り ({page + 1}/{pages})"))
         print(ui.footer(*keys))
@@ -1362,11 +1393,20 @@ def lesson_select(mode):
             return
         if value in ("b", "q"):
             return
+        if value == "r":
+            review_only = not review_only
+            page = 0
+            continue
         if value in ("n", "p") and pages > 1:
             page = (page + (1 if value == "n" else -1)) % pages
             continue
         if value == "":
-            play(mode)
+            if review_only:
+                first = next((i for i, step in enumerate(course) if step["id"] in review), None)
+                if first is not None:
+                    play(mode, first)
+            else:
+                play(mode)
         elif value.isdigit() and 1 <= int(value) <= len(course):
             play(mode, int(value) - 1)
         else:

@@ -51,21 +51,21 @@ class LessonQualityTests(unittest.TestCase):
                         self.assertIsNone(re.search(pattern, step["explanation"]),
                                           f"{step['id']}: 説明文に答え {answer!r} が書かれています")
 
-    def test_hints_go_from_thinking_to_tool_to_answer(self):
+    def test_hints_offer_guidance_separately_from_answers(self):
         for mode, index, step in selected():
             if mode != "expert" and "hints" not in step:
                 continue
             with self.subTest(lesson=step["id"]):
                 hints = step.get("hints")
                 self.assertIsInstance(hints, list, "hints（3段階）がありません")
-                self.assertEqual(len(hints), 3)
+                self.assertGreaterEqual(len(hints), 1)
                 self.assertTrue(all(h.strip() for h in hints))
                 command = step["command"]
                 pattern = r"(?<![\w./-])" + re.escape(command) + r"(?![\w./-])"
-                self.assertIn(command, hints[2], "3段階目は入力例（答え）です")
-                self.assertIsNone(re.search(pattern, hints[0]), "1段階目（考え方）に答えを書かない")
-                if len(command.split()) > 1:  # 2段階目は道具の名前まで。引数まで含む1行は3段階目で初めて見せる
-                    self.assertIsNone(re.search(pattern, hints[1]), "2段階目に答え全体を書かない")
+                guidance = guided.guidance_hints(step)
+                for hint in guidance:
+                    if len(command.split()) > 1:
+                        self.assertIsNone(re.search(pattern, hint), "完成した入力例は answer で表示する")
 
     def test_every_answer_is_accepted_from_a_fresh_start(self):
         for mode, index, step in selected():
@@ -116,7 +116,7 @@ class LessonQualityTests(unittest.TestCase):
     def test_hint_command_shows_one_stage_at_a_time(self):
         step = {"command": "ls -l", "hints": ["考え方", "道具は ls", "入力例: ls -l"]}
         self.assertEqual(guided.hint_text(step, 0), ("考え方", False))
-        self.assertEqual(guided.hint_text(step, 2), ("入力例: ls -l", True))
+        self.assertEqual(guided.hint_text(step, 2), ("道具は ls", True))
         self.assertEqual(guided.hint_text(step, 9)[1], True)
         auto, _ = guided.hint_text({"command": "ls -l"}, 1)
         self.assertIn("ls", auto)

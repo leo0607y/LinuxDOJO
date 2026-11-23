@@ -87,7 +87,7 @@ def cmd_mission(brief=False):
     lv = _hint_level()
     sname = runner.STAGES[m.stage][0]
     idx = [x.id for x in runner.missions_of(m.stage)].index(m.id) + 1
-    lines = [c(f"{sname}  第 {idx} / {len(runner.missions_of(m.stage))} 問   ヒント {lv}/3", "dim"),
+    lines = [c(f"{sname}  第 {idx} / {len(runner.missions_of(m.stage))} 問   ヒント {lv}/{len(runner.hint_steps(m))}", "dim"),
              c(runner.STAGES[m.stage][1], "dim"), ""]
     lines += [fmt(x) for x in m.render(m.story, d).strip().split("\n")]
     lines += ["", ui.rule("達成条件", w=ui.term_width() - 6)]
@@ -118,9 +118,9 @@ def cmd_intro():
 def cmd_help():
     rows = [
         ("mission", "問題文・達成条件・作業ディレクトリを再表示"),
-        ("hint", "段階的ヒント (1:考え方 → 2:使うコマンド → 3:具体的なオプション例)"),
+        ("hint", "段階的ヒント（考え方から順に。段階数は問題ごとに変わります）"),
         ("hint 2", "指定した段階までのヒントを表示"),
-        ("answer", "模範解答と徹底解説を表示（スコアは半分になります）"),
+        ("answer", "模範解答と解説を表示し、復習対象に追加（スコアは半分）"),
         ("check", "達成条件を満たしているか判定（クリアで次の問題へ）"),
         ("submit <答え>", "調べた答え（合言葉・PID・ポート番号など）を提出"),
         ("reset_mission", "この問題のサンドボックスを初期状態に戻す"),
@@ -138,25 +138,29 @@ def cmd_hint(args):
     m = _mission()
     d = _data()
     lv = _hint_level()
+    hints = runner.hint_steps(m)
+    total = len(hints)
+    if not total:
+        print(ui.status_line("info", "この問題にはヒントがありません。answer で模範解答を確認できます。"))
+        return
     if args and args[0].isdigit():
-        target = max(1, min(3, int(args[0])))
+        target = max(1, min(total, int(args[0])))
     else:
-        target = min(3, lv + 1)
+        target = min(total, lv + 1)
     if target > lv:
         _set_hint_level(target)
         save.bump("hints")
-    labels = ["考え方", "使うコマンド", "具体的なオプション例"]
     lines = []
     for i in range(target):
-        lines.append(c(f"{ui.HINT} {i + 1}. {labels[i]}", "bold", "accent"))
-        lines += ["  " + fmt(x) for x in m.render(m.hints[i], d).strip().split("\n")]
+        lines.append(c(f"{ui.HINT} {i + 1}. ヒント", "bold", "accent"))
+        lines += ["  " + fmt(x) for x in m.render(hints[i], d).strip().split("\n")]
         lines.append("")
-    if target < 3:
+    if target < total:
         lines.append(c("さらにヒントが欲しければ、もう一度 hint と入力してください。", "dim"))
     else:
-        lines.append(c("それでも分からなければ answer で模範解答を見られます（獲得スコアは半分）。", "dim"))
+        lines.append(c("answer で入力例を見られます（復習対象に追加・獲得スコアは半分）。", "dim"))
     print()
-    print(box(lines, title=f"HINT {target}/3"))
+    print(box(lines, title=f"HINT {target}/{total}"))
     print(footer_line())
     print()
 
@@ -185,7 +189,11 @@ def cmd_answer():
     if not _answer_viewed():
         (STATE / "answer_viewed").write_text("1")
         save.bump("answers")
+    d = save.load()
+    save.mark_review(d, "practice", m.id)
+    save.store(d)
     show_answer(m, _data())
+    print(ui.status_line("info", "復習対象に追加しました。新しく挑戦し、ヒント・解答なしで達成すると外れます。"))
     return 0
 
 

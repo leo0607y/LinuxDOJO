@@ -69,6 +69,7 @@ def empty():
         "version": 1,
         "player": {"created": None, "play_seconds": 0, "sessions": 0},
         "cleared": {},
+        "review": {},
         "titles": [],
         "stats": {"checks": 0, "hints": 0, "answers": 0, "resets": 0},
         "settings": {"docker_mode": "auto"},
@@ -95,6 +96,7 @@ def _plain_title(t):
 def load():
     try:
         d = json.loads(SAVE.read_text(encoding="utf-8"))
+        legacy_review = "review" not in d
         base = empty()
         # 既存の実践プレイヤーは同じモードから再開。初めての人は導入から。
         legacy_mode = "practice" if d.get("cleared") or d.get("player", {}).get("sessions", 0) else "intro"
@@ -109,6 +111,10 @@ def load():
                 learning[mode].setdefault(key, value)
         for k, v in base.items():
             d.setdefault(k, v)
+        if legacy_review:
+            for lesson_id, record in d["cleared"].items():
+                if record.get("answer"):
+                    mark_review(d, "practice", lesson_id)
         for k, v in base["stats"].items():
             d["stats"].setdefault(k, v)
         d["titles"] = list(dict.fromkeys(_plain_title(t) for t in d.get("titles", [])))
@@ -129,6 +135,22 @@ def bump(stat, n=1):
     store(d)
 
 
+def mark_review(data, mode, lesson_id):
+    """答えを見た時点で、未達成の問題も復習対象として残す。"""
+    data.setdefault("review", {})[mode + ":" + lesson_id] = {"mode": mode, "id": lesson_id}
+
+
+def finish_review(data, mode, lesson_id, assisted=False):
+    """ヒントや答えなしで解き直した試行だけ、復習対象から外す。"""
+    if not assisted:
+        data.setdefault("review", {}).pop(mode + ":" + lesson_id, None)
+
+
+def review_ids(data, mode):
+    return [item["id"] for item in data.get("review", {}).values()
+            if isinstance(item, dict) and item.get("mode") == mode and isinstance(item.get("id"), str)]
+
+
 def score_for(points, hint_level, answer_viewed):
     f = ANSWER_FACTOR if answer_viewed else HINT_FACTOR.get(hint_level, 0.7)
     return int(points * f)
@@ -140,6 +162,7 @@ def record_clear(mission, hint_level, answer_viewed, seconds):
     d = load()
     before_rank = rank_of(len(d["cleared"]))
     sc = score_for(mission.points, hint_level, answer_viewed)
+    finish_review(d, "practice", mission.id, assisted=bool(hint_level or answer_viewed))
     prev = d["cleared"].get(mission.id)
     first = prev is None
     if prev is None or sc > prev.get("score", 0):

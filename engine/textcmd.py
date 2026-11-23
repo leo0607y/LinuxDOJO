@@ -56,6 +56,8 @@ def grep(flags, pattern, lines, label=None):
             found.append(prefix + line)
     if "c" in flags:
         return ((f"{label}:" if label else "") + str(len(found))), 0 if found else 1
+    if "l" in flags:
+        return (label or "(standard input)") if found else "", 0 if found else 1
     return "\n".join(found), 0 if found else 1
 
 

@@ -4,6 +4,7 @@ import shlex
 import shutil
 
 from engine import guided, runner, save, ui
+from engine.guidance import advice_only
 
 
 def scenarios():
@@ -140,15 +141,25 @@ def record_result(scenario, assisted):
     old = completed.get(scenario["id"])
     if old is None or not assisted:
         completed[scenario["id"]] = {"assisted": bool(assisted)}
+    save.finish_review(d, "festival", scenario["id"], assisted=assisted)
     save.store(d)
 
 
-def persist(scenario, terminal, assisted):
+def persist(scenario, terminal, assisted, *, answer_viewed=False):
     d = save.load()
     progress = d["learning"].setdefault("readiness", {"completed": {}, "sessions": {}})
     progress["active"] = scenario["id"]
     progress.setdefault("sessions", {})[scenario["id"]] = {"terminal": terminal.progress, "assisted": assisted}
+    if answer_viewed:
+        save.mark_review(d, "festival", scenario["id"])
     save.store(d)
+
+
+def advice_hints(scenario):
+    """全文の手本を含むヒントを除き、部分的な助言だけを返す。"""
+    solution = scenario.get("solution", [])
+    complete = "\n".join(solution) if isinstance(solution, list) else solution
+    return advice_only(scenario.get("hints", []), [complete])
 
 
 def play(scenario):
@@ -191,15 +202,20 @@ def play(scenario):
                 print("この課題の作業場所を初期状態に戻しました。")
                 continue
             if line == "hint":
+                hints = advice_hints(scenario)
+                if hint_level >= len(hints):
+                    print("助言はここまでです。手順を見るには answer（閲覧すると復習対象になります）。")
+                    continue
                 assisted = True
-                print(scenario["hints"][min(hint_level, 2)])
+                print(hints[hint_level])
                 hint_level += 1
                 persist(scenario, terminal, assisted)
                 continue
             if line == "answer":
                 assisted = True
+                persist(scenario, terminal, assisted, answer_viewed=True)
                 print("\n".join(scenario["solution"]))
-                persist(scenario, terminal, assisted)
+                print("復習対象に記録しました。reset してヒント・手本なしで達成すると解除されます。")
                 continue
             if line == "check":
                 good, message = check(scenario, terminal)
@@ -341,22 +357,38 @@ def _groups():
     return [("基本の総合復習", SCENARIOS)] + [(title, items) for _, title, items in packs()]
 
 
-def _status(completed, scenario_id):
+def _status(completed, scenario_id, review=False):
+    if review:
+        return ui.c("要復習", "yellow")
     result = completed.get(scenario_id)
     return ui.c("未達成", "dim") if result is None else ui.c("△手本あり", "yellow") if result["assisted"] else ui.c("◎自力達成", "bold")
 
 
-def _choose_in_group(title, items):
+def review_scenarios(d=None):
+    """未達成の課題を含め、手本を見た課題を通常の教材順に並べる。"""
+    d = save.load() if d is None else d
+    review = d.get("review", {})
+    return [s for s in scenarios() if f"festival:{s['id']}" in review]
+
+
+def _choose_in_group(title, items, *, review_only=False):
     while True:
         ui.clear()
-        completed = save.load()["learning"].get("readiness", {}).get("completed", {})
+        d = save.load()
+        if review_only:
+            items = review_scenarios(d)
+            if not items:
+                ui.flash("復習対象はありません。")
+                return
+        completed = d["learning"].get("readiness", {}).get("completed", {})
+        review_ids = set(save.review_ids(d, "festival"))
         print(ui.header(["課題まつり", title], ""))
         print("\n  " + ui.c("* 基本 / ** 組み合わせ / *** 総合", "dim") + "\n")
         tw = max(20, ui.term_width() - 2 - 24)
         for index, scenario in enumerate(items, 1):
             stars = "*" * scenario.get("level", 1)
             print(f"  {ui.pad(ui.c(f'[{index}]', 'bold', 'accent'), 4)} {ui.pad(ui.c(stars, 'dim'), 4)} "
-                  f"{ui.pad(ui.clip(scenario['title'], tw), tw)} {_status(completed, scenario['id'])}")
+                  f"{ui.pad(ui.clip(scenario['title'], tw), tw)} {_status(completed, scenario['id'], scenario['id'] in review_ids)}")
         print()
         print(ui.footer(("番号", "挑戦"), ("Enter", "次の未達成"), ("b", "戻る")))
         print(ui.take_flash(), end="")
@@ -385,6 +417,7 @@ def run():
         progress = d["learning"].get("readiness", {})
         completed = progress.get("completed", {})
         groups = _groups()
+        review_items = review_scenarios(d)
         total = sum(len(items) for _, items in groups)
         solo = sum(1 for _, items in groups for s in items if completed.get(s["id"], {"assisted": True})["assisted"] is False)
         print(ui.header(["課題まつり"], f"{ui.progress_bar(solo / total if total else 0, 8)} 自力 {solo}/{total}"))
@@ -401,8 +434,9 @@ def run():
             mine = sum(1 for s in items if s["id"] in completed and not completed[s["id"]]["assisted"])
             print(f"  {ui.pad(ui.c(f'[{index}]', 'bold', 'accent'), 4)} {ui.pad(ui.clip(title, tw), tw)} "
                   f"{ui.progress_bar(done / len(items), 8)} {ui.pad(f'{done}/{len(items)}', 6)}" + ui.c(f"自力 {mine}", "dim"))
+        print(f"  [r] 復習対象  {len(review_items)} 課題")
         print()
-        print(ui.footer(("番号", "開く"), ("Enter", "前回の課題"), ("b", "戻る")))
+        print(ui.footer(("番号", "開く"), ("r", "復習対象"), ("Enter", "前回の課題"), ("b", "戻る")))
         print(ui.take_flash(), end="")
         try:
             choice = input(ui.c("\n  > ", "bold", "accent")).strip().lower()
@@ -410,11 +444,16 @@ def run():
             return
         if choice in ("b", "q", "menu"):
             return
-        if choice == "":
+        if choice == "r":
+            if review_items:
+                _choose_in_group("復習対象（reset して自力で再挑戦）", review_items, review_only=True)
+            else:
+                ui.flash("復習対象はありません。")
+        elif choice == "":
             active = progress.get("active")
             target = next((s for s in scenarios() if s["id"] == active), scenarios()[0])
             play(target)
         elif choice.isdigit() and 1 <= int(choice) <= len(groups):
             _choose_in_group(*groups[int(choice) - 1])
         else:
-            ui.invalid_choice(choice, f"1〜{len(groups)} の番号、Enter、b")
+            ui.invalid_choice(choice, f"1〜{len(groups)} の番号、r、Enter、b")
