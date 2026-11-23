@@ -169,7 +169,7 @@
 ### 3. 利用者の方針（再掲・厳守）
 - 絵文字を使わない。検証していないものを検証済みと書かない。失敗は失敗と報告する。
 - このサイトの公開先は danganlog.com のみ。利用者の他のサイト・ドメイン・他のプロジェクトには触れず、文書にも書かない。ローカルの絶対パスや個人情報も、公開リポジトリには書かない。
-- コミットは小さく頻繁に。作者は既存の `LinuxDOJO contributors`（`git -c user.name=... -c user.email=...`）。コミット末尾に Co-Authored-By を付ける。`.gitignore` は許可リスト方式で、新規ファイルは allowlist を確認する。
+- コミットは小さく頻繁に。作者は `leo0607y`、メールは `171763585+leo0607y@users.noreply.github.com`。コミット末尾に Co-Authored-By を付ける。`.gitignore` は許可リスト方式で、新規ファイルは allowlist を確認する。
 - 利用者は質問を重ねられるのを嫌う。確認が必要な破壊的操作（force push、本番デプロイ、削除）以外は、決めて進め、実画面のスクリーンショットで確認してから報告する。
 
 ## 最短の再開手順（次の担当はここから）
@@ -362,7 +362,7 @@ Linuxを学ぶうえで「使うもの・使わなくても必要なもの」を
 4. `README.md` の問数と章を更新
 5. 検証: `python3 tests/test_all_missions.py [ID...]` と `python3 -m unittest discover -s tests`
 - `.gitignore` は許可リスト方式。新しい最上位ディレクトリは追加が必要（`docs/` `tools/` は追加済み）。
-- コミットは `-c user.name="LinuxDOJO contributors" -c user.email="noreply@users.noreply.github.com"`。プッシュは確認してから。
+- コミットは `-c user.name="leo0607y" -c user.email="171763585+leo0607y@users.noreply.github.com"`。プッシュは確認してから。
 
 ## 網羅性の測り方
 - `python3 tools/audit_coverage.py --list`: 環境にインストール済みのコマンドのうち教材に一度も出ないものを列挙
