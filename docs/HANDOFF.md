@@ -4,12 +4,12 @@
 
 ## 2026-11-23 最新チェックポイント（この節を優先）
 
-- 利用者の最新指示: 作業を続け、進捗ごとにコミットしてpushする。コミット `6a0f7f1 Add answer review flow and flexible hints` は作成済み。pushは拒否された。fetch後、origin/learning-expansion が `a7458d6` から `aabd59d` に更新され、ローカルにない18コミットとローカル固有42コミットがあり、通常のmergeは大規模な競合になった。mergeは中止し作業ツリーを復元済み。force pushは許可されていないため実行しない。変更はローカルブランチにある。
+- 利用者の最新指示: 作業を続け、進捗ごとにコミットしてpushする。コミット `6a0f7f1 Add answer review flow and flexible hints` と `30b0fa5 Review lesson wording across curriculum` は作成済み。pushは拒否された。fetch後、origin/learning-expansion が `a7458d6` から `aabd59d` に更新され、ローカルにない18コミットとローカル固有42コミットがあり、通常のmergeは大規模な競合になった。mergeは中止し作業ツリーを復元済み。新コミット後も通常pushはnon-fast-forwardで拒否。force pushは許可されていないため実行しない。最新変更はローカルブランチにある。
 - 以前依頼された05:00 JSTのタイマーは起動したが、この会話スレッドが動作中でresumeに失敗した。run.logにthread-store競合が記録され、タイマーによる作業再開は行われていない。
 - **レッスン全体の逐読監査は完了**: intro/basic、practice stages 1–34とExtra、advanced/readiness/festivalを分担して確認し、発見箇所を修正。既習コマンドで調べられる既存ファイル名・隠し場所・手順は課題文や事前説明から外してヒントへ。接続先、ユーザー、ポート、新規出力名、要件値は課題文に残す。新概念の説明は維持する。basic18、readiness07、Stage15-3/9など監査中に見つかった個別の問題も修正。
 - `engine/guidance.py` で、説明文に埋め込まれた完全解答（複数コマンド列を含む）をヒントから除外。guided/practice/readinessで共有し、静的走査では完全解答の漏れ0件。
-- 検証: 最新の全Python suiteは654件成功、50 skip（Stage15-9の最後の文面変更より前）。Stage15-9変更後にpy_compileとdiff --check成功。readiness/SSH/全ミッション等の該当テスト、Web build/npm/e2eを再実行する。
-- Webのreview/hint機能は一度 build・npm test・E2E 17件まで成功済みだが、今回の最終教材変更後の再確認は必要。デプロイはしていない。
+- 検証: 全Python suiteは654件成功、50 skip（Stage15-9の最後の文面変更より前）。その後 `test_all_missions`, `test_readiness`, `test_guided_ssh`, `test_lesson_self_contained` を43件成功。Stage15-9変更後にpy_compileとdiff --check成功。Webはbuild成功、npm test 8件成功、E2E 17件成功。E2Eでworkerに画面側専用の`review`コマンドを直接送っていた期待値を、保存データのreview状態確認に修正した。
+- デプロイはしていない。作業ツリーはコミット済み。
 - これより下の2026-11-22節には再開前の予定・未完了リストが含まれる。事実として残すため削除しないが、上の最新チェックポイントで更新された状態を優先する。
 
 ## 2026-11-22 夜・利用者指示で一時停止（ここを最優先）
