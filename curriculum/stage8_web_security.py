@@ -13,8 +13,8 @@ from engine.runner import ROOT, free_port, register, wait_port
 from engine.security_lab import SECURE_HEADERS, secure_config
 
 S = 8
-NOTE = ("\n対象はこの課題が起動した 127.0.0.1 の URL だけです。scope.json に範囲、accounts.json に架空のテスト用資格情報があります。"
-        "外部への診断は行いません。lab_config.json は要求ごとに読み直され、再起動は不要です。"
+NOTE = ("\n対象はこの課題が起動した 127.0.0.1 の URL だけです。許可範囲と架空のテスト用資格情報の資料を作業フォルダに用意しています。"
+        "外部への診断は行いません。教材のHTTP設定ファイルは要求ごとに読み直され、再起動は不要です。"
         "これは設定とHTTP応答の検証であり、脆弱性診断や実務能力全体の認定ではありません。\n")
 BASE = "http://127.0.0.1:<<port>>"
 EDIT_HEADERS = "python3 -c \"import json; p='lab_config.json'; c=json.load(open(p)); c['headers']=json.load(open('header_policy.json')); open(p,'w').write(json.dumps(c))\""
@@ -203,8 +203,8 @@ def add(number, title, story, objectives, thinking, tools, solution, check, wron
              setup=setup(number), check=check, solution=solution, wrong=wrong)
 
 
-add(1, "診断の許可範囲を記録する", "作業を始める前に scope.json を読んで、対象と許可された操作・除外事項を確認します。",
-    ["scope.json の全項目を authorization.json に保存する", "decision に authorized-local-only を追加する"],
+add(1, "診断の許可範囲を記録する", "作業を始める前に許可範囲の資料を読んで、対象と許可された操作・除外事項を確認します。",
+    ["許可範囲の資料の全項目を authorization.json に保存する", "decision に authorized-local-only を追加する"],
     "調べられることと、依頼で調べてよいことは同じではありません。対象と除外事項を先に確定します。",
     "cat で範囲を読み、JSON の各値を保ったまま判断を追加します。", SCOPE_SOLUTION, c1,
     ["cp scope.json authorization.json", "echo '{}' > authorization.json",
@@ -215,8 +215,8 @@ add(2, "HTTP の応答と公開一覧を記録する", "依頼範囲内で正常
     "まず通常の要求が正常に返るかを基準として残します。", "curl の -D はヘッダー、-o は本文の保存先です。--noproxy '*' でプロキシを経由しません。",
     INVENTORY, c2, [f"curl --noproxy '*' -sS {BASE}/health > health.json", "echo '{}' > catalog.json"],
     "状態コード、ヘッダー、本文、公開されたパスを区別して記録しました。この公開一覧だけで全資産を発見したとは判断できません。")
-add(3, "合意したレスポンスヘッダーを適用する", "応答にセキュリティヘッダーがありません。変更前の応答を保存し、header_policy.json のポリシーを適用して再検証します。",
-    ["変更前を before.headers、変更後を after.headers に保存する", "lab_config.json の headers を header_policy.json と同じ値にする", "現在の HTTP 応答にも設定が反映されていること"],
+add(3, "合意したレスポンスヘッダーを適用する", "応答にセキュリティヘッダーがありません。変更前の応答を保存し、ヘッダーの承認ポリシーを適用して再検証します。",
+    ["変更前を before.headers、変更後を after.headers に保存する", "教材のHTTP設定ファイルの headers をヘッダーの承認ポリシーと同じ値にする", "現在の HTTP 応答にも設定が反映されていること"],
     "設定ファイルを書いただけでは完了ではありません。実際の応答を比較します。", "curl -D と JSON の編集を使います。ポリシーには nosniff・CSP・Referrer-Policy があります。",
     HEADER_SOLUTION, c3, [EDIT_HEADERS, f"curl --noproxy '*' -sS -D before.headers -o /dev/null {BASE}/health"],
     "ヘッダーは防御の一部です。CSP はアプリの資源利用と整合させます。このAPI用ポリシーを一般のWebサイトへそのままコピーする課題ではありません。")

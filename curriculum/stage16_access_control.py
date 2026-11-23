@@ -111,7 +111,7 @@ for l in open('ls-Z.txt'):
     if t!=exp: r['bad_file']=p; r['current_type']=t""")
 add(1, "SELinuxの動作モードとファイルコンテキスト",
     "ホームで作ったHTMLを /srv/www へ mv したら、Webサーバーが403を返します。chmodは正しいのに拒否されるのは、SELinuxの型(タイプ)が合っていないからかもしれません。",
-    g1, ["getenforce.txtからモードを読む", "ls-Z.txtと規則(fcontext.txt)を比べ、型が違うファイルを特定してdiagnosis.jsonへ記録する"],
+    g1, ["動作モードの採取記録からモードを読む", "コンテキストの採取記録と規則(既定コンテキストの規則)を比べ、型が違うファイルを特定してdiagnosis.jsonへ記録する"],
     ["getenforceは Enforcing / Permissive / Disabled を返します。型は user:role:type:level の3番目です。",
      "ls -Z の type と、そのパスに対する既定の規則を比べます。規則があるなら restorecon で戻せます。", S1],
     "mvは元のコンテキスト(user_home_t)を持ち込みます。パスの規則が既にあるなら restorecon -v で既定の型へ戻します。setenforce 0 は全体の保護を止めるので原因を隠す近道です。規則が無い場所のときだけ semanage fcontext で規則を追加します。",
@@ -189,7 +189,7 @@ PYCODE
 """
 add(3, "AppArmorのcomplainとenforce",
     "新しいAppArmorプロファイルはcomplain(学習)モードで運用中です。ログの内容から必要な許可を1行だけ足し、enforceへ切り替える準備をします。",
-    g3, ["apparmor.logからこのプロファイルのALLOWED記録を探す", "work/agent.profileへ必要最小の許可を足し、complainを外す"],
+    g3, ["AppArmorのログからこのプロファイルのALLOWED記録を探す", "対象プロファイルの控えへ必要最小の許可を足し、complainを外す"],
     ["complainは違反を許可して記録するだけです。enforceは拒否します。別プロファイルの行は無関係です。",
      "ログのprofile=が一致する行のname=とrequested_mask=を読み、'  パス r,' を加え、flags=(complain)を消します。", S3],
     "complainのログは『enforceにしたら拒否される操作』の一覧です。必要なものだけ許可し、aa-enforce(実機)で切替え、aa-statusで確認します。/** rwのような広い許可は保護の意味を失います。",
@@ -223,7 +223,7 @@ r={'user':u.group(1),'effective':u.group(2),'cause':'mask','new_file_group':re.s
    'fix_command':'setfacl -m m::rwx '+d}""")
 add(4, "ACLのmaskとdefault ACL",
     "ユーザーにrwxのACLを付けたのに書き込めません。getfacl出力の #effective とmaskに注目します。新規ファイルが共有グループに継承される仕組み(default ACL)も確認します。",
-    g4, ["getfacl.txtの #effective と mask:: を読む", "実効権限・原因・継承グループ・修復コマンドをdiagnosis.jsonに記録する"],
+    g4, ["ACLの採取記録の #effective と mask:: を読む", "実効権限・原因・継承グループ・修復コマンドをdiagnosis.jsonに記録する"],
     ["名前付きユーザー/グループとグループ所有者の実効権限は『指定権限 AND mask』です。",
      "default: 行は、そのディレクトリ内で新規作成されるものが継承するACLです。", S4],
     "maskは名前付きエントリの上限です。chmod g=... でも変わるため、ACLを付けた後にmaskがr--になる事故が起きます。setfacl -m m::rwx で直し、継承は setfacl -d -m で設定したdefault ACLが担います。",
@@ -251,7 +251,7 @@ lic=[x[1] for x in ls if not set('ia')&set(x[0])][0]
 r={'immutable_file':imm,'append_only_file':apo,'unlock_command':'chattr -i '+imm,'protect_command':'chattr +i '+lic,'root_bypasses_attributes':False}""")
 add(5, "chattr +i と +a の属性を読む",
     "rootで削除しても『Operation not permitted』になるファイルがあります。lsattrの属性を読み、不変(i)と追記専用(a)を区別します。",
-    g5, ["lsattr.txtから i と a の属性を持つファイルを区別する", "解除と保護のコマンドを記録する"],
+    g5, ["ファイル属性の採取記録から i と a の属性を持つファイルを区別する", "解除と保護のコマンドを記録する"],
     ["lsattrの先頭の属性欄に i や a が出ます。i は変更・削除・名前変更が不可、a は追記のみ可能です。",
      "設定の更新前に chattr -i、機密ファイルの保護は chattr +i。属性はrootでも先に外さないと変更できません。", S5],
     "iは内容・削除・リンクを禁じ、aは追記のみを許します。ログの改ざん防止にaが使われます。rootも属性を外すまで変更できませんが、外せる(CAP_LINUX_IMMUTABLE)ため万能ではありません。ext4/xfsなど対応FSが前提です。",
@@ -286,7 +286,7 @@ def c6(ctx, _):
 S6 = ("find work/audit/bin -perm /6000 ! -name passwd-lite -exec chmod u-s,g-s {} +\nchmod 1777 work/share/drop\n")
 add(6, "setuid・setgid・stickyの監査",
     "監査で find -perm /6000 を実行します。承認一覧にないsetuid/setgidを除去し、共有ディレクトリにはsticky bitが必要かを確認します。",
-    g6, ["find -perm /6000 で特別ビット付きを洗い出し、baseline.txtと照合する", "未承認のsetuid/setgidを外し、共有dropにsticky bitを付ける"],
+    g6, ["find -perm /6000 で特別ビット付きを洗い出し、承認一覧と照合する", "未承認のsetuid/setgidを外し、共有ディレクトリにsticky bitを付ける"],
     ["find work/audit -perm /6000 -ls で一覧します。承認済みまで外すと正規の機能が壊れます。",
      "chmod u-s,g-s は実行権を残して特別ビットだけを外します。chmod +t または 1777 でsticky。", S6],
     "setuid/setgidは実行者に所有者/グループの権限を与えるため、未承認の存在は権限昇格の足場です。stickyはディレクトリで『自分のファイルだけ削除可』にします(/tmpが1777)。chmod -R で全部外すと正規のpasswd等が壊れます。",
@@ -319,7 +319,7 @@ r={'needed_capability':'cap_net_bind_service','excessive_binary':x,'remove_comma
    'setcap_command':'setcap cap_net_bind_service=+ep '+b}""")
 add(7, "capabilityで最小権限にする",
     "サービスは1024未満のポートを待ち受けたいだけなのに、setuid rootで運用されています。getcapの記録を調べ、必要なcapabilityだけにします。",
-    g7, ["service.txtとgetcap.txtを読み、必要なcapabilityと過剰なものを特定する", "setcap/付与・削除コマンドを記録する"],
+    g7, ["サービス仕様とcapabilityの採取記録を読み、必要なcapabilityと過剰なものを特定する", "setcap/付与・削除コマンドを記録する"],
     ["1024未満へのbindは CAP_NET_BIND_SERVICE です。CAP_SYS_ADMINは『ほぼroot』と呼ばれる強力な権限です。",
      "付与は setcap cap_net_bind_service=+ep FILE、一覧は getcap、全削除は setcap -r です。", S7],
     "setuid rootは全権限を与えます。file capabilityなら必要な1権限だけに絞れます。cap_sys_admin=ep の付いたバイナリは実質root相当なので外して見直します。変更後は getcap -r で確認します。",
@@ -356,7 +356,7 @@ sed -i "/^\\[Service\\]/a LimitNOFILE=$v" work/app.service
 """
 add(8, "ulimit・limits.conf・LimitNOFILE",
     "サービスが『Too many open files』で落ちます。/proc/<pid>/limitsの記録では上限が1024です。PAM経由のlimits.confと、systemdサービスが使うLimitNOFILEの違いを踏まえて直します。",
-    g8, ["requirements.txtの値を読む", "limits.confに対象ユーザーのsoft/hardを追加し、unitにLimitNOFILEを足す"],
+    g8, ["要件書の値を読む", "limits.confに対象ユーザーのsoft/hardを追加し、unitにLimitNOFILEを足す"],
     ["limits.confはPAMのログインセッションに効きます。systemdのサービスは unit の LimitNOFILE が効きます。",
      "softは実際の上限、hardはそれ以上に上げられない天井です。soft<=hard にします。", S8],
     "ulimit -n(soft)は現プロセスの上限です。ログイン経由はlimits.conf、systemdサービスはLimitNOFILE(systemctl daemon-reload後に再起動)で設定します。無制限(infinity)はfd枯渇や暴走を許すので必要な値に留めます。",
@@ -473,7 +473,7 @@ echo "{\\"case\\": \\"$(python3 -c "import json;print(json.load(open('case.json'
 """
 add(11, "PAMのfaillock・pwqualityとchage",
     "ブルートフォース対策とパスワード方針を整えます。pam_faillock(失敗回数でロック)とpam_pwquality(強度)の設定を直し、chageでパスワード期限を設けます。",
-    g11, ["faillock.confとpwquality.confを方針値に直す(他は変更しない)", "chage-list.txtを参考に、期限設定のchageコマンドをdiagnosis.jsonへ記録する"],
+    g11, ["faillock.confとpwquality.confを方針値に直す(他は変更しない)", "パスワード期限の採取記録を参考に、期限設定のchageコマンドをdiagnosis.jsonへ記録する"],
     ["faillockは deny(失敗回数)・unlock_time(秒)、pwqualityは minlen で強度を決めます。PAMの順序(preauth→unix→authfail)は壊さないこと。",
      "chage -M 最大日数 -m 最短日数 -W 警告日数 ユーザー。一覧は chage -l です。", S11],
     "faillockは連続失敗でアカウントを一時ロックし、pwqualityは弱いパスワードを拒否します。chage -Mで定期変更を強制します。実機ではPAMの誤設定でログインできなくなるため、別のrootセッションを開いたまま確認します。",
@@ -516,7 +516,7 @@ printf 'bantime = %s\\nignoreip = 127.0.0.1/8 %s\\n' "$bt" "$ip" >> work/jail.lo
 """
 add(12, "fail2banのjail設定",
     "sshdへの総当たりが続いています。jail.localの[sshd]を有効にし、現実的な回数と時間を設定しつつ、管理者自身が誤BANされないようignoreipを設定します。",
-    g12, ["fail2ban.logと要件を読む", "[sshd]のenabled・maxretry・findtime・bantime・ignoreipを設定する"],
+    g12, ["fail2banのログと要件を読む", "[sshd]のenabled・maxretry・findtime・bantime・ignoreipを設定する"],
     ["maxretryはfindtime内の失敗許容回数、bantimeは遮断時間です。管理者IPは ignoreip に入れます。",
      "jail.localはINI形式です。[DEFAULT]や port は変更しないで [sshd] だけを直します。", S12],
     "fail2banはログから失敗を数えfirewallで一時遮断します。ignoreipが無いと打ち間違いで自分が締め出されます。ただし0.0.0.0/0のような広いignoreipは保護を無効化します。設定後は fail2ban-client status sshd で確認します。",

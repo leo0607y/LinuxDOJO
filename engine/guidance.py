@@ -3,7 +3,7 @@ import re
 
 
 def _plain(text):
-    text = str(text or "").replace("`", "").replace("→", " ")
+    text = str(text or "").replace("`", "").replace("→", " ").replace("'", "").replace('"', "")
     text = re.sub(r"^入力例[^:\n]*:\s*", "", text.strip())
     return " ".join(text.split())
 
@@ -15,7 +15,7 @@ def contains_full_solution(hint, solutions):
         return False
     for solution in solutions:
         expected = _plain(solution)
-        if expected and (candidate == expected or candidate.endswith(expected)):
+        if expected and expected in candidate:
             return True
     return False
 

@@ -76,12 +76,12 @@ def c41(ctx):
 register(
     id="4-1", stage=S, title="tar で固める・覗く",
     story="""
-ログをバックアップサーバーへ送る前に、`logs/` ディレクトリを **1つの圧縮ファイル** にまとめたい。
-また、取引先から届いた `received.tar.gz` に **どんなSQLファイルが入っているか**、
+ログをバックアップサーバーへ送る前に、ログのディレクトリを **1つの圧縮ファイル** にまとめたい。
+また、取引先から届いたtar.gzアーカイブに **どんなSQLファイルが入っているか**、
 （ウイルスの可能性もあるので）**展開せずに** 中身の一覧だけ確認してほしい。
 """,
-    objectives=["`logs/` ディレクトリを丸ごと gzip 圧縮して `logs_backup.tar.gz` を作る",
-                "`received.tar.gz` を **展開せずに** 中身を一覧表示し、入っている `.sql` ファイルの名前を `submit` する"],
+    objectives=["ログのディレクトリを丸ごと gzip 圧縮して `logs_backup.tar.gz` を作る",
+                "取引先から届いたtar.gzアーカイブを **展開せずに** 中身を一覧表示し、入っている `.sql` ファイルの名前を `submit` する"],
     hints=["tar は「c=作る」「x=展開」「t=一覧」が主役。`z` で gzip、`v` で詳細表示、`f` でファイル名指定です。",
            "作成は `tar czvf 出力.tar.gz 対象`、一覧は `tar tzvf ファイル.tar.gz`（t = list）。",
            "`tar czvf logs_backup.tar.gz logs/` → `tar tzvf received.tar.gz | grep .sql` → ファイル名を `submit`。"],
@@ -153,13 +153,13 @@ def c42(ctx):
 register(
     id="4-2", stage=S, title="展開先を指定せよ（tar -C と zip/unzip）",
     story="""
-新バージョンのリリースアーカイブ `release.tar.gz` を、決められた場所 `releases/v2.0/` に展開したい。
+新バージョンのリリース用tar.gzアーカイブを、決められた場所 `releases/v2.0/` に展開したい。
 カレントに直接展開してゴチャゴチャにするのはNGだ。
-さらに Windows ユーザー向けに `docs/` を zip にまとめ、デザイナーから届いた `assets.zip` も `assets/` に展開してほしい。
+さらに Windows ユーザー向けにドキュメントのディレクトリを zip にまとめ、デザイナーから届いたzipアーカイブも `assets/` に展開してほしい。
 """,
-    objectives=["`release.tar.gz` を `releases/v2.0/` ディレクトリの中に展開する（カレントには展開しない）",
-                "`docs/` ディレクトリをサブディレクトリごと `docs.zip` に圧縮する",
-                "`assets.zip` を `assets/` ディレクトリの中に展開する"],
+    objectives=["リリース用のtar.gzアーカイブを `releases/v2.0/` ディレクトリの中に展開する（カレントには展開しない）",
+                "ドキュメントのディレクトリをサブディレクトリごと `docs.zip` に圧縮する",
+                "デザイナーから届いたzipアーカイブを `assets/` ディレクトリの中に展開する"],
     hints=["tar は展開先ディレクトリを指定するオプションがあります（展開先は事前に作っておく必要あり）。zip はディレクトリを含めるのにオプションが要ります。",
            "`mkdir -p` → `tar xzvf ファイル -C 展開先`。`zip -r 出力.zip ディレクトリ`。`unzip ファイル.zip -d 展開先`。",
            "`mkdir -p releases/v2.0 && tar xzvf release.tar.gz -C releases/v2.0` / `zip -r docs.zip docs/` / `unzip assets.zip -d assets`"],
@@ -349,9 +349,9 @@ register(
 誰かが開発中に立ち上げたサーバーを **消し忘れて** ポートを占有しているようだ。
 犯人のプロセスを突き止めて停止し、正規のアプリを起動せよ。
 """,
-    objectives=["`./start_app.sh` を実行してエラーを確認する",
+    objectives=["アプリの起動スクリプトを実行してエラーを確認する",
                 "`ss` または `lsof` で、ポート <<port>> を LISTEN しているプロセスの PID を調べて停止する",
-                "`./start_app.sh &` でアプリをバックグラウンド起動する"],
+                "アプリの起動スクリプトをバックグラウンドで実行する"],
     hints=["「どのポートを、どのプロセスが待ち受けているか」を表示するコマンドがあります。",
            "`ss -tlnp`（t=TCP, l=LISTEN, n=数字表示, p=プロセス）や `lsof -i :ポート番号`。PID が分かったら `kill`。",
            "`ss -tlnp | grep <<port>>` → `users:((\"python3\",pid=XXXX,...))` の PID を `kill XXXX` → `./start_app.sh &`"],
@@ -510,17 +510,16 @@ def c47(ctx):
 register(
     id="4-7", stage=S, title="SSH の設定と rsync の差分同期",
     story="""
-Webサーバー `web01`（IP: 192.168.10.21、ユーザー: deploy、ポート: 2222）に毎回
-`ssh -i ~/.ssh/id_ed25519 -p 2222 deploy@192.168.10.21` と打つのは辛い。**SSH の設定ファイル** で `ssh web01` だけで繋がるようにしよう。
-さらに、サイトのファイル `project/` を `backup/` へ **差分同期**（rsync）して、完全なミラーにしてほしい。
-※ この問題では本物の `~/.ssh` は触らず、作業ディレクトリ内の `.ssh/` で練習します。
+Webサーバー web01（192.168.10.21、ユーザー deploy、ポート 2222）へ別名で接続できる設定を `.ssh/config` に作ろう。
+作業用のサイトデータを `backup/` へ同期し、元にない古いファイルも含めて完全なミラーにしてほしい。
+※ この問題では本物の `~/.ssh` は触らず、作業ディレクトリ内の `.ssh/` で練習します。鍵と同期元は既存の作業ファイルから探します。
 """,
-    objectives=["`.ssh/config` に `Host web01` の設定（HostName 192.168.10.21 / User deploy / Port 2222 / IdentityFile ~/.ssh/id_ed25519）を書く",
-                "`.ssh` ディレクトリを `700`、`.ssh/config` と秘密鍵 `.ssh/id_ed25519` を `600` にする",
-                "`rsync` で `project/` の中身を `backup/` に同期し、`project/` に無い古いファイルは `backup/` から削除する"],
-    hints=["SSH の設定ファイルは `Host 別名` の下にインデントして `キーワード 値` を並べる形式です。エディタ（nano/vim）か、ヒアドキュメント `cat > file <<'EOF'` で書けます。",
+    objectives=["`.ssh/config` に web01 の別名設定を書き、接続先・ユーザー・ポートと、見つけた秘密鍵を指定する",
+                "`.ssh` ディレクトリを `700`、設定ファイルと見つけた秘密鍵を `600` にする",
+                "作業用のサイトデータを `backup/` に同期し、元にない古いファイルも削除して完全なミラーにする"],
+    hints=["`ls -a` で隠し項目を含む一覧を出し、秘密鍵とサイトデータの場所を探します。設定ファイルは `Host 別名` の下にキーワードと値を並べます。",
            "キーワードは `HostName` `User` `Port` `IdentityFile`。確認は `ssh -G -F .ssh/config web01`。rsync は `-a`(アーカイブ) `-v` `-z`(圧縮) `--delete`。",
-           "`printf 'Host web01\\n  HostName 192.168.10.21\\n  User deploy\\n  Port 2222\\n  IdentityFile ~/.ssh/id_ed25519\\n' > .ssh/config` → `chmod 700 .ssh; chmod 600 .ssh/config .ssh/id_ed25519` → `rsync -avz --delete project/ backup/`"],
+           "`.ssh/config` は `Host` ごとの設定、権限はディレクトリとファイルで分けます。同期前にコピー元・先を確認し、削除を伴う同期は dry-run で確かめます。"],
     answer="cat > .ssh/config <<'EOF'\nHost web01\n    HostName 192.168.10.21\n    User deploy\n    Port 2222\n    IdentityFile ~/.ssh/id_ed25519\nEOF\nchmod 700 .ssh\nchmod 600 .ssh/config .ssh/id_ed25519\nssh -G -F .ssh/config web01 | grep -E '^(hostname|user|port) '\nrsync -avz --delete --dry-run project/ backup/   # まず確認\nrsync -avz --delete project/ backup/",
     explanation="""
 **~/.ssh/config** を書くと `ssh web01`・`scp file web01:/tmp/`・`rsync -av dir/ web01:/var/www/` のように **別名で全部繋がる** ようになります。
@@ -582,15 +581,13 @@ register(
     id="4-8", stage=S, title="【実践】隠されたサーバーからトークンを奪取せよ",
     story="""
 極秘指令: このマシンのどこか（ポート 20000〜29999 のどれか）で、**トークン配布サーバー** がひっそり動いている。
-ポート番号は誰も知らない。`ss` でポートを突き止め、`curl` で `/api/token` を叩いてトークンを入手し、
-`token.txt` に保存して `submission.tar.gz` に固めて提出せよ。
+ポート番号は記録されていない。配布サーバーからトークンを取得して `token.txt` に保存し、
+`submission.tar.gz` にまとめて提出せよ。API のパスは `/api/token`、対象はこのマシン内です。
 """,
-    objectives=["`ss` で、LISTEN しているポートの中からトークン配布サーバー（python3）のポートを特定する",
-                "`curl` で `http://localhost:<ポート>/api/token` を GET し、レスポンスを `token.txt` に保存する",
-                "`token.txt` を `submission.tar.gz` に gzip 圧縮した tar で固める"],
-    hints=["待ち受け中のポートとプロセス名を一覧するコマンドを思い出そう（前々問）。20000番台のポートで python3 が待っているはず。",
-           "`ss -tlnp | grep python` でポートが分かります。取得は `curl -s URL > token.txt`、固めるのは `tar czf`。",
-           "`ss -tlnp | grep python3` → `curl -s http://localhost:<ポート>/api/token > token.txt` → `tar czvf submission.tar.gz token.txt`"],
+    objectives=["配布サーバーのポート番号を調べ、API からトークンを取得する",
+                "応答を `token.txt` に保存し、`submission.tar.gz` にまとめる"],
+    hints=["待ち受け中のサービスとプロセスを調べ、指定範囲の配布サーバーを特定します。",
+           "見つけたポートで `http://localhost:<ポート>/api/token` を取得し、リダイレクトで token.txt に保存してから gzip 形式の tar を作ります。"],
     answer="ss -tlnp | grep python3          # → 127.0.0.1:<<port>> ... python3\ncurl -s http://localhost:<<port>>/api/token > token.txt\ncat token.txt\ntar czvf submission.tar.gz token.txt\ntar tzvf submission.tar.gz",
     explanation="""
 この問題は Stage 4 の総まとめです:

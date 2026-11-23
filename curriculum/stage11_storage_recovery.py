@@ -50,7 +50,7 @@ def answer(ctx, expected):
 def add(n, title, story, objectives, setup, check, solution, wrong, explanation):
     register(id=f'11-{n}', stage=S, title=title, story=story+'\n'+NOTE,
              objectives=objectives, hints=['対象の層と証拠を分け、元のデータを変えずに確認します。',
-             '採取データと requirements.txt を読み、必要な項目をJSONへ記録します。設定を直す課題は控えだけを編集します。',
+             'まず ls で資料を一覧し、cat で要件書と採取データを読み、必要な項目をJSONへ記録します。設定を直す課題は控えだけを編集します。',
              'answer で入力例を確認できます。まず手元のデータから根拠を探しましょう。'],
              answer=solution, explanation=explanation,
              tip='調査しただけか、設定を変更したか、実機で再検証したかを区別して記録します。',
@@ -79,7 +79,7 @@ p,c=next((p,c) for p in b for c in p.get('children',[]) if '/srv/data' in c.get(
 json.dump(dict(partition=c['name'],parent_disk=p['name'],filesystem=c['fstype'],stable_source='UUID='+c['uuid']),open('result.json','w'))
 PYCODE"""
 add(1,'ディスク・パーティション・UUIDを読み分ける','lsblk --json相当の採取データから、アプリデータがどこにあるかを調査します。',
-    ['capture/lsblk.json を変更しない','requirements.txt の形式で /srv/data の構成を記録'],s1,c1,SOL1,["echo '{}' > result.json"],
+    ['lsblkの採取データを変更しない','要件書の形式で /srv/data の構成を記録'],s1,c1,SOL1,["echo '{}' > result.json"],
     'ディスク、パーティション、その中のファイルシステム、マウント先は別の層です。UUIDはデバイスの列挙順に依存しない識別に使います。lsblkの列を指定して採取する習慣も大切です。')
 
 
@@ -108,7 +108,7 @@ u=re.search(r'UUID="([^"]+)"',Path('capture/blkid.txt').read_text()).group(1)
 p=Path('fstab'); p.write_text(p.read_text().splitlines()[0]+'\nUUID='+u+' /srv/data ext4 defaults,nodev,nosuid 0 2\n')
 PYCODE"""
 add(2,'fstabの控えをUUIDで修正する','デバイス名に頼らず、採取したUUIDと設定の対応を確認します。',
-    ['rootの行を維持','requirements.txtに従いfstabのデータ行だけを修正'],s2,c2,SOL2,["sed -i 's/missing/guessed/' fstab",'printf "UUID=root-fixture / ext4 defaults 0 1\\n" > fstab'],
+    ['rootの行を維持','要件書に従いfstabのデータ行だけを修正'],s2,c2,SOL2,["sed -i 's/missing/guessed/' fstab",'printf "UUID=root-fixture / ext4 defaults 0 1\\n" > fstab'],
     'fstabはsource・mountpoint・type・options・dump・passの6項目です。非rootのext4は通常pass=2で確認対象にします。この課題で実マウントの成功は検証していません。実機では構文、マウント状態、再起動後の結果を確認します。参考: https://www.man7.org/linux/man-pages/man5/fstab.5.html')
 
 
@@ -117,7 +117,7 @@ def s3(ctx):
     ctx.write('capture/df-h.txt','Filesystem Size Used Avail Use% Mounted on\n/dev/vdb1 4.0G 1.0G 3.0G 25% /srv/data\n')
     ctx.write('capture/df-i.txt','Filesystem Inodes IUsed IFree IUse% Mounted on\n/dev/vdb1 10000 10000 0 100% /srv/data\n')
     ctx.write('capture/files.txt','/srv/data/tmp/jobs: 9800 empty temporary files\n/srv/data/reports: 190 required files\nremaining inodes: directories and filesystem metadata\n')
-    ctx.write('requirements.txt','result.json: resource=inodes, mount=/srv/data, cause=many-small-files, cleanup=/srv/data/tmp/jobs, preserve=/srv/data/reports。原本は変更しない。これは診断のみ。\n')
+    ctx.write('requirements.txt','result.jsonには resource（容量不足 / inode不足）, mount, cause（少数の大きなファイル / 多数の小さなファイル）, cleanup（整理対象のパス）, preserve（保持するパス）を記録する。captureの記録から値を判断する。原本は変更しない。これは診断のみ。\n')
     preserve(ctx,'capture/df-h.txt','capture/df-i.txt','capture/files.txt')
 
 
@@ -160,7 +160,7 @@ def s5(ctx):
     ctx.write('capture/journal.txt','dojo-data.service: Started.\ndojo-app.service: ConditionPathExists=/srv/dojo/config.ini was not met.\ndojo-app.service: Skipped due to failed condition.\n')
     ctx.write('backup/config.ini',ctx.data['config'],mode=0o600)
     ctx.write('units/dojo-app.service','[Unit]\nRequires=dojo-data.service\nAfter=dojo-data.service\nConditionPathExists=/srv/dojo/config.ini\n[Service]\nExecStart=/usr/bin/true\n')
-    ctx.write('requirements.txt','backup/config.iniをrecovered/config.iniへ復元し権限600。result.json: cause=missing-config, unit=dojo-app.service, dependency=dojo-data.service, next_check=verify-config-then-restart-dedicated-service。依存関係を削除しない。\n')
+    ctx.write('requirements.txt','backup/config.iniをrecovered/config.iniへ復元し権限600。result.jsonには cause（missing-config / failed-dependency / permission）, unit（起動できないサービス）, dependency（必要なサービス）, next_check（設定確認後に専用サービスを再起動 / 権限を確認）を記録する。ログとユニット定義から判断し、依存関係を削除しない。\n')
     preserve(ctx,'capture/journal.txt','backup/config.ini','units/dojo-app.service')
 
 
@@ -214,7 +214,7 @@ def s7(ctx):
     ctx.write('capture/df.txt','/dev/vdb1 4G 3.8G 0.2G 95% /srv/data\n')
     ctx.write('capture/du.txt','400M /srv/data\n')
     ctx.write('capture/lsof.txt',f'COMMAND PID USER FD TYPE DEVICE SIZE/OFF NLINK NODE NAME\ndojo-log {pid} dojo-app 3w REG 7,0 3650722201 0 120 /srv/data/app.log (deleted)\n')
-    ctx.write('requirements.txt','result.json: cause=deleted-open-file, pid=採取PID, path=/srv/data/app.log, action=coordinate-log-reopen, verify=[lsof +L1,df -h]。この診断データのPIDを実ホストでkillしない。\n')
+    ctx.write('requirements.txt','result.jsonには cause（削除済みだがプロセスが開いたまま / 通常の大容量ファイル）, pid, path, action（担当者とログ再オープンを調整 / 安全なタイミングでプロセスを終了）を記録する。必要な確認コマンドの配列も含める。この診断データのPIDを実ホストでkillしない。\n')
     preserve(ctx,'capture/df.txt','capture/du.txt','capture/lsof.txt')
 
 
@@ -250,5 +250,5 @@ import json
 p=json.load(open('case.json'));p['steps']=['snapshot','collect-readonly-evidence','identify-cause','prepare-rollback','repair-dedicated-target','verify-data-and-service','reboot-and-reverify','document'];json.dump(p,open('result.json','w'))
 PYCODE"""
 add(8,'再起動後まで確認する復旧手順','一時的な復旧だけでなく、変更を戻せることと再起動後にも維持されることを計画します。',
-    ['case.jsonの対象と保持対象を維持','要件の順序で復旧ランブックを作成'],s8,c8,SOL8,[SOL8+"\npython3 -c \"import json;p=json.load(open('result.json'));p['steps'].remove('reboot-and-reverify');json.dump(p,open('result.json','w'))\""],
+    ['ケース資料の対象と保持対象を維持','要件の順序で復旧ランブックを作成'],s8,c8,SOL8,[SOL8+"\npython3 -c \"import json;p=json.load(open('result.json'));p['steps'].remove('reboot-and-reverify');json.dump(p,open('result.json','w'))\""],
     '再起動後の確認は、手動で直した状態と永続設定の違いを見つけます。先に復元点を確保し、原本を保全してから最小範囲を修正し、データ・サービス・依存関係を確認します。実際のインストールや起動救援は使い捨てVMとコンソールで行います。')

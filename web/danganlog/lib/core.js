@@ -98,6 +98,20 @@ function firstOpenIndex(course) {
   return 0;
 }
 
+function reviewItems(catalog, state) {
+var review = (state && state.review) || {};
+var result = [];
+  buildCourses(catalog, state).forEach(function (course) {
+    course.items.forEach(function (item) {
+      var entry = review[course.id + ':' + item.id];
+      if (entry && entry.mode === course.id && entry.id === item.id) {
+        result.push({ mode: course.id, course: course.name, index: item.index, id: item.id, title: item.title });
+      }
+    });
+  });
+  return result;
+}
+
 function filterItems(items, query, unit) {
 var q = (query || '').trim().toLowerCase();
   return items.filter(function (item) {
@@ -166,4 +180,4 @@ var pending = {};
 }
 
 export { STORAGE_KEY, HISTORY_KEY, COURSE_ORDER, COURSES, safeStorage, loadSavedState, saveState, createHistory,
-  buildCourses, firstOpenIndex, filterItems, feedbackFor, createClient, isDone, lastLine, pad2 };
+  buildCourses, firstOpenIndex, reviewItems, filterItems, feedbackFor, createClient, isDone, lastLine, pad2 };

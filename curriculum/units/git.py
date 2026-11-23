@@ -95,7 +95,7 @@ LESSONS = [
     lesson("ex-git-06", "リポジトリを作る（init）",
            "履歴を記録する場所を「リポジトリ」と呼びます。フォルダの中に隠しフォルダ .git ができ、履歴はすべてそこに入ります。"
            "既存のフォルダを管理対象にするには、そのフォルダの中で init サブコマンドを実行します。",
-           "いま居るフォルダ（proj）を、git のリポジトリにしましょう。", "git init",
+           'いま居るフォルダを、git のリポジトリにしましょう。', "git init",
            "Initialized empty Git repository と出て、.git フォルダができました。ここから履歴を残せます。",
            accept=["git init ."], cwd="proj", git=G(),
            goal=lambda t: t.cwd in state(t)["repos"],
@@ -104,7 +104,7 @@ LESSONS = [
                   "入力例: git init"]),
     lesson("ex-git-07", "新しいフォルダごとリポジトリにする",
            "init の後ろにフォルダ名を付けると、そのフォルダを新しく作って、同時にリポジトリにしてくれます。新規プロジェクトの開始に便利です。",
-           "proj の中に notes というフォルダを新しく作り、そこをリポジトリにしましょう。", "git init notes",
+           'いま居るフォルダの中に notes というフォルダを新しく作り、そこをリポジトリにしましょう。', "git init notes",
            "notes フォルダと、その中の .git ができました。",
            accept=["git init ./notes"], cwd="proj", git=G(),
            goal=lambda t: "proj/notes" in state(t)["repos"],
@@ -144,12 +144,12 @@ LESSONS = [
     lesson("ex-git-11", "記録する対象に選ぶ（add）",
            "git は、コミットの前に「次の記録に入れるファイル」を選ぶ場所（ステージ、またはインデックス）を挟みます。"
            "add サブコマンドでファイルをステージに載せます。\nこの仕組みのおかげで、「関係のない変更は別のコミットにする」ことができます。",
-           "hello.txt だけをステージに載せましょう（notes.txt は載せません）。", "git add hello.txt",
+           '挨拶文のファイルだけをステージに載せましょう。メモのファイルは載せません。', "git add hello.txt",
            "hello.txt が Changes to be committed に移りました。notes.txt はまだ未追跡のままです。",
            cwd="proj", git=G({"init": True}, {"write": {"hello.txt": "Hello, Git!\n", "notes.txt": "memo\n"}}),
            goal=goal(lambda t, r: "hello.txt" in r["index"] and "notes.txt" not in r["index"]),
            hints=["コミットの前に、「どのファイルを記録に入れるか」を選ぶ操作が必要です。追加を意味する英単語のサブコマンドです。",
-                  "git add の後ろに、選びたいファイル名を1つだけ書きます。",
+                  'ls -a や git status で対象の名前と状態を確かめます。git add の後ろに、選びたいファイル名を1つだけ書きます。',
                   "入力例: git add hello.txt"]),
     lesson("ex-git-12", "最初のコミット",
            "ステージしたものを履歴に確定するのが commit です。コミットには必ずメッセージ（何のための変更か）を付けます。"
@@ -178,7 +178,7 @@ LESSONS = [
            "ファイルが多いとき、1つずつ add するのは大変です。「いまのフォルダ以下すべて」を意味する記号（ドット1つ）や、"
            "「すべての変更」を意味するオプション（-A / --all）で、一度に載せられます。\n"
            ".gitignore で無視しているファイルは、まとめて載せても入りません（後の課題で扱います）。",
-           "a.txt、b.txt、c.txt の3つとも、まとめてステージに載せましょう。", "git add .",
+           'いま居るフォルダの未追跡ファイル3つを、まとめてステージに載せましょう。', "git add .",
            "3つとも Changes to be committed に入りました。",
            accept=["git add -A", "git add --all", "git add a.txt b.txt c.txt", "git add *.txt"], cwd="proj",
            git=G({"init": True}, {"write": {"a.txt": "a\n", "b.txt": "b\n", "c.txt": "c\n"}}),
@@ -200,7 +200,7 @@ LESSONS = [
            "status は「どのファイルが」変わったかを、diff は「どの行が」どう変わったかを教えます。"
            "オプションなしなら、作業フォルダの変更のうち、まだステージしていない分を表示します。\n"
            "- で始まる行は消えた行、+ で始まる行は増えた行です。",
-           "hello.txt の変更内容を、行単位の差分で表示しましょう。", "git diff",
+           '作業中の変更内容を、行単位の差分で表示しましょう。', "git diff",
            "追加された行が + で見えました。コミットの前に差分を読むと、余計な変更の混入に気づけます。",
            accept=["git diff hello.txt"], cwd="proj",
            git=G({"init": True}, {"commit": "Add hello", "files": BASE}, {"write": {"hello.txt": "Hello, Git!\nSecond line\n"}}),
@@ -223,14 +223,14 @@ LESSONS = [
            "すでに追跡しているファイルの変更なら、add を省いて「追跡中の変更を全部ステージしてコミット」できます。"
            "-a（all）と -m を合わせて -am と書く人が多いです。\n"
            "ただし新しいファイル（未追跡）は含まれないので注意しましょう。",
-           "hello.txt の変更を、add を使わずに、メッセージ「Update greeting」でコミットしましょう。", 'git commit -am "Update greeting"',
+           '追跡中の挨拶文の変更を、add を使わずに、メッセージ「Update greeting」でコミットしましょう。', 'git commit -am "Update greeting"',
            "コミットできました。add を省ける近道ですが、何を含めるか把握してから使いましょう。",
            accept=['git commit -a -m "Update greeting"', "git commit -am 'Update greeting'"], cwd="proj",
            git=G({"init": True}, {"commit": "Add hello", "files": BASE}, {"write": {"hello.txt": "Hello, Git!\nSecond line\n"}}),
            goal=goal(lambda t, r: messages(r) == ["Update greeting", "Add hello"]),
            hints=["追跡中のファイルの変更は、ステージを経由せずにコミットできる近道があります。",
-                  "git commit に、「すべての追跡ファイルの変更」を意味するオプション -a と、メッセージ用の -m を合わせて使います。",
-                  'git commit -a と -m を合体した -am の書き方もあります。入力例: git commit -am "Update greeting"']),
+                  '記録には git のコミット機能を使います。追跡中の変更をまとめて含める指定と、記録するメッセージの指定が必要です。',
+                  '入力例: git commit -am "Update greeting"']),
     lesson("ex-git-19", "履歴を読む（log）",
            "log サブコマンドは、コミットの履歴を新しい順に表示します。それぞれのコミットには、40桁の識別子（ハッシュ）、作者、日時、メッセージが付きます。\n"
            "括弧の中の (HEAD -> main) は、「いま main ブランチの先頭にいる」という意味です。",
@@ -271,7 +271,7 @@ LESSONS = [
            "ログや一時ファイル、秘密情報などは、履歴に入れたくありません。リポジトリ直下の .gitignore というファイルに無視するパターンを1行ずつ書くと、"
            "git はそれらを未追跡一覧にも出さず、add からも守ります。\n"
            "拡張子で一括指定するには「*」（任意の文字列）を使います。",
-           "拡張子が .log のファイルすべてを無視する設定ファイルを作りましょう（app.log と debug.log が対象）。", 'echo "*.log" > .gitignore',
+           '拡張子が .log のファイルすべてを無視する設定ファイルを作りましょう。', 'echo "*.log" > .gitignore',
            ".gitignore ができ、*.log にあてはまるファイルは git から見えなくなります。.gitignore 自体は、履歴に入れて共有します。",
            accept=["echo '*.log' > .gitignore"], cwd="proj",
            git=G({"init": True}, {"write": {"app.log": "start\n", "debug.log": "debug\n", "main.py": "print('hi')\n"}}),
@@ -283,21 +283,21 @@ LESSONS = [
     lesson("ex-git-24", "無視されているか確かめる",
            "「このファイルは .gitignore のどれかにあてはまるのか」を調べる道具が check-ignore サブコマンドです。"
            "無視されているファイル名だけが表示され、どれも無視されていなければ何も出ません。",
-           "app.log が git に無視されているかを調べましょう。", "git check-ignore app.log",
+           'アプリのログが git に無視されているかを調べましょう。', "git check-ignore app.log",
            "app.log と表示されました。無視されている印です。",
            cwd="proj", git=G({"init": True}, {"write": {".gitignore": "*.log\n", "app.log": "start\n", "main.py": "x\n"}}),
            hints=["「無視されているか」を直接聞ける、専用のサブコマンドがあります。名前に ignore を含みます。",
-                  "git の後ろに check-ignore と、調べたいファイル名を付けます。",
+                  'ls -a や git status で対象の名前と状態を確かめます。git の後ろに check-ignore と、調べたいファイル名を付けます。',
                   "入力例: git check-ignore app.log"]),
     lesson("ex-git-25", "無視したファイルを add すると",
            "無視しているファイルを名指しで add すると、git は「無視設定に載っているよ」と断ります（本当に必要なら -f で強制できます）。\n"
            "パスワード入りの設定ファイルを誤って載せないための安全装置です。実際に断られるところを見てみましょう。",
-           "app.log を名指しでステージに載せようとして、断られることを確かめましょう。", "git add app.log",
+           'アプリのログを名指しでステージに載せようとして、断られることを確かめましょう。', "git add app.log",
            "The following paths are ignored と出て、追加されませんでした。誤って秘密を載せないための仕組みです。",
            expected_code=1, cwd="proj",
            git=G({"init": True}, {"write": {".gitignore": "*.log\n", "app.log": "start\n"}}),
            hints=["普通に add を試みるだけで、断られる様子が見られます。",
-                  "git add の後ろに、無視されているファイル名を書きます。",
+                  'ls -a や git status で対象の名前と状態を確かめます。git add の後ろに、無視されているファイル名を書きます。',
                   "入力例: git add app.log"]),
     lesson("ex-git-26", "ブランチの一覧を見る",
            "ブランチは、履歴の「枝」です。main から枝分かれして新機能を試し、うまくいったら main に取り込む、という使い方をします。\n"
@@ -348,8 +348,8 @@ LESSONS = [
            goal=goal(lambda t, r: r["head"] == "feature" and messages(r)[0] == "Add login page"
                      and r["branches"]["main"] != r["branches"]["feature"]),
            hints=["ここまでの流れと同じです。ステージ済みのものを履歴に確定します。",
-                  "git commit にメッセージ用の -m を付け、引用符で囲んだ文を渡します。",
-                  'メッセージは Add login page です。入力例: git commit -m "Add login page"']),
+                  'ls -a や git status で対象の名前と状態を確かめます。記録には git のコミット機能を使います。ステージ済みの内容を、課題で指定されたメッセージで記録します。',
+                  '入力例: git commit -m "Add login page"']),
     lesson("ex-git-31", "main に戻ると変更が消える",
            "feature で作った login.html は、feature の履歴にしか入っていません。main に戻ると、作業フォルダからも消えます（履歴に残っているので、feature に戻せばまた現れます）。\n"
            "ブランチを切り替えると、フォルダの中身が入れ替わる様子を確かめましょう。",
@@ -408,24 +408,24 @@ LESSONS = [
            "ファイルを書き換えたが、やっぱりやめたい。そんなときは、最後にステージ（またはコミット）した状態に戻せます。"
            "restore サブコマンドにファイル名を渡します。\n"
            "注意：作業フォルダの未コミットの変更は、元に戻せなくなります。実行前に git diff で確認する習慣を付けましょう。",
-           "hello.txt の作業中の変更を捨てて、コミット済みの状態に戻しましょう。", "git restore hello.txt",
+           '挨拶文のファイルの作業中の変更を捨てて、コミット済みの状態に戻しましょう。', "git restore hello.txt",
            "hello.txt が元の内容に戻りました。",
            accept=["git checkout -- hello.txt", "git checkout hello.txt"], cwd="proj",
            git=G({"init": True}, {"commit": "Add hello", "files": BASE}, {"write": {"hello.txt": "oops\n"}}),
            goal=lambda t: t.path("hello.txt").read_text(encoding="utf-8") == BASE["hello.txt"],
            hints=["作業フォルダの変更を、記録されている状態で「上書き」して戻したいのです。「復元」を意味する英単語のサブコマンドがあります。",
-                  "git restore の後ろに、元に戻したいファイル名を書きます。",
+                  'ls -a や git status で対象の名前と状態を確かめます。git restore の後ろに、元に戻したいファイル名を書きます。',
                   "入力例: git restore hello.txt"]),
     lesson("ex-git-37", "ステージを取り消す",
            "間違って add してしまったときは、ステージだけを取り消せます（ファイルの内容は変わりません）。restore に、ステージ側を対象にするオプション --staged を付けます。\n"
            "status の表示にも、この使い方がヒントとして書かれています。",
-           "ステージに載せた notes.txt を、ステージから外しましょう（ファイルは残します）。", "git restore --staged notes.txt",
+           '新しくステージに載せたメモのファイルを、ステージから外しましょう（ファイルは残します）。', "git restore --staged notes.txt",
            "notes.txt が Changes to be committed から消え、未追跡に戻りました。中身は無事です。",
            accept=["git reset notes.txt", "git reset HEAD notes.txt"], cwd="proj",
            git=G({"init": True}, {"commit": "Add hello", "files": BASE}, {"write": {"notes.txt": "memo\n"}}, {"stage": ["notes.txt"]}),
            goal=goal(lambda t, r: "notes.txt" not in r["index"] and t.path("notes.txt").is_file()),
            hints=["元に戻す機能のうち、ステージだけを対象にする指定があります。",
-                  "git restore に、「ステージ済み」を意味する長いオプション（staged）と、ファイル名を渡します。",
+                  'ls -a や git status で対象の名前と状態を確かめます。git restore に、「ステージ済み」を意味する長いオプション（staged）と、ファイル名を渡します。',
                   "入力例: git restore --staged notes.txt"]),
     lesson("ex-git-38", "コミットメッセージを直す",
            "メッセージを間違えたまま、まだ誰にも渡していないなら、直前のコミットを作り直せます。--amend は「修正」の意味です。"
@@ -437,8 +437,8 @@ LESSONS = [
            git=G({"init": True}, {"commit": "Add helo", "files": BASE}),
            goal=goal(lambda t, r: messages(r) == ["Add hello.txt"]),
            hints=["コミットを「増やす」のではなく「直す」オプションがあります。修正を意味する英単語です。",
-                  "git commit に、--amend と、新しいメッセージ用の -m を付けます。",
-                  'メッセージは Add hello.txt です。入力例: git commit --amend -m "Add hello.txt"']),
+                  'ls -a や git status で対象の名前と状態を確かめます。記録には git のコミット機能を使います。新しい記録を増やす代わりに直前の記録を修正する指定と、メッセージの指定が必要です。',
+                  '入力例: git commit --amend -m "Add hello.txt"']),
     lesson("ex-git-39", "直前のコミットを取り消す",
            "コミットを取り消したいときは reset を使います。--soft は「コミットだけ取り消し、変更はステージに残す」安全な方法です。"
            "HEAD~1 は「いまの1つ前」を意味します。\n"
@@ -452,23 +452,23 @@ LESSONS = [
                   "入力例: git reset --soft HEAD~1"]),
     lesson("ex-git-40", "追跡をやめて削除する（rm）",
            "不要になったファイルは、git rm で「フォルダから削除」と「追跡の解除」を同時に行えます。通常の削除コマンドだと、削除した事実をさらに add する手間が要ります。",
-           "追跡中の old.txt を、git の管理から外し、ファイルも削除しましょう。", "git rm old.txt",
+           '追跡中の古いテキストファイルを、git の管理から外し、ファイルも削除しましょう。残すためのファイルは削除しません。', "git rm old.txt",
            "rm 'old.txt' と出て、ファイルが消え、削除がステージされました。次のコミットで履歴に反映されます。",
            accept=["git rm -f old.txt"], cwd="proj",
            git=G({"init": True}, {"commit": "Add files", "files": {"old.txt": "old\n", "keep.txt": "keep\n"}}),
            goal=lambda t: not t.path("old.txt").exists() and goal(lambda t, r: "old.txt" not in r["index"] and "keep.txt" in r["index"])(t),
            hints=["削除と追跡の解除を一度に行う、git 専用のサブコマンドがあります。名前は通常の削除と同じです。",
-                  "git rm の後ろに、削除したいファイル名を書きます。",
+                  'ls -a や git status で対象の名前と状態を確かめます。git rm の後ろに、削除したいファイル名を書きます。',
                   "入力例: git rm old.txt"]),
     lesson("ex-git-41", "名前を変える（mv）",
            "ファイルの名前変更も、git 経由なら「古い名前の削除」と「新しい名前の追加」をまとめてステージできます。",
-           "追跡中の draft.txt の名前を final.txt に変えましょう（git に変更を伝えること）。", "git mv draft.txt final.txt",
+           '追跡中の下書きファイルの名前を final.txt に変えましょう（git に変更を伝えること）。', "git mv draft.txt final.txt",
            "名前の変更がステージされました。内容が同じなら、git は履歴上も「名前の変更」として扱えます。",
            cwd="proj", git=G({"init": True}, {"commit": "Add draft", "files": {"draft.txt": "draft\n"}}),
            goal=lambda t: t.path("final.txt").is_file() and not t.path("draft.txt").exists() and goal(
                lambda t, r: "final.txt" in r["index"] and "draft.txt" not in r["index"])(t),
            hints=["git にも、移動・改名のためのサブコマンドがあります。通常の移動と同じ名前です。",
-                  "git mv の後ろに、古い名前と新しい名前を順に並べます。",
+                  'ls -a や git status で対象の名前と状態を確かめます。git mv の後ろに、古い名前と新しい名前を順に並べます。',
                   "入力例: git mv draft.txt final.txt"]),
     lesson("ex-git-42", "リポジトリを複製する（clone）",
            "すでにあるリポジトリを丸ごと手元に複製するのが clone サブコマンドです。履歴・ブランチもすべて付いてきます。\n"
@@ -527,13 +527,12 @@ LESSONS = [
            hints=["「いまどうなっているか」を聞くサブコマンドです。",
                   "git の後ろに status と付けます。出力の2行目に注目します。",
                   "入力例: git status"]),
-    lesson("ex-git-48", ".git/HEAD の中身を見る",
-           "いま居るブランチは、.git/HEAD という小さなファイルに書かれています。仕組みを知ると、git が「ただのファイルの集まり」だと実感できます。"
-           "ふつうのファイルなので、内容を表示する道具で読めます。",
-           "いま居るブランチが書かれているファイル（.git の中の HEAD）の中身を表示しましょう。", "cat .git/HEAD",
+    lesson("ex-git-48", '現在のブランチを記録するファイルを探す',
+           'Git の管理情報も、フォルダ内のファイルとして保存されています。管理情報を調べ、現在のブランチが書かれたファイルを探してみましょう。管理用のファイルは書き換えません。',
+           '現在のブランチが書かれている管理用ファイルを探し、その中身を表示しましょう。', "cat .git/HEAD",
            "ref: refs/heads/main と読めました。HEAD は、いま居るブランチへの案内です。",
            cwd="proj", git=G(*HISTORY),
-           hints=["ファイルの中身を表示する、おなじみの道具を使います。場所は隠しフォルダの中です。",
-                  "cat の後ろに、.git フォルダの中の HEAD ファイルのパスを書きます。",
+           hints=['管理情報には、通常の一覧に出ない項目もあります。現在のブランチを示す内容がないか調べましょう。',
+                  'ls -a で管理用フォルダを見つけ、ls フォルダ名 と cat で中を調べます。',
                   "入力例: cat .git/HEAD"]),
 ]

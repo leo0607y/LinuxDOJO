@@ -65,11 +65,11 @@ def fstab_rows(ctx, path='fstab'):
     return [x.split() for x in ctx.need_file(path).splitlines() if x.strip() and not x.lstrip().startswith('#')]
 
 
-def add(n, title, story, objectives, setup, check, solution, wrong, explanation, tip=None):
+def add(n, title, story, objectives, setup, check, solution, wrong, explanation, tip=None, hints=None):
     register(id=f'15-{n}', stage=S, title=title, story=story + '\n' + NOTE,
              objectives=objectives,
-             hints=['まず採取データと requirements.txt を読み、必要な値と出力先を整理します。',
-                    '元の採取データは変更せず、値は手で決め打ちせずデータから読み取ります。',
+             hints=hints or ['まず要件と観測した事実を分け、必要な値と出力先を整理します。',
+                    'ls で資料を一覧し、cat で要件書と採取記録を読みます。元の採取データは変更せず、値はデータから読み取ります。',
                     'answer で入力例を確認できます。形式は requirements.txt に従います。'],
              answer=solution, explanation=explanation,
              tip=tip or '実機では実行前に対象デバイスを必ず確認し、まず控えや計画書で手順と順序をレビューします。',
@@ -118,7 +118,7 @@ json.dump(dict(last_partition=last[0].split('/')[-1],free_start=fs,free_sectors=
  next_partition='sdb%d'%(len(ps)+1)),open('result.json','w'))
 PYCODE"""
 add(1, 'fdiskの出力から空き領域を読み解く', 'fdisk -l の採取結果から、新しいパーティションを作れる空きを計算します。',
-    ['fdisk-l.txt を変更しない', '最終パーティションと空き領域を result.json に記録'], s1, c1, SOL1,
+    ['fdiskの採取記録を変更しない', '最終パーティションと空き領域を result.json に記録'], s1, c1, SOL1,
     ["echo '{}' > result.json",
      """python3 - <<'PYCODE'
 import re, json
@@ -199,7 +199,7 @@ def c3(ctx):
 
 
 SOL3 = """printf '%s\\n' 'pvcreate /dev/<<d1>> /dev/<<d2>>' 'vgcreate <<vg>> /dev/<<d1>> /dev/<<d2>>' 'lvcreate -L <<size>>M -n <<lv>> <<vg>>' 'mkfs.ext4 /dev/<<vg>>/<<lv>>' 'mkdir -p /srv/<<lv>>' 'mount /dev/<<vg>>/<<lv>> /srv/<<lv>>' > plan.txt"""
-add(3, 'LVMの構築順序を組み立てる', '2台のディスクからLVを作り、マウントするまでの正しい順序を計画します。',
+add(3, 'LVMの構築順序を組み立てる', 'LVMは物理ボリューム（PV）をボリュームグループ（VG）にまとめ、そこから論理ボリューム（LV）を切り出します。LVにはファイルシステムを作ってからマウントします。2台のディスクからLVを作り、マウントするまでの正しい順序を計画します。',
     ['PV→VG→LV→mkfs→mountの順で plan.txt を作る'], s3, c3, SOL3,
     ["printf '%s\\n' 'vgcreate <<vg>> /dev/<<d1>> /dev/<<d2>>' 'pvcreate /dev/<<d1>> /dev/<<d2>>' 'lvcreate -L <<size>>M -n <<lv>> <<vg>>' 'mkfs.ext4 /dev/<<vg>>/<<lv>>' 'mkdir -p /srv/<<lv>>' 'mount /dev/<<vg>>/<<lv>> /srv/<<lv>>' > plan.txt",
      "printf '%s\\n' 'pvcreate /dev/<<d1>>' 'vgcreate <<vg>> /dev/<<d1>> /dev/<<d2>>' 'lvcreate -L <<size>>M -n <<lv>> <<vg>>' > plan.txt"],
@@ -272,7 +272,7 @@ json.dump(dict(array=md,state='degraded' if '_' in re.search(r'\\[[U_]+\\]',t).g
 PYCODE
 printf '%s\\n' 'mdadm /dev/<<md>> --remove /dev/<<bad>>' 'mdadm /dev/<<md>> --add /dev/<<spare>>' > recovery.txt"""
 add(5, '/proc/mdstatを読んで劣化RAIDを復旧する', 'RAID1の状態を示す /proc/mdstat の採取結果を読み、復旧手順を書きます。',
-    ['mdstat.txt を変更しない', '劣化状態と故障メンバを result.json へ', 'recovery.txt に --remove → --add'], s5, c5, SOL5,
+    ['RAID状態の採取記録を変更しない', '劣化状態と故障メンバを result.json へ', 'recovery.txt に --remove → --add'], s5, c5, SOL5,
     ["echo '{\"array\":\"<<md>>\",\"state\":\"clean\",\"failed\":\"<<bad>>\"}' > result.json; printf '%s\\n' 'mdadm /dev/<<md>> --add /dev/<<spare>>' 'mdadm /dev/<<md>> --remove /dev/<<bad>>' > recovery.txt",
      "echo '{\"array\":\"<<md>>\",\"state\":\"degraded\",\"failed\":\"<<bad>>\"}' > result.json; printf '%s\\n' 'mdadm --create /dev/<<md>> --level=1 --raid-devices=2 /dev/<<spare>> missing' > recovery.txt"],
     '[2/1] [U_] は2台中1台のみ稼働（Uが稼働、_が欠落）。(F)は故障扱いのメンバです。復旧は --remove で外し、新ディスクを --add すると再同期(recovery)が始まります。--create は既存データを壊す恐れがあります。')
@@ -351,7 +351,7 @@ for l in open('capture/state.txt'):
 json.dump(r,open('result.json','w'))
 PYCODE"""
 add(7, 'fsckと修復の判断（e2fsck/xfs_repair）', '3つのデバイスについて、種類とマウント状態から次の一手を判断します。',
-    ['state.txt を変更しない', 'result.json に各デバイスの次の一手を記録'], s7, c7, SOL7,
+    ['デバイス状態の記録を変更しない', 'result.json に各デバイスの次の一手を記録'], s7, c7, SOL7,
     ["""python3 - <<'PYCODE'
 import re, json
 r={}
@@ -402,8 +402,9 @@ def s9(ctx):
     u = str(uuidlib.uuid4())
     ctx.data.update(user=user, soft=soft, hard=hard, u=u, root='UUID=root-fixture / ext4 defaults 0 1')
     ctx.write('fstab', f'{ctx.data["root"]}\nUUID={u} /home ext4 defaults 0 2\n')
-    ctx.write('requirements.txt', f'/home でユーザ/グループquotaを有効にする設計。fstabの/home行に usrquota,grpquota を追加(defaultsは残す)。plan.txt に1行1コマンド: '
-              f'quotacheck -cug /home → quotaon /home → setquota -u {user} {soft} {hard} 0 0 /home (ブロックのsoft/hard、inodeは無制限)。実行はしない。\n')
+    ctx.write('requirements.txt', f'/home でユーザ/グループquotaを有効にする設計。fstabの/home行に usrquota,grpquota を追加し、defaultsは残す。'
+              f'plan.txt に1行1コマンドで手順を書く。対象ユーザは {user}、ブロック上限は soft={soft}, hard={hard}、inode上限は無制限。'
+              'softは警告の基準、hardは超えられない上限。計画だけ作り、コマンドは実行しない。\n')
 
 
 def c9(ctx):
@@ -422,11 +423,14 @@ def c9(ctx):
 
 SOL9 = """sed -i -E '/ \\/home /s/defaults/defaults,usrquota,grpquota/' fstab
 printf '%s\\n' 'quotacheck -cug /home' 'quotaon /home' 'setquota -u <<user>> <<soft>> <<hard>> 0 0 /home' > plan.txt"""
-add(9, 'quotaの設定例を作る', 'ユーザごとのディスク使用量上限を設定する手順を、fstabと計画ファイルにまとめます。',
-    ['fstabにusrquota,grpquota', 'quotacheck→quotaon→setquotaの順の plan.txt'], s9, c9, SOL9,
+add(9, 'quotaの設定例を作る', 'quotaはユーザごとのディスク使用量を制限する仕組みです。softは警告を出す基準、hardは超えられない上限です。fstabと計画ファイルに設定をまとめます。',
+    ['fstabで /home のユーザ/グループquotaを有効化する', 'plan.txt に必要な手順を正しい順で書く'], s9, c9, SOL9,
     ["sed -i -E '/ \\/home /s/defaults/defaults,usrquota/' fstab; printf '%s\\n' 'setquota -u <<user>> <<soft>> <<hard>> 0 0 /home' 'quotaon /home' > plan.txt",
      "sed -i -E '/ \\/home /s/defaults/usrquota,grpquota/' fstab; printf '%s\\n' 'quotacheck -cug /home' 'quotaon /home' 'setquota -u <<user>> <<hard>> <<soft>> 0 0 /home' > plan.txt"],
-    'quotaはマウントオプションで有効化し、quotacheckで集計ファイルを作り、quotaonで有効化、setquotaで上限を設定します。soft(警告)はhard(絶対上限)以下にします。')
+    'quotaはマウントオプションで有効化し、quotacheckで集計ファイルを作り、quotaonで有効化、setquotaで上限を設定します。soft(警告)はhard(絶対上限)以下にします。',
+    hints=['requirements.txt に対象ユーザと上限値があります。まず fstab の /home 行と必要な出力を確認します。',
+           'quotaの準備、集計、上限設定を担当するコマンドを思い出し、plan.txt に1行ずつ正しい順序で書きます。',
+           'man setquota で引数の順を確認できます。inodeを制限しない値と、soft/hard の位置に注意します。'])
 
 
 # ---------------------------------------------------------------- 10 inode
@@ -526,7 +530,7 @@ for blk in t.split('=== ')[1:]:
 json.dump(dict(replace=bad,cable_check=cab,reason=['Current_Pending_Sector','Reallocated_Sector_Ct']),open('result.json','w'))
 PYCODE"""
 add(12, 'smartctlの出力から交換判断をする', '3台分のSMART採取結果から、交換すべきディスクとケーブル確認で済むディスクを見分けます。',
-    ['smart.txt を変更しない', '交換対象・ケーブル確認対象・理由を result.json へ'], s12, c12, SOL12,
+    ['SMARTの採取記録を変更しない', '交換対象・ケーブル確認対象・理由を result.json へ'], s12, c12, SOL12,
     ["echo '{\"replace\":\"<<cable>>\",\"cable_check\":\"<<bad>>\",\"reason\":[\"UDMA_CRC_Error_Count\"]}' > result.json",
      "echo '{\"replace\":\"<<bad>>\",\"cable_check\":\"<<cable>>\",\"reason\":[\"UDMA_CRC_Error_Count\"]}' > result.json"],
     'Reallocated_Sector_CtやCurrent_Pending_Sectorは媒体劣化の兆候で、交換を計画します。UDMA_CRC_Error_Countは転送経路(ケーブル等)の問題を示すことが多いです。総合判定PASSEDでも属性の推移を見ます。')

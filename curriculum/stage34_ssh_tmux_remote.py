@@ -389,7 +389,7 @@ def s6(ctx):
     if KG:
         kgrun(['-q', '-t', 'ed25519', '-N', old, '-C', 'work', '-f', str(ctx.p('keys/id_work'))])
         ctx.p('keys/id_work.pub').unlink(missing_ok=True)
-    ctx.write('requirements.txt', f'keys/id_work のパスフレーズを {old} から {new} へ変更し（ssh-keygen -p）、鍵のフィンガープリントを fingerprint.txt に保存（-l）、失われた公開鍵 keys/id_work.pub を秘密鍵から復元（-y）する。' + ('' if KG else ' ※ssh-keygenがない環境なので、3つのコマンドを cmd.txt に書く。') + '\n')
+    ctx.write('requirements.txt', f'作業用の既存秘密鍵を探し、パスフレーズを {old} から {new} へ変更する。フィンガープリントを fingerprint.txt に保存し、公開鍵を keys/id_work.pub に復元する。' + ('' if KG else ' ※ssh-keygenがない環境なので、3つのコマンドを cmd.txt に書く。') + '\n')
 
 
 def c6(ctx):
@@ -416,7 +416,7 @@ mission(6, 'ssh-keygenで鍵のパスフレーズ変更(-p)・フィンガープ
         ['-p で旧→新パスフレーズに変更', '-l のフィンガープリントを保存', '-y で公開鍵を復元'], s6, c6, SOL6,
         ["ssh-keygen -p -N '<<new>>' -f keys/id_work </dev/null", "ssh-keygen -p -P '<<old>>' -N '<<new>>' -f keys/id_work\nssh-keygen -y -P '<<new>>' -f keys/id_work > fingerprint.txt"],
         '-p は秘密鍵のパスフレーズ変更（-P 旧・-N 新で非対話）、-l -f は鍵のフィンガープリント（SHA256）表示で、サーバー側の鍵と照合するのに使います。-y は秘密鍵から公開鍵を再生成します。パスフレーズ付きの秘密鍵は漏洩しても直ちに使われません。コマンドラインのパスフレーズは履歴に残るので本番では対話入力にします。',
-        '3つとも ssh-keygen のオプションです。', 'ssh-keygen -p ... / -l -f ... / -y ... を順に実行します。')
+        'ls -a で作業用の秘密鍵を探します。出力名 fingerprint.txt と keys/id_work.pub は指定どおりにします。', 'ssh-keygen の -p は変更、-l は指紋、-y は公開鍵の復元に使います。旧・新の値を要件書で確認します。')
 
 
 # ================================================================ 7 authorized_keys オプション
@@ -430,7 +430,7 @@ def s7(ctx):
     ctx.data.update(cidr=cidr, script=script)
     put(ctx, 'backup.pub', fakepub() + ' backup@batch\n')
     put(ctx, 'legacy.pub', fakepub() + ' ops@legacy\n')
-    ctx.write('requirements.txt', f'authorized_keys を作る。(1) backup.pub: command="{script}"・from="{cidr}"・restrict（コマンドは固定、接続元を制限）。(2) legacy.pub（古いsshdで restrict が使えない）: no-port-forwarding,no-agent-forwarding,no-X11-forwarding,no-pty を明示。鍵本体は変更しない。\n')
+    ctx.write('requirements.txt', f'authorized_keys を作る。(1) コメント backup@batch の鍵に command="{script}"・from="{cidr}"・restrict（コマンドは固定、接続元を制限）。(2) コメント ops@legacy の鍵（古いsshdで restrict が使えない）に no-port-forwarding,no-agent-forwarding,no-X11-forwarding,no-pty を明示。鍵本体は変更しない。\n')
 
 
 def c7(ctx):
@@ -459,7 +459,7 @@ mission(7, 'authorized_keysのオプション（command= from= no-port-forwardin
         ['backup 鍵に command=・from=・restrict', 'legacy 鍵に個別の no-* オプション'], s7, c7, SOL7,
         ["cat backup.pub legacy.pub > authorized_keys", "printf 'command=\"<<script>>\" %s\\n' \"$(cat backup.pub)\" > authorized_keys\ncat legacy.pub >> authorized_keys"],
         'オプションは行頭にカンマ区切りで書き、値は二重引用符で囲みます。command= は鍵で認証されると指定コマンドしか実行できず（元の指定は SSH_ORIGINAL_COMMAND に入る）、from= は接続元アドレス/CIDR/ホスト名を絞ります。restrict は no-port-forwarding・no-agent-forwarding・no-X11-forwarding・no-pty・no-user-rc をまとめて有効にし、必要なものだけ後から許可します（OpenSSH 7.2以降）。',
-        'オプションは鍵の種別（ssh-ed25519）の手前に置きます。', 'printf で オプション + 鍵本体 の1行を組み立てます。')
+        'ls で公開鍵を探し、cat でコメントを読んでバックアップ用とlegacy用を特定します。出力先は authorized_keys です。', 'オプションは鍵本体より前に置きます。バックアップ用は command/from/restrict、legacy用は個別の no-* を付けます。')
 
 
 # ================================================================ 8 ssh-copy-id
@@ -472,7 +472,7 @@ def s8(ctx):
     put(ctx, 'remote_home/.ssh/authorized_keys', ex + '\n')
     os.chmod(ctx.p('remote_home/.ssh/authorized_keys'), 0o644)
     ctx.mkdir('remote_home/.ssh', 0o755)
-    ctx.write('requirements.txt', f'(1) copy.txt に、ポート{port}の {user}@{host} へ keys/id_ci.pub を登録する ssh-copy-id を1行で書く（実行しない）。(2) ssh-copy-id が使えない場合の手作業として、同じ鍵を remote_home/.ssh/authorized_keys（既存の鍵は残す・重複させない）へ追加し、.ssh は 700、authorized_keys は 600 にする。\n')
+    ctx.write('requirements.txt', f'(1) copy.txt に、ポート{port}の {user}@{host} へCI用の公開鍵を登録する ssh-copy-id を1行で書く（実行しない）。鍵のコメントでCI用かを確認する。(2) ssh-copy-id が使えない場合の手作業として、同じ鍵を接続先に見立てた疑似ホームの登録済み公開鍵一覧へ追加する（既存の鍵は残す・重複させない）。SSH用ディレクトリは 700、登録済み公開鍵一覧は 600 にする。\n')
 
 
 def c8(ctx):
@@ -500,7 +500,7 @@ mission(8, 'ssh-copy-idで公開鍵を登録し、使えない時の手作業も
         ['ssh-copy-id のコマンドを copy.txt へ', '疑似ホームに追記し権限を設定'], s8, c8, SOL8,
         ["echo \"ssh-copy-id keys/id_ci.pub <<user>>@<<host>>\" > copy.txt\ncp keys/id_ci.pub remote_home/.ssh/authorized_keys", "echo \"ssh-copy-id -i keys/id_ci.pub -p <<port>> <<user>>@<<host>>\" > copy.txt\ncat keys/id_ci.pub >> remote_home/.ssh/authorized_keys"],
         'ssh-copy-id -i 公開鍵 [-p ポート] ユーザー@ホスト は、対象の ~/.ssh を作成して authorized_keys に追記し、権限（.ssh 700・authorized_keys 600）も整えます。重複登録はスキップされます。手作業では必ず > ではなく >> で追記します（既存の鍵が消えてログインできなくなる事故を防ぐ）。-i は公開鍵（または秘密鍵）、-o で ssh オプションも渡せます。',
-        'ssh-copy-id は -i と -p を取ります。', '手作業は cat 公開鍵 >> authorized_keys と chmod 700/600 です。')
+        'まずCI用の公開鍵と、接続先に見立てたホームを探しましょう。', 'ls と ls -a で用意されたフォルダを調べ、cat で鍵のコメントを確認します。ssh-copy-id は -i と -p を取り、手作業は cat 公開鍵 >> authorized_keys と chmod 700/600 です。')
 
 
 # ================================================================ 9 SSH 証明書
@@ -516,7 +516,7 @@ def s9(ctx):
     if KG:
         kgrun(['-q', '-t', 'ed25519', '-N', '', '-C', 'ca', '-f', str(ctx.p('keys/ca'))])
         kgrun(['-q', '-t', 'ed25519', '-N', '', '-C', 'user', '-f', str(ctx.p('keys/user_key'))])
-    ctx.write('requirements.txt', f'CA鍵 keys/ca で keys/user_key.pub に署名して証明書を発行する（ssh-keygen -s）。Key ID は {kid}、プリンシパルは {",".join(pr)}、有効期間は {val[0]}。さらにサーバー側で CA を信頼する行を sshd_ca.conf に1行書く（CA公開鍵のパスは /etc/ssh/ca.pub）。' + ('' if KG else ' ※ssh-keygenがない環境なので、署名コマンドを cmd.txt に書く。') + '\n')
+    ctx.write('requirements.txt', f'用意された鍵のうち、公開鍵のコメントが ca の鍵をCA用、user の鍵を利用者用として、CA秘密鍵で利用者の公開鍵に署名して証明書を発行する（ssh-keygen -s）。Key ID は {kid}、プリンシパルは {",".join(pr)}、有効期間は {val[0]}。さらにサーバー側で CA を信頼する行を sshd_ca.conf に1行書く（CA公開鍵のパスは /etc/ssh/ca.pub）。' + ('' if KG else ' ※ssh-keygenがない環境では鍵も生成されません。CA秘密鍵を keys/ca、利用者公開鍵を keys/user_key.pub とする署名コマンドを cmd.txt に書く。') + '\n')
 
 
 def c9(ctx):
@@ -548,7 +548,7 @@ mission(9, 'SSH証明書認証（ssh-keygen -s でCA署名し、サーバーはC
         ['-s -I -n -V で証明書を発行', 'TrustedUserCAKeys の行を sshd_ca.conf へ'], s9, c9, SOL9,
         ["ssh-keygen -s keys/ca -I '<<kid>>' keys/user_key.pub\necho 'TrustedUserCAKeys /etc/ssh/ca.pub' > sshd_ca.conf", "ssh-keygen -s keys/user_key -I '<<kid>>' -n '<<princ>>' -V '<<val>>' keys/ca.pub\necho 'TrustedUserCAKeys /etc/ssh/ca.pub' > sshd_ca.conf"],
         'ssh-keygen -s CA秘密鍵 -I 識別名 -n プリンシパル -V 有効期間 利用者公開鍵 で *-cert.pub が作られます。-n はログインを許す名前（sshd 側の AuthorizedPrincipalsFile や対象ユーザー名と照合）、-V +4h のような短い期限が運用の肝で、失効管理が楽になります。サーバーは sshd_config に TrustedUserCAKeys を書くだけで、利用者側は ssh -i 鍵 で同名の -cert.pub を自動的に使います。ssh-keygen -L -f で内容を確認します。',
-        '署名するのはCAの秘密鍵、署名される対象は利用者の公開鍵です。', 'ssh-keygen -s keys/ca -I ID -n 名前 -V +期間 keys/user_key.pub です。')
+        '署名するのはCAの秘密鍵、署名される対象は利用者の公開鍵です。', 'ls で鍵を探し、cat で公開鍵のコメントからCA用と利用者用を区別します。ssh-keygen -s CA秘密鍵 -I ID -n 名前 -V +期間 利用者公開鍵 の形です。')
 
 
 # ================================================================ 10 権限
@@ -562,7 +562,7 @@ def s10(ctx):
         os.chmod(ctx.p(f'{u}/.ssh/{n}'), m)
     put(ctx, 'ssh_debug.txt', "debug1: identity file /home/trainee/.ssh/id_ed25519 type 3\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n@         WARNING: UNPROTECTED PRIVATE KEY FILE!          @\nPermissions 0644 for '/home/trainee/.ssh/id_ed25519' are too open.\nThis private key will be ignored.\nLoad key \"/home/trainee/.ssh/id_ed25519\": bad permissions\n")
     put(ctx, 'sshd_auth.log', "Nov 21 10:02:11 web01 sshd[2211]: Authentication refused: bad ownership or modes for directory /home/trainee/.ssh\nNov 21 10:02:11 web01 sshd[2211]: Authentication refused: bad ownership or modes for file /home/trainee/.ssh/authorized_keys\n")
-    ctx.write('requirements.txt', 'home/trainee を疑似ホームとして、ssh_debug.txt（クライアント）と sshd_auth.log（サーバー）のエラーが出なくなるよう権限を直す: ~/.ssh は 700、秘密鍵と config と authorized_keys は 600、ホームは他人が書き込めない状態に。中身は変更しない。\n')
+    ctx.write('requirements.txt', 'クライアントとサーバーの採取記録から、権限エラーの対象を調べる。ログの /home は作業フォルダの home に対応する疑似環境です。SSH用ディレクトリは 700、秘密鍵・クライアント設定・登録済み公開鍵一覧は 600、疑似ホームは他人が書き込めない状態に直す。中身は変更しない。\n')
 
 
 def c10(ctx):
@@ -580,11 +580,11 @@ SOL10 = """chmod go-w home/trainee
 chmod 700 home/trainee/.ssh
 chmod 600 home/trainee/.ssh/id_ed25519 home/trainee/.ssh/authorized_keys home/trainee/.ssh/config"""
 mission(10, '~/.sshは700・鍵は600: 権限エラー（too open・bad ownership）の診断と修正',
-        '鍵認証がなぜか通りません。クライアントの ssh_debug.txt には "UNPROTECTED PRIVATE KEY FILE"、サーバー側の sshd_auth.log には "bad ownership or modes" があります。メッセージから原因を読み、疑似ホームの権限を直してください。',
+        '鍵認証がなぜか通りません。クライアント側の採取記録には "UNPROTECTED PRIVATE KEY FILE"、サーバー側の採取記録には "bad ownership or modes" があります。メッセージから原因を読み、疑似ホームの権限を直してください。',
         ['2つのログから原因を特定', 'ホーム・.ssh・鍵・authorized_keys・config の権限を修正'], s10, c10, SOL10,
         ["chmod -R 600 home/trainee/.ssh", "chmod 600 home/trainee/.ssh/id_ed25519"],
         '秘密鍵が他人に読めると ssh はその鍵を無視します（クライアント側）。サーバーは StrictModes yes で、ホーム・~/.ssh・authorized_keys が他人に書き込み可能だと鍵を拒否します。目安は ~/.ssh が700、秘密鍵・config・authorized_keys が600、ホームは755以下（group/other 書き込み不可）です。chmod -R 600 は ディレクトリの実行権を奪うので不可です。',
-        'ログに出ている3種類の対象を整理しましょう。', 'ディレクトリは700、ファイルは600。ホームは go-w です。')
+        'まずエラーの採取記録を探し、示された対象の権限を調べましょう。', 'ls -a と ls -l で疑似ホーム内を調べ、ログのパスと対応づけます。ディレクトリは700、ファイルは600、ホームは go-w です。')
 
 
 # ================================================================ 11 -vvv ログ
@@ -622,7 +622,7 @@ def c11(ctx):
 SOL11 = """echo '{"cause": "<<cause>>", "evidence": "<<evidence>>"}' > diagnosis.json"""
 mission(11, 'ssh -v/-vvvのログを読んでPermission denied (publickey)の原因を切り分ける',
         '"Permission denied (publickey)" だけでは原因が分かりません。ssh -v（詳細度は -vv、-vvv の順に増える）のログで、鍵が提示されたか、サーバーが拒否したか、そもそも読み込めなかったかを追います。',
-        ['ssh_vvv.log から原因を判定', 'diagnosis.json に cause と evidence を保存'], s11, c11, SOL11,
+        ['SSHの詳細ログを見つけて原因を判定', 'diagnosis.json に cause と evidence を保存'], s11, c11, SOL11,
         ['echo \'{"cause": "key_not_authorized", "evidence": "none"}\' > diagnosis.json', 'echo \'{"cause": "too_many_auth_failures", "evidence": "1"}\' > diagnosis.json'],
         '"Offering public key" の後に type 51（SSH_MSG_USERAUTH_FAILURE）が返れば、鍵は提示されたがサーバーの authorized_keys にありません。"no such identity" は IdentityFile の指定違い、"UNPROTECTED PRIVATE KEY FILE" は権限、"Too many authentication failures" はエージェントの鍵を順に出しすぎた場合で IdentitiesOnly yes と -i で解決します。サーバー側は sshd の auth.log（journalctl -u ssh）も合わせて見ます。',
         '提示（Offering）→拒否（receive packet: type 51）という流れの有無を見ます。', 'ログに出る Offering/no such identity/Permissions/Too many の行で場合分けします。')
@@ -792,11 +792,11 @@ def c16(ctx):
 SOL16 = """echo "ssh-keyscan -t ed25519 -p <<port>> <<host>>" > cmd.txt
 grep -v '^#' scan.txt | grep ' ssh-ed25519 ' > known_hosts_new"""
 mission(16, 'ssh-keyscanでホスト鍵を取得しknown_hostsを作る',
-        '初回接続の "authenticity of host can\'t be established" を安全に処理するため、事前にホスト鍵を取得して known_hosts に入れておきます。ssh-keyscan は接続せずに公開されているホスト鍵を取得します。ただし中間者の可能性があるので、取得結果は別の経路で得たフィンガープリントと照合します。',
-        ['ssh-keyscan の取得コマンド', 'scan.txt から ed25519 だけを抽出'], s16, c16, SOL16,
+        '初回接続の "authenticity of host can\'t be established" に備え、必要な種類のホスト鍵だけを集める復習です。取得できた鍵でも、中間者の可能性は残ります。以前学んだ接続相手の確認を行ってから、信頼する鍵として登録する運用にしてください。',
+        ['ssh-keyscan の取得コマンド', '採取済みのホスト鍵から ed25519 だけを抽出'], s16, c16, SOL16,
         ["echo \"ssh-keyscan <<host>>\" > cmd.txt\ncp scan.txt known_hosts_new", "echo \"ssh-keyscan -p <<port>> <<host>>\" > cmd.txt\ngrep ssh scan.txt > known_hosts_new"],
         'ssh-keyscan -t 種類 -p ポート ホスト でホスト鍵を取得します。-H を付けるとホスト名をハッシュ化できます。標準ポート以外は known_hosts に [ホスト]:ポート の形式で記録されます。出力のコメント行（#）と他の鍵種別を除き、ssh-keygen -l -f で得たフィンガープリントを公式の値と照合してから追記します。盲目的に >> ~/.ssh/known_hosts するとTOFUの保護が失われます。',
-        '取得は -t と -p、整形は grep です。', 'grep -v "^#" scan.txt | grep " ssh-ed25519 " で抽出します。')
+        '取得結果から、コメントと不要な種類の鍵を除きます。登録前の指紋照合も忘れないでください。', 'ssh-keyscan は種類を -t、ポートを -p で指定します。ls と cat で採取記録を見つけ、grep -v "^#" と grep " ssh-ed25519 " をつないで抽出します。')
 
 
 # ================================================================ 17 Windows/WSL
@@ -904,7 +904,7 @@ ssh -o PreferredAuthentications=publickey -o PasswordAuthentication=no deploy@se
 EOF"""
 mission(18, 'パスワード認証オフ移行の安全手順とsshd -tによる設定検証',
         'サーバーの SSH をパスワード認証から鍵認証へ移行します。設定を間違えて自分が締め出されないよう、sshd -t で検証し、reload し、別端末で確認する手順を守ります。クラウドの drop-in（sshd_config.d）が先に読まれて設定が効かない罠にも注意してください。',
-        ['sshd_t_output.txt のエラーとタイポを修正', '実効値を鍵認証のみにする', 'procedure.txt に安全な手順を記録'], s18, c18, SOL18,
+        ['sshd -tの採取記録からエラーとタイポを見つけて修正', '実効値を鍵認証のみにする', 'procedure.txt に安全な手順を記録'], s18, c18, SOL18,
         ["sed -i 's/^PasswordAuthentication yes/PasswordAuthentication no/' sshd_config", "sed -i 's/PubkeyAuthenticaton/PubkeyAuthentication/' sshd_config\nprintf 'systemctl restart ssh\\n' > procedure.txt"],
         'sshd_config は最初に得た値が優先で、Include を先頭に書くと sshd_config.d の 50-cloud-init.conf などが勝ちます。sshd -t は構文だけを検証し、-T で実効値を表示できます。手順は、設定バックアップ → sshd -t → systemctl reload（restartより接続を切らない）→ 既存セッションを閉じずに別端末から PreferredAuthentications=publickey で鍵ログイン確認 → 完了、の順です。失敗しても元のセッションが生きているので戻せます。',
         '実効値と設定の読み込み順を確認しましょう。', 'sed でタイポと値を直し、Include を末尾へ移します。procedure.txt に4行書きます。')
@@ -1140,7 +1140,7 @@ def s24(ctx):
     put(ctx, 'vim_warning.txt', f'$ vim app.conf\nE325: ATTENTION\nFound a swap file by the name ".app.conf.swp"\n          owned by: trainee   dated: Sat Nov 21 10:02:11 2026\n         file name: ~trainee/app.conf\n          modified: YES\n         user name: trainee   host name: web01\n        process ID: {pid}' + (' (STILL RUNNING)' if run else '') + '\nWhile opening file "app.conf"\n')
     act = 'read_only' if run else 'recover'
     ctx.data['act'] = act
-    ctx.write('requirements.txt', 'vim_warning.txt を読んで、(1) decision.json に {"pid": 該当PID, "still_running": true/false, "action": "read_only" か "recover"} を書く（プロセスが生きていれば他の人が編集中なので上書きしない）。(2) steps.txt に、実行する手順を1行ずつ書く。read_only なら読み取り専用で開く1行（vim -R）。recover なら、まず元ファイルを cp -p で app.conf.bak に控え、vim -r で復旧し、diff -u app.conf.bak app.conf で差分を確認、問題なければ不要になったスワップ .app.conf.swp を rm する。\n')
+    ctx.write('requirements.txt', 'Vimの警告の採取記録を見つけて読んで、(1) decision.json に {"pid": 該当PID, "still_running": true/false, "action": "read_only" か "recover"} を書く（プロセスが生きていれば他の人が編集中なので上書きしない）。(2) steps.txt に、実行する手順を1行ずつ書く。read_only なら警告に示された元ファイルを読み取り専用で開く1行（vim -R）。recover なら、まず元ファイルを cp -p で app.conf.bak に控え、vim -r で復旧し、diff -u で控えと復旧結果の差分を確認、問題なければ警告に示された不要なスワップを rm する。\n')
 
 
 def c24(ctx):

@@ -60,7 +60,7 @@ def add(n, title, story, files, expected, objectives, thinking, tools, explanati
             extra_check(ctx)
     sol = solution(expected, extra_solution)
     register(id=f"12-{n}", stage=S, title=title, story=story + "\n\n" + NOTICE,
-             objectives=objectives + ["case.jsonのcaseを含むdiagnosis.jsonを作り、元の観測資料は維持する"],
+             objectives=objectives + ["ケース資料のcaseを含むdiagnosis.jsonを作り、元の観測資料は維持する"],
              hints=[thinking, tools, "資料の数値・対象・時刻を区別してJSONに記録します。具体例はanswerで確認できます。"],
              answer=sol, explanation=explanation,
              tip="平均値だけで結論を決めず、観測期間と別の指標を照合します。VM実習では実測と変更後の確認も行います。",
@@ -73,7 +73,7 @@ add(1, "CPU待ちとI/O待ちを分ける", "2台の観測記録から、どち�
      "io-vmstat.txt": "# 2 vCPU; vmstat 1 3\nr b swpd free buff cache si so bi bo in cs us sy id wa st\n1 0 0 900000 30000 400000 0 0 3 2 80 160 10 2 88 0 0\n1 5 0 900000 30000 400000 0 0 25000 10000 800 1800 5 4 20 71 0\n1 6 0 900000 30000 400000 0 0 27000 11000 900 1900 4 5 19 72 0\n",
      "requirements.txt": "diagnosis.json: cpu_host/io_hostをcpu-saturation・io-wait-suspectedから選ぶ。cpu_evidenceは[r,us,id]または[b,wa]、io_evidenceも同じ候補から選ぶ。first_sampleはsince-boot-averageまたはinstantaneous。next_checkはper-device-latencyまたはkill-all-workers。\n"},
     {"cpu_host": "cpu-saturation", "io_host": "io-wait-suspected", "cpu_evidence": ["r", "us", "id"], "io_evidence": ["b", "wa"], "first_sample": "since-boot-average", "next_check": "per-device-latency"},
-    ["cpu-vmstat.txtとio-vmstat.txtを比較し、CPUとI/O待ちを区別する", "requirements.txtのJSON項目を記録する"],
+    ["CPU負荷時とI/O負荷時のvmstat記録を比較し、CPUとI/O待ちを区別する", "要件書のJSON項目を記録する"],
     "r・bと、CPU時間の内訳を組み合わせます。起動以来の平均を現在値と取り違えないでください。", "catやcolumnで資料を読み、us・id・waと待機列を比較します。",
     "rがvCPU数より継続的に多く、usが高くidが小さい記録はCPU飽和を示唆します。bとwaの高い記録ではI/Oを追加調査します。wa単独では故障デバイスや根本原因を断定できません。参考: https://man7.org/linux/man-pages/man8/vmstat.8.html")
 
@@ -106,7 +106,7 @@ add(4, "straceから設定の参照先を追う", "プロセスは起動直後�
      "work/worker.conf": "input=/srv/data/job.csv\nworkers=2\n",
      "requirements.txt": "diagnosis.json: syscall/errnoを記録から読む。causeはwrong-config-pathまたはunix-permissions。corrected_pathはinventory.txtから選ぶ。work/worker.confのinputだけを修正する。\n"},
     {"syscall": "openat", "errno": "ENOENT", "cause": "wrong-config-path", "corrected_path": "/srv/data/jobs.csv"},
-    ["失敗した呼び出し・エラー名・正しいパスを記録する", "work/worker.confを修正しworkers=2は維持する"],
+    ["失敗した呼び出し・エラー名・正しいパスを記録する", "ワーカーの設定控えを修正しworkers=2は維持する"],
     "ENOENTとEACCESは別の原因です。設定と存在するファイル名を比較します。", "保存済みstraceのopenat行を読み、sedなどで設定の誤字だけを修正します。",
     "この記録はENOENTなので、chmod 777を試す根拠にはなりません。実測では対象プロセスと機密情報の扱いに注意してstraceを使い、修正後に正常動作も再確認します。", check_config,
     "sed -i 's@/srv/data/job.csv@/srv/data/jobs.csv@' work/worker.conf",
@@ -142,7 +142,7 @@ add(6, "監視の通知とログ保存を設計する", "一瞬の値で通知�
     {"policy.txt": "disk used >=85% が3回連続したらon-callへ通知し、80%未満で解除。ログはdaily、7世代、圧縮、空/欠損は無視、新規0640 dojo-app:adm。\n",
      "requirements.txt": "diagnosis: alert=duration-with-hysteresis, log_retention=daily-seven-generations。work/alerts.jsonとwork/logrotate.confを作成。設定の保存判定であり実際の通知やlogrotate実行はVM側で別途確認。\n"},
     {"alert": "duration-with-hysteresis", "log_retention": "daily-seven-generations"},
-    ["policy.txtに沿って監視条件とログ保存設定を作成する", "設定の保存と実際の通知・ローテーションの確認を区別する"],
+    ["承認済みの方針資料に沿って監視条件とログ保存設定を作成する", "設定の保存と実際の通知・ローテーションの確認を区別する"],
     "警告になる条件と解除する条件を同じ値にすると通知が揺れやすくなります。", "JSONに閾値と連続回数を記録し、ログの保存世代と新規作成時の権限を記述します。",
     "監視は閾値だけでなく継続時間・通知先・解除の設計が必要です。この課題は設定作成までで、実環境のlogrotateや通知を実行した証明ではありません。", check_monitor,
     r"""mkdir -p work

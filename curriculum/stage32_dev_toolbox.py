@@ -1040,7 +1040,7 @@ def s21(ctx):
     br = secrets.choice([48, 64, 96])
     w = secrets.choice([640, 800, 1024])
     ctx.data.update(br=br, w=w)
-    rtxt(ctx, f'convert.txt に3行（実行はしない）。(1) pandoc で report.md を単独文書（-s）・目次つき（--toc）で report.docx に変換。(2) ffmpeg で *.wav を for ループで1つずつ、Opus（-c:a libopus）{br}k（-b:a {br}k）の「元の名前.opus」へ変換（ファイル名は ${{f%.wav}}）。(3) imagemagick（magick。旧版は convert）で *.png を for ループで幅{w}（-resize {w}x）にして thumbs/ に「元の名前.jpg」で出力。')
+    rtxt(ctx, f'convert.txt に3行を書く（実行はしない）。(1) report.md を単独文書・目次つきで report.docx に変換。(2) すべての .wav を Opus（libopus）{br}k で、元と同じ名前に .opus を付けて変換。(3) すべての .png を幅{w}に縮小し、thumbs/ に元と同じ名前で .jpg として出力。元ファイルは上書きしない。')
 
 
 def c21(ctx):
@@ -1054,7 +1054,7 @@ def c21(ctx):
 
 
 mission(21, 'pandoc・ffmpeg・imagemagickで一括変換の命令を設計する',
-        '文書は pandoc、音声動画は ffmpeg、画像は ImageMagick（magick、旧名 convert）が定番です。一括変換は「for で1ファイルずつ・出力名を ${f%.拡張子} で作る」形にし、元ファイルを上書きしない設計が基本です。',
+        '文書は pandoc、音声動画は ffmpeg、画像は ImageMagick（magick、旧名 convert）が定番です。指定された入出力名と形式を守り、元ファイルを上書きしない一括変換の命令を設計します。',
         ['convert.txt に3行'], s21, c21,
         """cat > convert.txt <<'EOF'
 pandoc -s --toc report.md -o report.docx

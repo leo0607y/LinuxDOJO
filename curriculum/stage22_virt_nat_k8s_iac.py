@@ -337,7 +337,7 @@ def c1(ctx):
 
 
 mission(1, 'virsh define/start/listでdomain XMLからVMを複製する',
-        'KVM/libvirtのVMはdomain XMLで定義されます。dom.xmlは既存VMのdomain XMLです。これを元に別名のVMを作るnew.xmlを作り、virsh define・virsh start・virsh list の手順をcmds.txtに書いてください。uuidとMACが重複するとlibvirtが拒否します。',
+        'KVM/libvirtのVMはdomain XMLで定義されます。作業フォルダにある既存VMのdomain XMLを見つけ、それを元に別名のVMを作るnew.xmlを作り、virsh define・virsh start・virsh list の手順をcmds.txtに書いてください。uuidとMACが重複するとlibvirtが拒否します。',
         ['new.xmlを要件どおりに作る', 'cmds.txtにvirshの3手順を書く'], s1, c1,
         """sed -e 's#<<base>>#<<new>>#g' -e '/<uuid>/d' -e '/<mac /d' -e 's#>2097152</#><<memkib>></#' -e 's#>2</vcpu>#><<cpu>></vcpu>#' dom.xml > new.xml
 printf '%s\\n' 'virsh define new.xml' 'virsh start <<new>>' 'virsh list --all' > cmds.txt""",
@@ -435,7 +435,7 @@ def c3(ctx):
 
 
 mission(3, 'qemu-imgでqcow2のスナップショット・resize・差分を扱う',
-        'KVMのディスクイメージにはqcow2形式が使われ、qemu-imgで調べ、スナップショットを取り、resizeで容量を増やし、裏打ちファイルを使った差分イメージも作れます。info.txtのqemu-img info出力を読んでanswer.jsonにまとめ、実行予定のコマンドをcmds.txtに書いてください。',
+        'KVMのディスクイメージにはqcow2形式が使われ、qemu-imgで調べ、スナップショットを取り、resizeで容量を増やし、裏打ちファイルを使った差分イメージも作れます。採取済みのqemu-img info出力を見つけて読み、answer.jsonにまとめ、実行予定のコマンドをcmds.txtに書いてください。',
         ['answer.jsonに情報を書く', 'cmds.txtにスナップショット・resize・差分作成を書く'], s3, c3,
         """printf '{"format":"qcow2","virtual_gib":<<virt>>,"backing_file":"base-os.qcow2","snapshots":<<tagjson>>}\\n' > answer.json
 printf '%s\\n' 'qemu-img snapshot -c <<new>> guest.qcow2' 'qemu-img resize guest.qcow2 +<<grow>>G' 'qemu-img create -f qcow2 -b guest.qcow2 -F qcow2 overlay.qcow2' > cmds.txt""",
@@ -538,7 +538,7 @@ def c5(ctx):
 
 
 mission(5, 'iptablesのMASQUERADE/DNATとnet.ipv4.ip_forwardを設定する',
-        '社内LANの出口ルーターでNATを設定します。出ていく通信はMASQUERADE、公開ポートへの着信はDNATで内側のサーバへ転送します。カーネルが転送を許可する net.ipv4.ip_forward も必要です。current.txtの症状を読み、実行予定のiptablesとsysctlをnat.shに書き、永続化の設定ファイルも作ってください。',
+        '社内LANの出口ルーターでNATを設定します。出ていく通信はMASQUERADE、公開ポートへの着信はDNATで内側のサーバへ転送します。カーネルが転送を許可する net.ipv4.ip_forward も必要です。現状の症状を記した資料を読み、実行予定のiptablesとsysctlをnat.shに書き、永続化の設定ファイルも作ってください。',
         ['nat.shにMASQUERADE・DNAT・FORWARD許可・sysctlを書く', '99-forward.confで永続化'], s5, c5,
         """cat > nat.sh <<'EOF'
 sysctl -w net.ipv4.ip_forward=1
@@ -645,7 +645,7 @@ def c7(ctx):
 
 
 mission(7, 'iptablesルールをnftablesへ書き換える',
-        '新しいサーバではiptablesではなくnftが標準です。rules.v4（iptables-save形式）を読み、同じ意味のnftルールセットを書いてください。iptables-translateのような変換ツールが使えても、出力は必ず自分で読み直します。適用はせず、nft -c で検査します。',
+        '新しいサーバではiptablesではなくnftが標準です。iptables-save形式で保存された既存ルールを見つけて読み、同じ意味のnftルールセットを書いてください。iptables-translateのような変換ツールが使えても、出力は必ず自分で読み直します。適用はせず、nft -c で検査します。',
         ['nft.nftを書く', '検査コマンドをcmd.txtへ'], s7, c7,
         """cat > nft.nft <<'EOF'
 table inet filter {
@@ -949,7 +949,7 @@ def c12(ctx):
 
 
 mission(12, 'Helmのvaluesで環境差分を上書きしupgradeを組み立てる',
-        'Helmはチャート（テンプレート＋既定のvalues.yaml）に、環境ごとのvaluesを重ねて、Kubernetesへ配布します。chart/values.yamlとテンプレートを読み、本番用のvalues-prod.yamlと、安全な helm upgrade --install の手順を書いてください。',
+        'Helmはチャート（テンプレート＋既定のvalues.yaml）に、環境ごとのvaluesを重ねて、Kubernetesへ配布します。チャートを見つけて既定のvaluesとテンプレートを読み、本番用のvalues-prod.yamlと、安全な helm upgrade --install の手順を書いてください。',
         ['values-prod.yamlを作る', 'helm.txtに3手順を書く'], s12, c12,
         """cat > values-prod.yaml <<'EOF'
 replicaCount: <<rep>>
@@ -1247,7 +1247,7 @@ def c16(ctx):
 
 
 mission(16, 'GitHub ActionsのCI/CDを読み、秘密情報を安全に扱う',
-        'CI/CDパイプラインはリポジトリに置いたGitHub ActionsのYAMLで定義します。ci.orig.ymlには、秘密情報の直書き、フォークから実行されうるトリガー、バージョン固定のないactionがあります。リスクを読み取り、安全な修正版を書いてください。',
+        'CI/CDパイプラインはリポジトリに置いたGitHub ActionsのYAMLで定義します。既存のCI定義には、秘密情報の直書き、フォークから実行されうるトリガー、バージョン固定のないactionがあります。リスクを読み取り、安全な修正版を書いてください。',
         ['findings.jsonにリスクをまとめる', 'ci.ymlを修正する'], s16, c16,
         """printf '{"hardcoded_token_line":<<tokline>>,"unpinned":["actions/checkout@main","actions/checkout@master"],"risky_trigger":"pull_request_target"}\\n' > findings.json
 cat > ci.yml <<'EOF'

@@ -75,7 +75,7 @@ def c1(ctx):
 
 
 mission(1, 'nmcliプロファイルとresolvectlの食い違い', 'resolvectlが示すDNSサーバーが、接続プロファイルの意図と違います。',
-        ['resolvectl.txtとプロファイルの dns= を読む', 'ens3.nmconnection を最小限だけ修正', 'diagnosis.json に原因を記録'], s1, c1,
+        ['DNS状態の採取記録とプロファイルの dns= を読む', '対象接続のプロファイル控えを最小限だけ修正', 'diagnosis.json に原因を記録'], s1, c1,
         """sed -i 's/^dns=.*/dns=<<good>>;/' ens3.nmconnection
 echo '{"cause":"wrong-dns-server","current":"<<bad>>","expected":"<<good>>"}' > diagnosis.json""",
         ["sed -i 's/^method=.*/method=auto/' ens3.nmconnection", "echo '{\"cause\":\"wrong-dns-server\"}' > diagnosis.json",
@@ -105,7 +105,7 @@ def c2(ctx):
 
 
 mission(2, 'nftablesルールを最小公開へ直す', 'DB(3306)やRedis(6379)まで全世界へ開いているルールセット案が見つかりました。',
-        ['ruleset.nftの公開範囲を読み取る', 'ruleset.fixed.nftを最小公開で作る', 'exposedポートを記録'], s2, c2,
+        ['元のルールセットの公開範囲を読み取る', 'ruleset.fixed.nftを最小公開で作る', 'exposedポートを記録'], s2, c2,
         """cat > ruleset.fixed.nft <<'EOF'
 table inet filter {
   chain input {
@@ -148,7 +148,7 @@ def c3(ctx):
 
 
 mission(3, 'bond・VLANの設定とリンクduplex不一致', 'LACPのスイッチに対し、サーバー側のbondやVLAN idが合わず、片方のNICは100Mb/Halfで動いています。',
-        ['network.confをswitch.txtと突き合わせて修正', 'ethtool記録からduplex不一致を特定', 'fix.shとdiagnosis.jsonを作る'], s3, c3,
+        ['ネットワーク設定控えをスイッチの仕様と突き合わせて修正', 'ethtool記録からduplex不一致を特定', 'fix.shとdiagnosis.jsonを作る'], s3, c3,
         """sed -i 's/mode=active-backup/mode=802.3ad/; s/id=[0-9]*/id=<<vlan>>/' network.conf
 echo 'ethtool -s <<nic>> autoneg on' > fix.sh
 echo '{"cause":"duplex-mismatch","nic":"<<nic>>","vlan_id":<<vlan>>,"bond_mode":"802.3ad"}' > diagnosis.json""",
@@ -177,7 +177,7 @@ def c4(ctx):
 
 
 mission(4, 'tcの帯域制御：mbpsとmbitの罠', '帯域を絞ったはずが、実測が想定の8倍になっています。tcの出力を読み解きましょう。',
-        ['tc-show.txtの実効レートを読む', 'shape.shの単位を直す', '診断をdiagnosis.jsonへ'], s4, c4,
+        ['tcの採取記録の実効レートを読む', '帯域制御スクリプトの単位を直す', '診断をdiagnosis.jsonへ'], s4, c4,
         """sed -i 's/mbps/mbit/' shape.sh
 echo '{"cause":"mbps-is-bytes","configured_mbit":<<r8>>,"wanted_mbit":<<r>>}' > diagnosis.json""",
         ["sed -i 's/<<r>>mbps/<<r8>>mbit/' shape.sh; echo '{}' > diagnosis.json",
@@ -260,7 +260,7 @@ def c6(ctx):
 
 
 mission(6, 'chrony：時刻同期が取れない原因', 'ログの時刻がずれ、TLS検証や認証が失敗します。timedatectlとchronyc trackingの記録を読み解きましょう。',
-        ['timedatectl.txtとtracking.txtを読む', 'chrony.confを修正', 'ずれを記録'], s6, c6,
+        ['時刻同期状態とchronyの採取記録を読む', 'chrony.confを修正', 'ずれを記録'], s6, c6,
         """printf 'server <<ntp>> iburst\\ndriftfile /var/lib/chrony/drift\\nmakestep 1.0 3\\n' > chrony.conf
 echo '{"cause":"not-synchronized","offset_seconds":<<off>>}' > diagnosis.json""",
         ["sed -i 's/^pool.*/server <<ntp>> iburst/' chrony.conf; echo '{}' > diagnosis.json",

@@ -3,18 +3,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   HISTORY_KEY, STORAGE_KEY, buildCourses, createClient, createHistory, feedbackFor, filterItems,
-  firstOpenIndex, lastLine, loadSavedState, pad2, safeStorage, saveState
+  firstOpenIndex, lastLine, loadSavedState, pad2, reviewItems, safeStorage, saveState
 } from '../lib/core.js';
 
 import Masthead from './Masthead.jsx';
 import { applyTheme, readPrefs, savePrefs } from './preferences.js';
 
 const MAX_ENTRIES = 200;
-const LOCAL_COMMANDS = ['help', 'hint', 'answer', 'next', 'prev', 'menu', 'modes', 'progress', 'goto', 'theme', 'simple', 'completion', 'clear', 'data', 'course', 'reset', 'check'];
+const LOCAL_COMMANDS = ['help', 'hint', 'answer', 'review', 'next', 'prev', 'menu', 'modes', 'progress', 'goto', 'theme', 'simple', 'completion', 'clear', 'data', 'course', 'reset', 'check'];
 const HELP_TEXT = [
   'help           このヘルプ',
   'hint           ヒントを1つ (何度でも可。減点なし)',
-  'answer         入力例を表示',
+  'answer         入力例を表示し、復習対象に追加',
+  'review [N]     答えを見た問題の一覧 / N 番を初期状態から解き直す',
   'next / prev    次 / 前のレッスン (next は達成後)',
   'menu [語]      レッスンの一覧。番号を入力すると開く',
   'modes          コースの一覧。番号を入力すると開く',
@@ -93,6 +94,7 @@ export default function Dojo() {
   const courses = useMemo(() => (catalog ? buildCourses(catalog, progress) : []), [catalog, progress]);
   const course = courses.find((c) => c.id === viewMode) || courses[0];
   const totalDone = courses.reduce((n, c) => n + c.done, 0);
+  const reviews = useMemo(() => catalog ? reviewItems(catalog, progress) : [], [catalog, progress]);
 
   const addEntry = useCallback((prompt, command, output, kind) => {
     setEntries((all) => all.concat([{ id: ++entrySeq, prompt, command, output, kind }]).slice(-MAX_ENTRIES));
@@ -135,6 +137,14 @@ export default function Dojo() {
       addEntry('', null, '[NG] ' + friendly(error), '');
     }
   }, [call, applyView]);
+
+  const selectReview = async (item) => {
+    try {
+      const v = await call({ type: 'review', mode: item.mode, lessonId: item.id });
+      setEntries([{ id: ++entrySeq, prompt: '', command: null, output: '復習を開始します。ヒント・答えを使わず達成すると復習対象から外れます。' }]);
+      applyView(v);
+    } catch (error) { say('NG', friendly(error)); }
+  };
 
   /* 起動: 実行環境の読み込み → 保存データの復元 → 最初のレッスン */
   useEffect(() => {
@@ -205,7 +215,11 @@ export default function Dojo() {
     if (pending && /^\d+$/.test(text)) {
       echo();
       const n = parseInt(text, 10);
-      if (pending.kind === 'mode') {
+      if (pending.kind === 'review') {
+        const item = pending.items[n - 1];
+        if (!item) { say('NG', '1 から ' + pending.items.length + ' の番号を入力します。'); return true; }
+        await selectReview(item);
+      } else if (pending.kind === 'mode') {
         const c = courses[n - 1];
         if (!c) { say('NG', '1 から ' + courses.length + ' の番号を入力します。'); return true; }
         await selectLesson(c.id, firstOpenIndex(c));
@@ -253,6 +267,17 @@ export default function Dojo() {
         echo();
         addEntry('', null, courses.map((c) => bar(c.total ? c.done / c.total : 0, 20) + ' ' + String(c.done).padStart(3) + '/' + String(c.total).padEnd(3) + ' ' + c.name).join('\n') + '\n合計 ' + totalDone + ' 達成 (このブラウザーに保存)', '');
         return true;
+      }
+      case 'review': {
+        echo();
+        if (!reviews.length) { say('INFO', '復習対象はありません。answer で答えを見た問題がここに残ります。'); return true; }
+        if (args.length) {
+          const n = /^\d+$/.test(args[0]) ? Number(args[0]) : 0;
+          if (args.length !== 1 || !reviews[n - 1]) { say('NG', 'review 1 のように、1 から ' + reviews.length + ' の番号を指定します。'); return true; }
+          await selectReview(reviews[n - 1]); return true;
+        }
+        addEntry('', null, '復習対象 (' + reviews.length + '問)\n' + reviews.map((item, i) => pad2(i + 1) + '  ' + item.course + ' / ' + item.title).join('\n') + '\n番号を入力すると初期状態から解き直せます。ヒント・答えなしで達成すると対象から外れます。', '');
+        pendingRef.current = { kind: 'review', items: reviews }; return true;
       }
       case 'menu': case 'lessons': {
         echo();

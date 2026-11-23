@@ -90,7 +90,7 @@ def c1(ctx):
 
 SOL1 = 'for t in md5sum sha1sum b2sum cksum; do echo "$t $($t payload.bin | cut -d\' \' -f1)"; done > digests.txt'
 mission(1, 'md5sum・sha1sum・b2sum・cksumの出力を並べる',
-        '配布物のpayload.binについて、古い互換用のmd5sumとsha1sum、現代的で高速なb2sum、誤り検出専用のcksumの値を一覧にします。ツールごとに出力の桁数と用途が違うことを確かめましょう。',
+        '用意されたバイナリの配布物について、古い互換用のmd5sumとsha1sum、現代的で高速なb2sum、誤り検出専用のcksumの値を一覧にします。ツールごとに出力の桁数と用途が違うことを確かめましょう。',
         ['4つのツールで同じファイルの値を得る', 'digests.txtに順番通り書く'], s1, c1, SOL1,
         ["for t in sha256sum sha256sum sha256sum sha256sum; do echo \"$t $($t payload.bin | cut -d' ' -f1)\"; done > digests.txt",
          "md5sum payload.bin > digests.txt"],
@@ -124,7 +124,7 @@ def c2(ctx):
 
 SOL2 = 'LC_ALL=C sha256sum -c SHA256SUMS 2>/dev/null | grep FAILED | cut -d: -f1 | sort > tampered.txt'
 mission(2, 'sha256sum -cでダウンロードを検証して改ざんを見つける',
-        'ミラーから取得した4つのパッケージとSHA256SUMSがあります。sha256sum -c（sha512sum --checkのsha*sum --check系も同じ使い方）で照合し、改ざんされたものを特定してください。',
+        'ミラーから取得した4つのパッケージと検証用のハッシュ一覧があります。以前学んだ整合性の確認方法を使い、改ざんされたものを特定してください。',
         ['sha256sum -cで照合する', '失敗したファイル名をtampered.txtへ'], s2, c2, SOL2,
         ["sha256sum pkg-* > tampered.txt", "ls pkg-* > tampered.txt"],
         'sha*sum --checkは一覧のハッシュと実ファイルを再計算して比較し、OKかFAILEDを出します。ハッシュの一覧自体が改ざんされないよう、別経路や署名で入手することが前提です。--quietは失敗だけ、--statusは終了コードだけにします。',
@@ -154,8 +154,8 @@ def c3(ctx):
 
 SOL3 = 'for n in 224 384 512; do sha${n}sum dist/* > m$n.sum; done\nsha384sum --check m384.sum'
 mission(3, 'sha224sum・sha384sum・sha512sumで検証用マニフェストを作る',
-        '配布先ごとに要求されるハッシュ長が違います。sha224sum、sha384sum、sha512sumで同じdistを対象にマニフェストを作り、--checkで自己検証します。',
-        ['3種のマニフェストを作る', '--checkが成功する'], s3, c3, SOL3,
+        '配布先ごとに要求されるハッシュ長が違います。配布物が置かれたディレクトリを探し、sha224sum、sha384sum、sha512sumで同じ内容のマニフェストを m224.sum・m384.sum・m512.sum として作り、--checkで自己検証します。',
+        ['3種のマニフェスト m224.sum・m384.sum・m512.sum を作る', '--checkが成功する'], s3, c3, SOL3,
         ["for n in 224 384 512; do sha256sum dist/* > m$n.sum; done", "sha512sum dist/* > m224.sum; sha512sum dist/* > m384.sum; sha512sum dist/* > m512.sum"],
         'SHA-2は出力長が違うだけの兄弟で、sha224sumからsha512sumまで同じ作法です。マニフェストの行はハッシュ種別と一致している必要があり、検証には同じ種類のsha*sum --checkを使います。長いほど衝突に強い一方で、署名や規格が種類を指定する場合はそれに従います。',
         '種類によってコマンド名だけが変わります。', 'ループとシェル展開でコマンド名を組み立てます。')
@@ -185,7 +185,7 @@ def c4(ctx):
 
 SOL4 = 'base32 secret.txt > token.b32\nbasenc --base64url secret.txt > token.b64u\nbase32 -d incoming.b32 > message.txt'
 mission(4, 'base32・basencで符号化と復号をする',
-        '設定の値を人が手入力するためにbase32、URLに載せるためにbasenc --base64urlで符号化します。受信したincoming.b32はbase32 -dで戻します。',
+        '設定の値を人が手入力するためにbase32、URLに載せるためにbasenc --base64urlで符号化します。受信したbase32形式のデータはbase32 -dで戻します。',
         ['2形式で符号化', '受信データを復号'], s4, c4, SOL4,
         ['base64 secret.txt > token.b32\nbase64 secret.txt > token.b64u\nbase64 -d incoming.b32 > message.txt',
          'base32 secret.txt > token.b32\nbase32 secret.txt > token.b64u\nbase32 -d incoming.b32 > message.txt'],
@@ -218,7 +218,7 @@ def c5(ctx):
 
 SOL5 = "csplit -z -f part- -b '%02d.txt' report.txt '/^=== /' '{*}' > /dev/null\nptx -i ignore.txt notes.txt > index.txt"
 mission(5, 'csplitでレポートを分割しptxで用語索引を作る',
-        '複数ホストの結果を連結したreport.txtを見出しごとにcsplitで切り出し、メモnotes.txtはptxで用語の文脈付き索引(KWIC)にします。',
+        '複数ホストの結果を連結したレポートを、以前学んだ方法で見出しごとに切り出してください。今回はさらに ptx を使います。ptx はメモから用語の前後関係を並べた文脈付き索引(KWIC)を作る道具です。',
         ['csplitで見出しごとに分割', 'ptxの索引を作る'], s5, c5, SOL5,
         ["split -l 3 report.txt part-\nptx notes.txt > index.txt", "csplit report.txt '/^=== /' '{*}' > /dev/null\nptx -i ignore.txt notes.txt > index.txt"],
         'csplitは正規表現や行番号で区切ります。{*}で繰り返し、-zは空の断片を捨て、-fと-bで名前を整えます。splitは行数やバイト数で機械的に切る違いがあります。ptxは各語を中央に並べた索引を作り、-iで無視語（the, a など）を除きます。',

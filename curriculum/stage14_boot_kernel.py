@@ -77,7 +77,7 @@ def c1(ctx):
 
 mission(1, 'GRUBの設定とカーネル引数の追加',
         'チケットのカーネル引数を次回起動から有効にします。/etc/default/grub相当の元設定を直し、grub.cfgを再生成します。',
-        ['default_grubのGRUB_CMDLINE_LINUX_DEFAULTへ引数を追加する', './mkconfig.shでgrub.cfgを再生成する'], s1, c1,
+        ['GRUBの元設定のGRUB_CMDLINE_LINUX_DEFAULTへ引数を追加する', '教材の設定生成スクリプトでgrub.cfgを再生成する'], s1, c1,
         """P=$(grep -o 'dojo.tag=[0-9a-f]*' ticket.txt)
 sed -i "s/^\\(GRUB_CMDLINE_LINUX_DEFAULT=\\"[^\\"]*\\)\\"/\\1 $P\\"/" default_grub
 ./mkconfig.sh""",
@@ -155,7 +155,7 @@ def c3(ctx):
 
 
 mission(3, 'emergencyモードでfstabとパスワードを直す', 'emergencyモードで起動しました。fstabの誤記とロックされたrootを修復します。',
-        ['blkid.txtから正しいUUIDを取りfstabを直す', 'shadowのrootへ新しいハッシュを設定する'], s3, c3,
+        ['blkidの採取記録から正しいUUIDを取りfstabを直す', 'shadowのrootへ新しいハッシュを設定する'], s3, c3,
         """U=$(awk '/LABEL="data"/{for(i=1;i<=NF;i++) if($i ~ /^UUID=/){gsub(/UUID=|"/,"",$i); print $i}}' blkid.txt)
 sed -i "s|^UUID=[^ ]* /data|UUID=$U /data|" fstab
 PW=$(sed -n 's/^password: //p' ticket.txt)
@@ -234,7 +234,7 @@ def c5(ctx):
 
 
 mission(5, 'sysctlの恒久設定と一時設定', 'sysctl -wで調整した値は再起動で戻ります。必要なものだけを恒久設定へ移します。',
-        ['runtime.txtの現在値を確認する', 'sysctl.confへ対象項目だけを重複なしで反映する'], s5, c5,
+        ['一時設定値の記録の現在値を確認する', 'sysctl.confへ対象項目だけを重複なしで反映する'], s5, c5,
         """for k in $(sed -n 's/^.*維持したい: //p' ticket.txt | tr -d ',' ); do
   sed -i "/^$k[ =]/d" sysctl.conf
   grep "^$k " runtime.txt >> sysctl.conf
@@ -404,7 +404,7 @@ def c10(ctx):
 
 
 mission(10, 'initramfsの起動失敗を診断する', '起動中に(initramfs)プロンプトへ落ちました。ログと情報から原因を特定し修正します。',
-        ['boot.logとblkid・モジュール一覧を比較する', 'cmdline.txtとcause.txtを修正する'], s10, c10,
+        ['起動ログとblkid・モジュール一覧を比較する', 'カーネル引数の控えとcause.txtを修正する'], s10, c10,
         """U=$(sed -n 's/.*LABEL="root" UUID="\\([^"]*\\)".*/\\1/p' blkid.txt)
 sed -i "s/root=UUID=[^ ]*/root=UUID=$U/" cmdline.txt
 echo wrong-root-uuid > cause.txt""",

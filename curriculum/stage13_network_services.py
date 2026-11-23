@@ -72,7 +72,7 @@ json.dump(n,open(p,'w'),indent=2)
 json.dump(dict(cause='default-gateway-outside-subnet',gateway=a['gateway']),open('diagnosis.json','w'))
 PYCODE"""
 mission(1,'接続を維持する経路設定の修正','出口のアドレスだけが別ネットワークを指す設定案が届きました。',
- ['採取済みの経路と承認されたアドレスを比較する','netplan.jsonの経路を直しdiagnosis.jsonへ理由を残す'],s1,c1,SOL1,
+ ['採取済みの経路と承認されたアドレスを比較する','経路の設定控えの経路を直しdiagnosis.jsonへ理由を残す'],s1,c1,SOL1,
  ["echo '{}' > diagnosis.json", "cp approved.json netplan.json"],
  '経路の設定はアドレス・サブネット・インターフェースとセットで検証します。設定例の一致は通信成功の証明ではないため、VMでは相手からの通信も確認します。',
  '宛先の前に、自分が渡せる出口かを考えます。','JSON形式の設定例を読み、routesだけを編集します。')
@@ -98,7 +98,7 @@ a=json.load(open('approved.json')); json.dump(a,open('zone.json','w'),indent=2)
 json.dump(dict(cause='stale-a-record',name=a['name'],answer=a['address']),open('diagnosis.json','w'))
 PYCODE"""
 mission(2,'名前が引けても宛先が古い','DNSは正常応答ですが、移設前のアドレスが返っています。',
- ['dns-observation.txtとapproved.jsonを照合する','zone.jsonとdiagnosis.jsonを作る'],s2,c2,SOL2,
+ ['DNS観測記録と承認資料を照合する','zone.jsonとdiagnosis.jsonを作る'],s2,c2,SOL2,
  ["echo '{}' > zone.json", "echo '{\"cause\":\"nxdomain\"}' > diagnosis.json"],
  'NOERRORはサービスの正しい配置まで保証しません。キャッシュのTTL、権威側の更新、問い合わせ先を分けて確認します。実DNSの再読込と複数台からの照合はVMで学びます。',
  '名前が存在しない場合と、違う番号を返す場合を分けます。','採取済み回答のAレコードと承認されたIPを比較します。')
@@ -171,7 +171,7 @@ a=json.load(open('approved.json')); p=json.load(open('proxy.json')); p['upstream
 json.dump(dict(cause='wrong-upstream-port',upstream=a['upstream']),open('diagnosis.json','w'))
 PYCODE"""
 mission(4,'502の上流と待ち受けを照合する','公開口へは届きますが、リバースプロキシが別のポートへ接続しています。',
- ['エラーログとbackend-listen.txtを比較','proxy.jsonを修正しdiagnosis.jsonに根拠を記録'],s4,c4,SOL4,
+ ['エラーログとバックエンドの待ち受け記録を比較','プロキシの設定控えを修正しdiagnosis.jsonに根拠を記録'],s4,c4,SOL4,
  ["echo '{}' > proxy.json", "echo '{\"cause\":\"dns\"}' > diagnosis.json"],
  'フロントへの接続、上流への接続、アプリの処理は別の段階です。502という数字だけで再起動せず、上流のURLと実際の待ち受けを照合します。',
  'ブラウザーから公開口まで届くことと、公開口からアプリへ届くことを分けます。','接続拒否の宛先とLISTENの番号を比較します。')
@@ -237,7 +237,7 @@ def s6(ctx):
 10:00:01 IP {client}.40101 > 192.0.2.20.8088: Flags [S], seq 100
 10:00:01 IP 192.0.2.20.8088 > {client}.40101: Flags [R.], ack 101
 ''')
-    ctx.write('requirements.txt','diagnosis.json: client, dns=answered, tcp=refused, layer=listener-or-active-reject, next_check=ss-listener-and-firewall。RSTだけでどちらの原因かは断定しない。\n')
+    ctx.write('requirements.txt','diagnosis.jsonには client, dns（answered / no-answer）, tcp（refused / timeout / connected）, layer（listener-or-active-reject / route / service）, next_check（ss-listener-and-firewall / route-check / service-check）を記録する。packets.txtの要約から選び、RSTだけで原因を断定しない。\n')
 
 
 def c6(ctx):
@@ -250,7 +250,7 @@ import json
 a=json.load(open('approved.json')); json.dump(dict(client=a['client'],dns='answered',tcp='refused',layer='listener-or-active-reject',next_check='ss-listener-and-firewall'),open('diagnosis.json','w'))
 PYCODE"""
 mission(6,'DNSとTCPの観測を分けて読む','採取済みパケット要約から、どこまで成功しどこから調査すべきかを判断します。',
- ['packets.txtのDNS応答とTCPフラグを読む','requirements.txtに従いdiagnosis.jsonへ観測と次の確認を保存'],s6,c6,SOL6,
+ ['パケット要約の記録のDNS応答とTCPフラグを読む','要件書に従いdiagnosis.jsonへ観測と次の確認を保存'],s6,c6,SOL6,
  ["echo '{\"dns\":\"failed\"}' > diagnosis.json", "echo '{\"tcp\":\"connected\"}' > diagnosis.json"],
  'SYNに対するRSTは接続拒否を示す観測で、待ち受け不在や明示的な拒否などを追加確認します。採取済み要約の診断と、本物のパケット採取・解析は別です。VM networkで自分の通信を観察します。',
  '最初の問い合わせが成功しているか、次の接続に何が返ったかを順に読みます。','Aの回答とSYN/RSTを確認し、待ち受けとファイアウォールを次に調べます。')
@@ -278,7 +278,7 @@ for h in i['hosts']: h.update(desired=a,actions=['backup','validate','apply','ve
 json.dump(i,open('plan.json','w'),indent=2)
 PYCODE"""
 mission(7,'OS差分を含む再現可能な変更計画','UbuntuとRHEL系の設定更新を同じコマンドで流す案を、環境差と復旧まで考えた計画へ直します。',
- ['inventory.jsonとapproved.jsonを読みplan.jsonを作る','OSごとのパッケージ管理と変更手順を保つ'],s7,c7,SOL7,
+ ['環境一覧と承認資料を読みplan.jsonを作る','OSごとのパッケージ管理と変更手順を保つ'],s7,c7,SOL7,
  ["cp approved.json plan.json", "echo '{\"hosts\":[]}' > plan.json"],
  '構成管理では目的の状態と実行方法を分け、環境差と冪等性を検証します。この課題は計画の作成でありAnsibleの実行ではありません。VM実習ではsetupの繰り返しと再起動後の状態を確認します。',
  '対象のOSと、作業が失敗したときに戻す条件を計画へ含めます。','inventoryの各hostへdesiredと順序付きactionsを追加します。')
@@ -302,7 +302,7 @@ a=json.load(open('approved.json')); a['steps']=['provision','verify-backup-integ
 json.dump(a,open('recovery.json','w'),indent=2)
 PYCODE"""
 mission(8,'バックアップから別環境へ戻す計画','バックアップ成功の通知だけでは、サービスを復旧できるか分かりません。復元を試す計画を作ります。',
- ['approved.jsonの許容欠損時間と復旧時間を理解する','別VMへの復元と利用側の確認までrecovery.jsonへ記録'],s8,c8,SOL8,
+ ['承認資料の許容欠損時間と復旧時間を理解する','別VMへの復元と利用側の確認までrecovery.jsonへ記録'],s8,c8,SOL8,
  ["cp approved.json recovery.json", "echo '{\"steps\":[\"backup-success\"]}' > recovery.json"],
  'RPOは許容するデータ欠損時間、RTOは目標復旧時間です。計画の一致だけで実現を保証できないので、VMの複製や再構築で実際の時間と欠損を測る必要があります。',
  'バックアップの成功と、利用者が再び使える状態への復旧を区別します。','承認条件と、新環境・検査・権限・サービス・利用側・結果記録の順序を組み合わせます。')

@@ -96,8 +96,8 @@ def c1(ctx):
 SOL1 = """awk 'NR>1 && $2=="trainee" && /--job <<tag>>/ {print $1}' processes.txt | sort -n > pids.txt
 echo "pkill -u trainee -f -- '--job <<tag>>'" > kill.txt"""
 mission(1, 'pkill・killall・pgrepで誤爆せず止める',
-        '同じworker.pyが他のユーザーや別ジョブでも動いています。killall python3 のような名前だけの指定は無関係な処理まで止めます。processes.txtのps出力を読み、まずpgrep相当で対象を絞り、pkillで止める手順を作ってください。',
-        ['processes.txtから対象PIDだけをpids.txtへ', 'ユーザーと引数で絞ったpkillをkill.txtへ'], s1, c1, SOL1,
+        '同じworker.pyが他のユーザーや別ジョブでも動いています。killall python3 のような名前だけの指定は無関係な処理まで止めます。プロセスの採取記録のps出力を読み、まずpgrep相当で対象を絞り、pkillで止める手順を作ってください。',
+        ['プロセスの採取記録から対象PIDだけをpids.txtへ', 'ユーザーと引数で絞ったpkillをkill.txtへ'], s1, c1, SOL1,
         ["awk 'NR>1 && /worker.py/ {print $1}' processes.txt | sort -n > pids.txt\necho 'killall python3' > kill.txt",
          "awk 'NR>1 && /--job <<tag>>/ {print $1}' processes.txt | sort -n > pids.txt\necho \"pkill -9 -f <<tag>>\" > kill.txt"],
         'pgrepは対象の確認、pkillは同じ条件で通知、killallは名前の完全一致で全員に通知します。-uで所有者、-fでコマンドライン全体、-xで完全一致を指定できます。止める前に必ず同じ条件でpgrep -af を実行して対象一覧を見て、まずSIGTERMを使います。この課題ではOSのプロセスを実際には操作しません。',
@@ -134,8 +134,8 @@ def c2(ctx):
 
 SOL2 = 'echo "systemd-run --user --scope -p MemoryMax=<<mem>> -p CPUQuota=<<cpu>> -p TasksMax=<<tasks>> ./job.sh" > cmd.txt'
 mission(2, 'systemd-runで制限付きに一時実行する',
-        'バッチ処理が他のサービスのメモリを圧迫しないよう、一時的なユニットとして資源制限を付けて動かします。example.txtの設定例（ユニットとプロパティ）を読み、systemd-runコマンドを組み立てます。',
-        ['example.txtを読む', '指定の制限を全て含むsystemd-runをcmd.txtへ'], s2, c2, SOL2,
+        'バッチ処理が他のサービスのメモリを圧迫しないよう、一時的なユニットとして資源制限を付けて動かします。実行要件の資料の設定例（ユニットとプロパティ）を読み、systemd-runコマンドを組み立てます。',
+        ['実行要件の資料を読む', '指定の制限を全て含むsystemd-runをcmd.txtへ'], s2, c2, SOL2,
         ['echo "./job.sh" > cmd.txt', 'echo "sudo systemd-run -p MemoryMax=<<mem>> ./job.sh" > cmd.txt'],
         'systemd-runはcgroup上に一時ユニットを作って実行します。MemoryMaxは上限、CPUQuotaは使用率の上限、TasksMaxはプロセス数の上限です。--userはユーザーマネージャー配下で実行でき、完了後の確認はsystemctl --user showやsystemd-cgtopで行います。実機では実行中のcgroup制限を検証してください。',
         '制限はコマンドではなくsystemdのプロパティで与えます。', 'systemd-run --user --scope -p プロパティ=値 コマンド の形です。')
@@ -171,7 +171,7 @@ def c3(ctx):
 SOL3 = 'echo "loginctl terminate-session <<target>>" > cmd.txt'
 mission(3, 'loginctlのセッション出力を読んで1つだけ終了する',
         '共有サーバーに同じユーザーの複数セッションが残っています。loginctl list-sessions と show-sessionの出力から、放置されたリモートセッションだけを特定してください。',
-        ['sessions.txtとshow.txtを読み対象を特定', 'loginctl terminate-sessionをcmd.txtへ'], s3, c3, SOL3,
+        ['セッション一覧と属性の採取記録を読み対象を特定', 'loginctl terminate-sessionをcmd.txtへ'], s3, c3, SOL3,
         ['echo "loginctl terminate-user <<user>>" > cmd.txt', 'echo "loginctl terminate-session 1" > cmd.txt'],
         'loginctl list-sessionsは一覧、show-sessionは属性（Remote, State, IdleHint）を表示します。terminate-sessionは指定した1セッション、terminate-userはそのユーザーの全セッションを終了するので影響範囲が大きく違います。lock-sessionでロックだけする方法もあり、実機ではセッションIDを再確認してから実行します。',
         '同じユーザー名のセッションが複数あります。', '属性の組み合わせで1つに絞り、terminate-sessionに渡します。')
@@ -285,7 +285,7 @@ json.dump(r,open('result.json','w'))
 PYCODE"""
 mission(5, 'gpg --verifyの結果を読み分ける',
         '配布物3つの検証ログが届きました。Good signature、BAD signature、No public keyは意味が全く違います。',
-        ['verify.logを読み分ける', 'result.jsonを作る'], s5, c5, SOL5,
+        ['署名検証の記録を読み分ける', 'result.jsonを作る'], s5, c5, SOL5,
         ["echo '{}' > result.json", 'python3 - <<\'PYCODE\'\nimport json\njson.dump(dict(tampered="x"),open("result.json","w"))\nPYCODE'],
         'BAD signatureは内容か署名が改ざんされた疑いで使用しません。No public keyは検証不能で、未知の鍵をgpg --recv-keysで取得してもフィンガープリントを公式の別経路と照合してから信頼します。Good signatureでも、その鍵が正しい発行元のものかを確認する必要があります。',
         '3つの状態はそれぞれ対応が違います。', 'ログを順に読み、状態ごとに分類してJSONにします。')
@@ -394,7 +394,7 @@ f="$1"
 wc -l < "$f"
 EOF"""
 mission(8, 'evalの危険とインジェクションを避ける',
-        'evalは文字列をシェルコードとして再解釈します。入力に;や$(...)があると、意図しないコマンドが実行されます。vulnerable.shを読み、同じ目的の安全なsafe.shを作ってください。',
+        'evalは文字列をシェルコードとして再解釈します。入力に;や$(...)があると、意図しないコマンドが実行されます。脆弱なスクリプトを読み、同じ目的の安全なsafe.shを作ってください。',
         ['脆弱な点を理解する', 'evalなしのsafe.shを作る'], s8, c8, SOL8,
         ["cat > safe.sh <<'EOF'\n#!/bin/bash\neval \"wc -l < \\\"$1\\\"\"\nEOF", "cat > safe.sh <<'EOF'\n#!/bin/bash\nwc -l < $1\nEOF"],
         '入力をeval・bash -c・sh -cへ連結するとコードになります。必要ならprintf %qでの引用や、配列と"$@"、case文による許可リストを使います。変数は必ず"$var"と引用し、ファイル名の先頭が-なら--や./を付けます。evalが必要な場面でも入力は信頼できる値だけに限定します。',
@@ -435,7 +435,7 @@ SOL9 = """find collect -type f | while read -r f; do
 done"""
 mission(9, '診断情報を安全に共有する前に機密をマスクする',
         'sosreport（RHEL系）やsos report、journalctl・設定ファイルを集めた診断バンドルをサポートへ送ります。パスワードやAPIキーが入ったまま出してはいけません。',
-        ['collect/を変更せずbundle/へ複製', '機密値だけを<REDACTED>に置換'], s9, c9, SOL9,
+        ['収集済みの診断資料を変更せずbundle/へ複製', '機密値だけを<REDACTED>に置換'], s9, c9, SOL9,
         ['cp -r collect bundle', 'cp -r collect bundle\nsed -i "s/.*//" bundle/etc/app.conf'],
         'sosreportは構成・ログを自動収集しますが、環境固有の機密は残ることがあります。送る前に元データは保全したまま複製に対しマスクし、grepで値が残っていないことを検証します。sos reportの--cleanなどの匿名化も、結果の確認は人が行います。行を丸ごと消すより、キー名を残してどの設定があったか分かるようにします。',
         '全消去では診断に使えません。', 'sed -Eで値の部分だけを置換し、同じ構成で出力します。')
@@ -469,7 +469,7 @@ def c10(ctx):
 SOL10 = """echo '{"cause":"privileged-port-rootless"}' > diagnosis.json
 echo "podman run -d --name <<name>> -p 8080:80 -v ./data:/usr/share/nginx/html:Z <<image>>" > run.sh"""
 mission(10, 'rootless podmanへの読み替え',
-        'docker composeの定義をrootless podmanで動かします。podmanはデーモンなしで一般ユーザーのまま動き、podman-composeやquadletでも同様に扱えます。error.txtとpodman-info.txtを読み、動くコマンドに直してください。',
+        'docker composeの定義をrootless podmanで動かします。podmanはデーモンなしで一般ユーザーのまま動き、podman-composeやquadletでも同様に扱えます。エラーログとpodmanの環境情報を読み、動くコマンドに直してください。',
         ['エラーの原因を診断', 'rootlessで動くpodman runをrun.shへ'], s10, c10, SOL10,
         ['echo "docker run -d --name <<name>> -p 80:80 <<image>>" > run.sh', 'echo "sudo podman run -d --name <<name>> -p 80:80 <<image>>" > run.sh\necho \'{"cause":"privileged-port-rootless"}\' > diagnosis.json'],
         'rootless podmanは1024未満のポートへの割り当てにsysctl net.ipv4.ip_unprivileged_port_startの変更が必要ですが、通常は高番号ポートに公開し、前段のプロキシで受けます。SELinux有効環境ではボリュームに:Zを付けます。dockerとの違いは常駐デーモンがないこと、rootless、podman generate/quadletでsystemd統合できることです。',
@@ -511,7 +511,7 @@ c=<<c>>; net=[r[2] for r in rows if int(r[0])==c][0]
 json.dump(dict(shares_net_with=sorted(int(r[0]) for r in rows if r[2]==net and int(r[0])!=c),command=f'nsenter -t {c} -n ip addr'),open('diagnosis.json','w'))
 PYCODE"""
 mission(11, 'nsenterでnamespaceの共有を読み解く',
-        'コンテナやPodの中ではプロセスごとにnamespaceが分かれます。/proc/PID/nsのinode番号（lsnsでも確認可）が同じなら同じ空間です。ns.txtを読み、nsenterで調べる対象を決めます。',
+        'コンテナやPodの中ではプロセスごとにnamespaceが分かれます。/proc/PID/nsのinode番号（lsnsでも確認可）が同じなら同じ空間です。namespaceの採取記録を読み、nsenterで調べる対象を決めます。',
         ['NETの同じプロセスを特定', 'nsenterコマンドを記録'], s11, c11, SOL11,
         ["echo '{}' > diagnosis.json", "python3 - <<'PYCODE'\nimport json\njson.dump(dict(shares_net_with=[],command='nsenter -t <<c>> -a ip addr'),open('diagnosis.json','w'))\nPYCODE"],
         'namespaceは番号が同じなら共有です。nsenter -t PID -nは対象プロセスのネットワークnamespaceだけに入り、ホストのツールでip addrやssを実行できます。-aは全namespaceへ入り影響が大きいので必要な種類だけ指定します。nsenterは通常rootまたは権限が必要ですが、この課題では記録の読解だけを行います。',
@@ -527,7 +527,7 @@ def s12(ctx):
     put(ctx, 'ldd.txt', '$ ldd /bin/sh\n' + ''.join(f'\t{os.path.basename(x)} => {x} (0x00007f0000000000)\n' for x in libs))
     put(ctx, 'newroot-tree.txt', '$ find newroot -type f\nnewroot/bin/sh\n' + ''.join('newroot' + x + '\n' for x in present))
     put(ctx, 'error.txt', "$ chroot newroot /bin/sh\nchroot: failed to run command '/bin/sh': No such file or directory\n")
-    ctx.write('requirements.txt', 'diagnosis.jsonにcause=missing-shared-libraries、newrootに足りないライブラリの絶対パス配列missing（昇順）、boundary=filesystem-root-only を保存。chroot自体はプロセス・ネットワーク・ユーザーを隔離しない。\n')
+    ctx.write('requirements.txt', 'diagnosis.jsonには cause（missing-command / permission / missing-shared-libraries）、newrootに不足するライブラリの絶対パス配列missing（昇順）、boundary（filesystem-root-only / process-network-user-isolation）を保存する。lddとファイル一覧を比較する。chroot自体はプロセス・ネットワーク・ユーザーを隔離しない。\n')
 
 
 def c12(ctx):
@@ -571,7 +571,7 @@ def c13(ctx):
 SOL13 = "sed -i 's/^- hosts: .*/- hosts: <<group>>/' site.yml"
 mission(13, 'Ansibleのインベントリとplaybookを読み合わせる',
         'ansible-playbookが「no hosts matched」で何もせず成功します。ansible-inventory --listで見えるグループ名とplaybookのhostsを突き合わせてください。',
-        ['inventory.iniのグループを確認', 'site.ymlのhostsを修正'], s13, c13, SOL13,
+        ['インベントリの控えのグループを確認', 'playbookの控えのhostsを修正'], s13, c13, SOL13,
         ["sed -i 's/^- hosts: .*/- hosts: all/' site.yml", "sed -i 's/^- hosts: .*/- hosts: db/' site.yml"],
         'hostsに書く名前はインベントリのグループ・ホスト名と一致する必要があります。allなどで広げると意図しない環境も変更します。実行前にansible-inventory --graphとansible-playbook --list-hostsで対象を確認し、--limitで絞ります。',
         '一致しないパターンはエラーにならず飛ばされます。', 'hosts行だけをsedなどで差し替えます。')
@@ -609,7 +609,7 @@ EOF
 echo 'set max connections' > idempotent.txt"""
 mission(14, 'Ansibleの冪等性を--check出力で診断する',
         'playbookを2回実行しても毎回changedになります。--check --diff相当の記録を読み、「やり方」ではなく「状態」を宣言する形に直します。',
-        ['run2.txtでchangedの理由を読む', 'site.ymlをlineinfileにして冪等にする'], s14, c14, SOL14,
+        ['2回目の実行記録でchangedの理由を読む', 'playbookの控えをlineinfileにして冪等にする'], s14, c14, SOL14,
         ["echo 'set max connections' > idempotent.txt", "echo 'set max connections' > idempotent.txt\nsed -i 's/shell/command/' site.yml"],
         'shellやcommandで追記すると実行のたびに行が増えます。lineinfileは正規表現で行を特定し、すでに目的の状態ならokになります。ansible-playbook --check --diffで差分だけを事前確認し、2回目の実行でchanged=0になることを冪等性の判定にします。',
         '2回目に何が変わるかを見ます。', 'lineinfileにpath, regexp, lineを指定します。')

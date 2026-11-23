@@ -70,7 +70,7 @@ p=json.load(open('engagement.json'))
 json.dump(dict(case=p['case'],assets=p['allowed_assets'],actions=p['allowed_actions'],stop_conditions=p['stop_conditions'],data_handling=p['data_handling']),open('acceptance.json','w'),indent=2)
 PY"""
 mission(1, "診断の許可範囲と停止条件", "調査開始前に許可書を読み、実施できる対象と行動を確定します。",
-        ["engagement.json は変更せず読む", "submission-schema.txt の形式で acceptance.json を作成し、許可のない対象を含めない"],
+        ["許可書は変更せず読む", "提出形式の資料に従って acceptance.json を作成し、許可のない対象を含めない"],
         s91, c91, S91, ["echo '{}' > acceptance.json", S91 + "\npython3 - <<'PY'\nimport json\np=json.load(open('acceptance.json'));p['assets'].append('production.example.invalid');json.dump(p,open('acceptance.json','w'))\nPY"],
         "最初の成果物は許可範囲です。対象の所有者、許可された操作、停止条件とデータの扱いを明記し、候補一覧と許可一覧を区別します。",
         ["調査の前に、許可されたことと停止すべき条件を確定します。", "cat で許可書を読み、JSON の必要な項目だけを対応する名前で保存します。", S91])
@@ -111,7 +111,7 @@ p=next(Path('deploy').glob('*/private/token.env'))
 json.dump(dict(secret_path=str(p),original_mode='666',cause='world-readable-secret',remediation='owner-only'),open('findings.json','w'))
 PY"""
 mission(2, "秘密情報と実行ファイルの権限監査", "デプロイ済みファイルに公開範囲の広すぎる秘密情報と書き換え可能なスクリプトが混在しています。",
-        ["private は700、token.env は600、serve.sh は750へ修正", "公開ページの644と全ファイル内容を維持", "report-schema.txt の findings.json を作り、秘密の値は記録しない"],
+        ["秘密情報のディレクトリは700、秘密の環境ファイルは600、公開用スクリプトは750へ修正", "公開ページの644と全ファイル内容を維持", "報告形式の資料に従って findings.json を作り、秘密の値は記録しない"],
         s92, c92, S92, ["chmod -R 600 deploy", "find deploy -name token.env -delete"],
         "読み取り可能な秘密と、他者が書き換えられる実行ファイルは別の問題です。ディレクトリの探索権限も含めて必要な範囲を設定し、公開ファイルの利用を壊さないことを確認します。",
         ["一括で権限を狭めると公開ページや実行も壊れます。種類ごとに考えます。", "find の権限表示と chmod を使い、秘密の値ではなく場所と原因を JSON へ記録します。", S92])
@@ -149,7 +149,7 @@ port=int(next(x.split()[1] for x in s.splitlines() if x.startswith('Port ')))
 json.dump(dict(control='ssh-authentication',port=port,root_login='no',passwords='no',allowed_users=['learner']),open('findings.json','w'))
 PY"""
 mission(3, "SSH 認証を壊さずに絞る", "SSH の設定控えを、公開鍵認証を維持したまま強化します。本物の SSH サービスは操作しません。",
-        ["requirements.txt に沿って sysroot/etc/ssh/sshd_config を修正", "findings.json に元の Port と変更後の認証制限を記録", "Match/Include などの設定は追加しない"],
+        ["要件書に沿って作業フォルダ内のSSH設定控えを修正", "findings.json に元の Port と変更後の認証制限を記録", "Match/Include などの設定は追加しない"],
         s93, c93, S93, ["printf '\\nPermitRootLogin no\\nPasswordAuthentication no\\n' >> sysroot/etc/ssh/sshd_config", "sed -i 's/PubkeyAuthentication yes/PubkeyAuthentication no/' sysroot/etc/ssh/sshd_config"],
         "SSH 設定は同じ全体項目を末尾へ追記するだけでは先の値が優先される場合があります。PasswordAuthentication の禁止だけで keyboard-interactive も禁止されたとは限らないため、認証経路を明示します。一次資料: https://man.openbsd.org/sshd_config.5 。この課題は小さな全体設定だけを扱います。実運用では Match/Include を含む実効設定を調べ、鍵による別接続と復旧経路を確保してからネイティブ検証します。",
         ["入口を閉じる前に、残す認証経路と接続番号を確認します。", "既存行を編集します。項目を末尾へ足すだけでは、先にある値が残ります。", S93])
@@ -186,7 +186,7 @@ p.chmod(0o440)
 json.dump(dict(account=user,risk='unrestricted-root-command',allowed_command=command),open('findings.json','w'))
 PY"""
 mission(4, "sudo の権限を1つの操作へ限定", "リリース担当には Web サービスの再起動だけが必要なのに、すべての root コマンドが許可されています。",
-        ["requirements.txt の1コマンドだけを許可する sudoers 控えへ変更", "控えの440と findings.json の正しい対象名を確認", "本物の sudoers を編集・適用しない"],
+        ["要件書の1コマンドだけを許可する sudoers 控えへ変更", "控えの440と findings.json の正しい対象名を確認", "本物の sudoers を編集・適用しない"],
         s94, c94, S94, ["chmod 440 sysroot/etc/sudoers.d/dojo-release", "sed -i 's@NOPASSWD: ALL@NOPASSWD: /usr/bin/systemctl *@' sysroot/etc/sudoers.d/dojo-release"],
         "権限の最小化は、利用者だけでなく実行するコマンドと引数も制約します。この教材は指定した単一行の表記を判定します。本番ではエディタの設定を含めた管理手順と visudo の構文検証が別途必要です。",
         ["ファイルの読み取り権限と、sudo が許可する操作の範囲は別の問題です。", "許可行のコマンド部分を絶対パスと完全な引数へ置き換え、chmod で控えを保護します。", S94])
@@ -221,7 +221,7 @@ p.write_text(s)
 json.dump(dict(service='dojo-web.service',risk='overprivileged-service',run_as='dojo-app',writable_path='/var/lib/dojo-app'),open('findings.json','w'))
 PY"""
 mission(5, "サービスの最小権限と書き込み範囲", "Web サービスが root と広い capability で起動する設定になっています。機能の起動先を保ち、設定控えを強化します。",
-        ["requirements.txt に従って unit の [Service] を修正", "ExecStart を保持し、機能を削除して問題を隠さない", "findings.json にリスクと必要な書込先を記録"],
+        ["要件書に従って unit の [Service] を修正", "ExecStart を保持し、機能を削除して問題を隠さない", "findings.json にリスクと必要な書込先を記録"],
         s95, c95, S95, ["sed -i 's/User=root/User=dojo-app/' sysroot/etc/systemd/system/dojo-web.service", "sed -i 's@ExecStart=.*@ExecStart=/bin/true@' sysroot/etc/systemd/system/dojo-web.service"],
         "実行するアカウントを変えるだけでなく、権限の追加、ファイル書込先、実行環境の分離も調べます。この課題は設定控えの評価です。対象プログラムと systemd の版による対応、実際の起動・更新・復旧は別途検証します。",
         ["不要な権限を減らしながら、サービスが必要とする実行先と保存先を残します。", "[Service] の User と保護設定を編集します。別セクションへ追記しても Service の設定にはなりません。", S95])
@@ -235,8 +235,8 @@ def s96(ctx):
     ctx.write("release/app/config.example", "API_TOKEN=REPLACE_ME\n")
     ctx.write("release/.env", "API_TOKEN=TRAINING_ONLY_" + secrets.token_hex(8) + "\n")
     ctx.write("release/.ssh/id_ed25519", "TRAINING_ONLY_FAKE_PRIVATE_KEY\n")
-    ctx.write("requirements.txt", "bundle.tar.gz へ public/index.html と app/config.example だけを相対パスで格納。元の全ファイルは保持。\n"
-              "findings.json: risk=secret-in-release-artifact, excluded=[.env,.ssh/id_ed25519], verified=true\n")
+    ctx.write("requirements.txt", "bundle.tar.gz へ公開用のHTMLと設定見本だけを相対パスで格納。元の全ファイルは保持。\n"
+              "findings.jsonには risk='secret-in-release-artifact', excluded=[秘密を含むファイルの相対パス], verified=true を記録。全ファイルを調べ、作成したアーカイブの中身を確認してから記録する。\n")
     ctx.data["release_hashes"] = {str(p.relative_to(ctx.work)): sha256(p) for p in ctx.p("release").rglob("*") if p.is_file()}
 
 
@@ -304,7 +304,7 @@ import json
 json.dump(dict(integrity='sha256-matched',restored='live/app.conf',preserved='evidence/before.conf'),open('findings.json','w'))
 PY"""
 mission(7, "期待値と照合してから復元", "バックアップがあるだけでは安全に戻せません。承認済みのハッシュを使って照合し、変更前も残して復元します。",
-        ["approved.sha256 は変更せず、backup/app.conf を照合", "変更前を evidence/before.conf に退避し、live/app.conf を復元", "restore.sha256 と findings.json を作り、復元した内容も照合"],
+        ["承認済みハッシュの原本は変更せず、バックアップの設定ファイルを照合", "変更前を evidence/before.conf に退避し、稼働側の設定ファイルを復元", "restore.sha256 と findings.json を作り、復元した内容も照合"],
         s97, c97, S97, ["cp backup/app.conf live/app.conf", "mkdir -p evidence\ncp live/app.conf evidence/before.conf\necho 'version=guessed' > live/app.conf\nsha256sum live/app.conf > restore.sha256"],
         "ハッシュは期待値が信頼できるときに整合性確認へ使えます。復元後だけ自分でハッシュを作っても、正しいバックアップかは分かりません。承認済みの期待値を保ち、変更前のデータと復元後の両方を記録します。",
         ["比較対象の期待値と、比較したいデータを同時に書き換えてはいけません。", "sha256sum -c で既存の期待値と照合し、cp で変更前を残してから復元します。", S97])

@@ -215,7 +215,7 @@ def s3(ctx):
     ctx.write('wg0.conf', f'[Interface]\nAddress = 10.{sub}.0.1/24\nListenPort = 51821\nPrivateKey = REPLACE_ME\n\n'
               f'[Peer]\n# laptop-{lap}\nPublicKey = {pub1}\nAllowedIPs = 0.0.0.0/0\n\n'
               f'[Peer]\n# branch\nPublicKey = {pub2}\nAllowedIPs = 10.{sub}.0.3/32, 192.168.50.0/24\n', mode=0o644)
-    ctx.write('requirements.txt', f'WireGuardのサーバー設定wg0.confを仕上げる。PrivateKeyはserver.keyの値、ListenPortは{port}。laptop-{lap}のピアはAllowedIPsが0.0.0.0/0になっていて全経路を引き込むため、そのピアのトンネルIP 10.{sub}.0.2だけ（/32）にする。branchのピアは正しいので変更しない。秘密鍵を含むのでモード600。\n')
+    ctx.write('requirements.txt', f'サーバーのWireGuard設定ファイルを探して仕上げる。用意されたサーバー秘密鍵を見つけてPrivateKeyに設定し、ListenPortは{port}。全経路を引き込んでいるlaptop用ピアを調べ、そのピアに割り当てられたトンネルIPだけ（/32）をAllowedIPsに残す。他のピアは変更しない。秘密鍵を含むので設定ファイルのモードは600。\n')
 
 
 def c3(ctx):
@@ -238,13 +238,13 @@ def c3(ctx):
 SOL3 = """sed -i -e 's|^PrivateKey = .*|PrivateKey = '"$(cat server.key)"'|' -e 's|^ListenPort = .*|ListenPort = <<port>>|' wg0.conf
 sed -i '/^# laptop-<<lap>>$/,/^$/ s|^AllowedIPs = .*|AllowedIPs = <<ip1>>/32|' wg0.conf
 chmod 600 wg0.conf"""
-mission(3, 'wg0.confのAllowedIPsを絞る',
-        'WireGuardのwg0.confでは、サーバー側のピアのAllowedIPsは「そのピアから受け取る送信元」と「そのピアへ送る宛先」の両方を決めます。0.0.0.0/0のままだと別のピアの通信まで奪います。',
+mission(3, 'WireGuardのAllowedIPsを絞る',
+        'サーバーのWireGuard設定と秘密鍵を探してください。ListenPortを指定値に合わせ、全経路を指定しているlaptop用ピアは割り当てられたトンネルIPだけに絞ります。他のピアは変更せず、秘密鍵を含む設定ファイルを所有者だけが読める権限にしてください。',
         ['PrivateKeyとListenPortを設定', 'laptopのAllowedIPsを/32へ', 'wg0.confをモード600に'], s3, c3, SOL3,
         ["sed -i 's|^AllowedIPs = .*|AllowedIPs = <<ip1>>/32|' wg0.conf\nsed -i 's|^PrivateKey = .*|PrivateKey = x|' wg0.conf",
          "sed -i 's|^PrivateKey = .*|PrivateKey = '\"$(cat server.key)\"'|; s|^ListenPort = .*|ListenPort = <<port>>|' wg0.conf\nchmod 600 wg0.conf"],
         'AllowedIPsはWireGuardの暗号鍵ルーティング表です。ピアごとに重ならない範囲を割り当てます。0.0.0.0/0はクライアント側の「全通信をVPNへ」設定で、サーバー側のピアに書くと他のピアと衝突します。wg-quickは秘密鍵を含む設定がグループ・他人に読めると警告します。',
-        'ピアごとに許可する範囲は重ねません。', 'sedのアドレス範囲で対象ピアのブロックだけを書き換えます。')
+        'ls -a で設定と秘密鍵を探し、cat でPeer名・公開鍵・トンネルIPの対応を読みます。', 'AllowedIPsの範囲アドレスで、対象Peerのブロックだけを変更します。秘密鍵を含むファイルの権限も設定します。')
 
 
 # ---------------------------------------------------------------- 4 wg show
@@ -736,7 +736,7 @@ def c14(ctx):
 
 SOL14 = r"""sed -i -e 's/^\( *\)ssl_protocols .*/\1ssl_protocols TLSv1.2 TLSv1.3;/' -e 's/^\( *\)ssl_ciphers .*/\1ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305;/' -e 's/^\( *\)ssl_certificate_key .*/&\n\1add_header Strict-Transport-Security "max-age=31536000" always;/' nginx.conf"""
 mission(14, 'nginxのssl_protocolsと暗号スイートを現代化する',
-        'TLSスキャン結果(scan.txt)で古いTLSプロトコルと弱い暗号スイートが指摘されました。nginxのssl_protocolsとssl_ciphers、HSTSを全serverブロックで直します。',
+        'TLSスキャンの採取記録で古いTLSプロトコルと弱い暗号スイートが指摘されました。nginxのssl_protocolsとssl_ciphers、HSTSを全serverブロックで直します。',
         ['ssl_protocolsを整理', 'ssl_ciphersを強いものだけに', 'HSTSを追加'], s14, c14, SOL14,
         ["sed -i 's/^\\( *\\)ssl_protocols .*/\\1ssl_protocols TLSv1.2 TLSv1.3;/' nginx.conf",
          "sed -i -e '0,/ssl_protocols .*/s//ssl_protocols TLSv1.2 TLSv1.3;/' -e 's/ssl_ciphers .*/ssl_ciphers HIGH:!aNULL;/' nginx.conf"],
@@ -754,7 +754,7 @@ def s15(ctx):
     ctx.write('id_old', '-----BEGIN OPENSSH PRIVATE KEY-----\n(fake)\n-----END OPENSSH PRIVATE KEY-----\n', mode=0o600)
     ctx.write('id_old.pub', old + '\n')
     ctx.write('authorized_keys', f'{col}\n{old}\n{ci}\n')
-    ctx.write('requirements.txt', f'デプロイ用のSSH鍵を鍵ローテーションする。手順: 新しい鍵を作る→新公開鍵をauthorized_keysへ追加（重複運用）→旧公開鍵を削除→旧秘密鍵を退避。ssh-keygenでed25519の新鍵id_new（パスフレーズなし、コメントdeploy-{t}）を作り、authorized_keysには他人の2行を残したまま新公開鍵を加えて旧鍵（{oldc}）だけ除く。id_oldとid_old.pubはretired/へ移す。\n')
+    ctx.write('requirements.txt', f'デプロイ用のSSH鍵をローテーションする。鍵ファイルのコメント deploy-old-{t} から旧鍵を特定し、新しいed25519鍵 id_new（パスフレーズなし、コメント deploy-{t}）を作る。authorized_keysには他の2行を残して新公開鍵を加え、旧公開鍵だけを除く。旧秘密鍵と公開鍵を retired/ へ移す。\n')
 
 
 def c15(ctx):

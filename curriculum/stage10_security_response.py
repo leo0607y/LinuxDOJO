@@ -262,7 +262,7 @@ PYCODE'''
 
 def add(number, title, story, objectives, setup, check, solution, wrong, thinking, tools, explanation, tip):
     register(id=f"10-{number}", stage=S, title=title,
-             story=story + "\n対象はこの作業フォルダの架空ケースだけです。case.json の許可範囲を確認してから作業します。",
+             story=story + "\n対象はこの作業フォルダの架空ケースだけです。ケース資料の許可範囲を確認してから作業します。",
              objectives=objectives, hints=[thinking, tools, "入力例（実行前に各行の対象を確認してください）:\n" + solution],
              answer=solution, explanation=explanation, tip=tip, setup=setup, check=check,
              solution=solution, wrong=wrong)
@@ -270,7 +270,7 @@ def add(number, title, story, objectives, setup, check, solution, wrong, thinkin
 
 add(1, "証拠を保全し、取得記録を残す",
     "調査開始の依頼が届きました。原本を変更せず証拠用コピーと照合用ハッシュを作ります。",
-    ["case.json と logs/ の2ログを evidence/ 配下の同じ相対パスへコピーする", "証拠コピーの権限を600にし、evidence/SHA256SUMS に3ファイルのハッシュを保存する", "collection-format.json を参考に collection.json へ許可番号・取得担当・UTC時刻を記録する"],
+    ["ケースの許可資料と原本の認証・アクセスログを evidence/ 配下の同じ相対パスへコピーする", "証拠コピーの権限を600にし、evidence/SHA256SUMS に3ファイルのハッシュを保存する", "取得記録の書式資料を参考に collection.json へ許可番号・取得担当・UTC時刻を記録する"],
     s1, c1, SOL1, ["mkdir -p evidence; touch evidence/SHA256SUMS", SOL1 + "\nprintf 'changed\\n' >> logs/auth.csv", SOL1 + "\nchmod 644 evidence/logs/auth.csv"],
     "原本・取得したコピー・取得者の記録を分けます。ハッシュはコピーの一致と後の変化を確かめるための情報です。",
     "cp、chmod、sha256sum と UTC の日時記録を使います。case.json の許可番号も取得記録に含めます。",
@@ -301,8 +301,8 @@ add(4, "セッションで資産へのアクセスを結び付ける",
     "対象セッションの成功と拒否、無関係の業務処理を区別しました。HTTP 200や読み取りの記録だけで外部流出まで断定しません。",
     "影響範囲には「確認済み」「試行のみ」「未確認」を分けて記載します。")
 add(5, "許可された対処を実施し、業務の維持も検証する",
-    "所有者から対象セッションの失効・認証ログ有効化・有効期間短縮の承認を得ました。設定は教材の settings.json だけです。",
-    ["認証ログA03のセッションだけを settings.json の sessions から削除する", "業務用セッションとservice_enabled=trueを保ち、log_auth_events=true、有効期間を1〜30分にする", "変更せずに verify.py を実行し、retest.json に結果を保存する"],
+    "所有者から対象セッションの失効・認証ログ有効化・有効期間短縮の承認を得ました。設定は教材の設定ファイルだけです。",
+    ["認証ログA03のセッションだけを教材の設定ファイルの sessions から削除する", "業務用セッションとservice_enabled=trueを保ち、log_auth_events=true、有効期間を1〜30分にする", "変更せずに教材の検証スクリプトを実行し、retest.json に結果を保存する"],
     s5, c5, SOL5, ["python3 verify.py > retest.json", SOL5 + "\npython3 -c \"import json; p='settings.json'; d=json.load(open(p)); d['sessions']={}; json.dump(d,open(p,'w'))\""],
     "全部停止する方法では業務を壊します。許可された対象を限定して変更し、正常な処理が残っていることも確かめます。",
     "設定をJSONとして読み書きし、対象セッションを削除します。検証は python3 verify.py の出力を保存します。",
@@ -310,7 +310,7 @@ add(5, "許可された対処を実施し、業務の維持も検証する",
     "再テストは「危険な状態が消えた」と「必要な機能が動く」の両側を確認します。")
 add(6, "証拠と限界を添えた調査報告書を作る",
     "依頼者へ初期調査を報告します。断定を増やすのではなく、確かな観測・判断の限界・次の行動を伝えます。",
-    ["report-guide.txt の形式で report.json を作る", "許可範囲、認証成功と読み取り成功の所見、原本のSHA-256を記録する", "未確定の原因・行為者・流出を明示し、影響・対処・次の確認を具体的に書く"],
+    ["報告書の書式資料に従って report.json を作る", "許可範囲、認証成功と読み取り成功の所見、原本のSHA-256を記録する", "未確定の原因・行為者・流出を明示し、影響・対処・次の確認を具体的に書く"],
     s6, c6, SOL6, ["printf '{}\\n' > report.json", SOL6 + "\npython3 -c \"import json; p='report.json'; d=json.load(open(p)); d['limitations']=[]; json.dump(d,open(p,'w'))\""],
     "依頼者が次の判断をできるよう、何を見て何が分かり、何は分からないのかを整理します。",
     "JSONで範囲と所見を構造化し、ログのハッシュとイベントIDを引用します。書式は report-guide.txt を読みます。",

@@ -159,7 +159,7 @@ def c2(ctx):
 
 
 mission(2, 'iptables-legacy・iptables-nft・save・restoreを確かめる',
-        'iptablesの実体は iptables-legacy(xtables) と iptables-nft(nf_tables互換) の2系統で、どちらが使われるかは update-alternatives で決まります。規則の保存は iptables-save、復元は iptables-restore です。version.txtから系統を判断し、rules.v4を直して保存・検査コマンドを用意してください。',
+        'iptablesの実体は iptables-legacy(xtables) と iptables-nft(nf_tables互換) の2系統で、どちらが使われるかは update-alternatives で決まります。規則の保存は iptables-save、復元は iptables-restore です。採取済みのバージョン情報から系統を判断し、保存されたルールを直して保存・検査コマンドを用意してください。',
         ['rules.v4のポートを修正', 'backendを判定してanswer.jsonへ', 'save.txt/test.txtを正しい実体名で'], s2, c2,
         "sed -i 's/--dport <<old>>/--dport <<new>>/' rules.v4\necho '{\"backend\":\"<<be>>\"}' > answer.json\necho 'iptables-<<be>>-save' > save.txt\necho 'iptables-<<be>>-restore --test < rules.v4' > test.txt",
         ["sed -i 's/<<old>>/<<new>>/' rules.v4\necho '{\"backend\":\"nft\"}' > answer.json\necho 'iptables-save' > save.txt\necho 'iptables-restore < rules.v4' > test.txt",
@@ -252,7 +252,7 @@ def c4(ctx):
 
 
 mission(4, 'ctstat・lnstat・nstat・rtstat・arpdの統計を読む',
-        'iproute2には統計・補助ツール群があります。nstat はカーネルのネットワークカウンタ、ctstat と rtstat は lnstat の別名(それぞれconntrackとルートキャッシュ)、arpd はユーザー空間ARP DBです。nstat.txtとctstat.txtを読み、必要な値を答えにして、同等コマンドも書いてください。',
+        'iproute2には統計・補助ツール群があります。nstat はカーネルのネットワークカウンタ、ctstat と rtstat は lnstat の別名(それぞれconntrackとルートキャッシュ)、arpd はユーザー空間ARP DBです。nstatとctstatの採取記録を読み、必要な値を答えにして、同等コマンドも書いてください。',
         ['2つの記録から値を抽出', 'lnstatによる同等コマンドとarpdを書く'], s4, c4,
         "r=$(awk '/TcpRetransSegs/{print $2}' nstat.txt)\nc=$(awk 'NR==1{for(i=1;i<=NF;i++)if($i==\"invalid\")k=i} NR==2{print $k}' ctstat.txt)\n"
         "echo \"{\\\"retrans\\\":\\\"$r\\\",\\\"ct_invalid\\\":\\\"$c\\\"}\" > answer.json\nprintf '%s\\n' 'lnstat -f nf_conntrack' 'lnstat -f rt_cache' 'arpd -l -b neigh.db' > cmds.txt",
@@ -292,7 +292,7 @@ def c5(ctx):
 
 
 mission(5, 'routel・rtmon・genlでルートとnetlinkを読む',
-        'routel は ip route show table all を表形式にするスクリプト、rtmon は netlink のルーティング変更を記録して ip monitor file で再生できるツール、genl は Generic Netlink のファミリを調べるツールです。routel.txt と genl.txt の出力を読み、rtmon の記録コマンドを書いてください。',
+        'routel は ip route show table all を表形式にするスクリプト、rtmon は netlink のルーティング変更を記録して ip monitor file で再生できるツール、genl は Generic Netlink のファミリを調べるツールです。routel と genl の採取記録を読み、rtmon の記録コマンドを書いてください。',
         ['routel出力から経路を特定', 'genlのファミリIDを調べる', 'rtmon file のコマンドを書く'], s5, c5,
         "g=$(awk '$1==\"<<net>>\"{print $2}' routel.txt)\nv=$(awk '$1==\"<<net>>\"{print $4}' routel.txt)\nf=$(awk '/Name: <<fam>>$/{print $1}' genl.txt)\n"
         "echo \"{\\\"gateway\\\":\\\"$g\\\",\\\"dev\\\":\\\"$v\\\",\\\"genl_id\\\":\\\"$f\\\"}\" > answer.json\necho 'rtmon file rt.mon' > mon.txt",
@@ -375,7 +375,7 @@ def c7(ctx):
 
 
 mission(7, 'IPv6の表記・ping -6・ip -6 routeを扱う',
-        'IPv6は16進8グループで、連続するゼロは :: で1回だけ省略できます。疎通確認は ping6(= ping -6)、IPv4側は ping4(= ping -4) と書き分けます。ルートは ip -6 route で扱います。addr.txtのアドレスを短縮し、確認コマンドと経路追加コマンドを書いてください。',
+        'IPv6は16進8グループで、連続するゼロは :: で1回だけ省略できます。疎通確認は ping6(= ping -6)、IPv4側は ping4(= ping -4) と書き分けます。ルートは ip -6 route で扱います。資料にあるIPv6アドレスを短縮し、確認コマンドと経路追加コマンドを書いてください。',
         ['短縮表記を求める', 'ping -6 と ip -6 route のコマンドを書く'], s7, c7,
         "echo '<<v6>>' > short.txt\necho 'ping -6 -c 3 <<v6>>' > ping.txt\necho 'ip -6 route add <<pfx>> via <<gw>> dev eth0' > route.txt",
         ["cat addr.txt > short.txt\necho 'ping -c 3 <<v6>>' > ping.txt\necho 'ip route add <<pfx>> via <<gw>> dev eth0' > route.txt",
@@ -408,7 +408,7 @@ def c8(ctx):
 
 
 mission(8, 'ssh-keygen・ssh-agent・ssh-addで鍵運用の手順を書く',
-        'SSH鍵は ssh-keygen で作り、ssh-agent に ssh-add で一時的に預けるとパスフレーズ入力の手間とリスクを減らせます。ssh-agent は環境変数を出力するので eval "$(ssh-agent -s)" で取り込みます。requirements.txtの条件で手順スクリプト agent.sh を書いてください。',
+        'SSH鍵の作成と、一時的に鍵を預ける仕組みの復習です。鍵を預ける期間を限定し、登録できたことを確認できる手順にしてください。要件に合わせて手順スクリプト agent.sh を書いてください。',
         ['4行の手順をagent.shへ', 'ssh-add -t で期限付き登録'], s8, c8,
         "printf '%s\\n' \"ssh-keygen -t ed25519 -f keys/id_ed25519 -N '' -C <<c>>\" 'eval \"$(ssh-agent -s)\"' 'ssh-add -t <<sec>> keys/id_ed25519' 'ssh-add -l' > agent.sh",
         ["printf '%s\\n' 'ssh-keygen -t rsa -f keys/id_ed25519' 'ssh-agent' 'ssh-add keys/id_ed25519' 'ssh-add -L' > agent.sh",
@@ -446,7 +446,7 @@ def c9(ctx):
 
 
 mission(9, 'ssh-keyscan・ssh-copy-id・sloginで接続を準備する',
-        '初回接続の確認をスクリプトで済ませるには ssh-keyscan でホスト鍵を集めて known_hosts に登録し、ssh-copy-id で公開鍵を authorized_keys へ置き、slogin(ssh の別名)で入ります。keyscan.txtから対象ホストのed25519鍵だけを known_hosts に入れ、2つのコマンドを書いてください。',
+        '初回接続の確認をスクリプトで済ませるには ssh-keyscan でホスト鍵を集めて known_hosts に登録し、ssh-copy-id で公開鍵を authorized_keys へ置き、slogin(ssh の別名)で入ります。採取済みのホスト鍵から対象ホストのed25519鍵だけを known_hosts に入れ、2つのコマンドを書いてください。',
         ['known_hostsを作る', 'ssh-copy-idとsloginを書く'], s9, c9,
         "grep '^<<host>> ssh-ed25519 ' keyscan.txt > known_hosts\necho 'ssh-copy-id -i keys/id_ed25519.pub -p <<port>> <<user>>@<<host>>' > copy.txt\necho 'slogin -i keys/id_ed25519 -p <<port>> <<user>>@<<host>>' > slogin.txt",
         ["grep '<<host>>' keyscan.txt > known_hosts\necho 'ssh-copy-id <<user>>@<<host>>' > copy.txt\necho 'slogin <<user>>@<<host>>' > slogin.txt",
@@ -518,7 +518,7 @@ def c11(ctx):
 
 
 mission(11, 'apt-cache・apt-configで候補版と設定を調べる',
-        'apt-cache policy は「入っている版」と「入れられる候補版」、どのリポジトリが供給するかを示します。apt-config は設定(/etc/apt/apt.conf.d/*)を統合表示する道具です。policy.txtから版を読み取り、設定ファイルを作成して、確認コマンドを書いてください。',
+        'apt-cache policy は「入っている版」と「入れられる候補版」、どのリポジトリが供給するかを示します。apt-config は設定(/etc/apt/apt.conf.d/*)を統合表示する道具です。採取済みのpolicy出力から版を読み取り、設定ファイルを作成して、確認コマンドを書いてください。',
         ['policyから版を抽出', 'apt.conf.d/99localを書く', 'apt-config dumpを書く'], s11, c11,
         "i=$(awk '/Installed:/{print $2}' policy.txt)\nc=$(awk '/Candidate:/{print $2}' policy.txt)\necho \"{\\\"installed\\\":\\\"$i\\\",\\\"candidate\\\":\\\"$c\\\"}\" > answer.json\n"
         "mkdir -p apt.conf.d\nprintf '%s\\n' 'APT::Default-Release \"<<suite>>\";' 'APT::Install-Recommends \"false\";' > apt.conf.d/99local\necho 'apt-config dump' > dump.txt",
@@ -626,7 +626,7 @@ def c14(ctx):
 
 
 mission(14, 'dpkg-debとdpkg-splitでパッケージを作る・分割する',
-        'dpkg-deb は .deb の作成(--build)・内容表示(-c)・制御情報の取得(-f)を行います。大きな.debはメール添付やメディア容量のため dpkg-split で分割(--split)し、--join で戻せます。pkgroot の control を読んで、4つのコマンドを書いてください。',
+        'dpkg-deb は .deb の作成(--build)・内容表示(-c)・制御情報の取得(-f)を行います。大きな.debはメール添付やメディア容量のため dpkg-split で分割(--split)し、--join で戻せます。用意されたパッケージ用ツリーのcontrolを見つけて読んで、4つのコマンドを書いてください。',
         ['ファイル名をcontrolから決める', '4つのコマンドを書く'], s14, c14,
         "f=<<pkg>>_<<ver>>_all.deb\necho \"dpkg-deb --build --root-owner-group pkgroot $f\" > build.txt\necho \"dpkg-deb -f $f Depends\" > info.txt\necho \"dpkg-split --split --partsize <<kib>> $f\" > split.txt\necho 'dpkg-split --join -o full.deb part1.deb part2.deb' > join.txt",
         ["echo 'dpkg-deb --build pkgroot' > build.txt\necho 'dpkg-deb -I x.deb' > info.txt\necho 'dpkg-split x.deb' > split.txt\necho 'dpkg-split full.deb' > join.txt",
@@ -669,7 +669,7 @@ def c15(ctx):
 
 
 mission(15, 'dpkg-divert・dpkg-statoverride・dpkg-realpath',
-        'パッケージ管理下のファイルを上書き・権限変更してもアップグレードで元に戻されます。dpkg-divert はファイルの置き場所を迂回し、dpkg-statoverride は所有者・モードの変更を保持します。usrmergeで/binが/usr/binへのリンクになると実体の解決も重要で、dpkg-realpath が使えます。requirements.txtのとおりに書き、diversions.txtを診断してください。',
+        'パッケージ管理下のファイルを上書き・権限変更してもアップグレードで元に戻されます。dpkg-divert はファイルの置き場所を迂回し、dpkg-statoverride は所有者・モードの変更を保持します。usrmergeで/binが/usr/binへのリンクになると実体の解決も重要で、dpkg-realpath が使えます。requirements.txtのとおりに書き、採取済みの迂回一覧を診断してください。',
         ['3つのdpkgコマンドを書く', '迂回一覧を診断'], s15, c15,
         "p=/usr/bin/<<tool>>\necho \"dpkg-divert --local --rename --divert $p.orig --add $p\" > divert.txt\necho \"dpkg-statoverride --update --add <<usr>> <<usr>> <<mode>> $p\" > statover.txt\necho 'dpkg-realpath /bin/<<tool>>' > realpath.txt\n"
         "n=$(grep -c '^local diversion' diversions.txt)\no=$(grep ' <<dpath>> to ' diversions.txt | awk '{print $NF}')\necho \"{\\\"local_count\\\":\\\"$n\\\",\\\"owner\\\":\\\"$o\\\"}\" > answer.json",
@@ -744,7 +744,7 @@ def c17(ctx):
 
 
 mission(17, 'mandb・whatis・apropos・manpath・accessdb・catmanで索引を扱う',
-        'manの検索はインデックスに依存します。mandb がDBを作り、whatis は名前の一行説明、apropos はキーワード検索、manpath は検索パス、accessdb はDBの内容ダンプ、catman は表示済み形式(cat)ページの事前生成です。whatis.txtを読み、5つの操作コマンドを書いてください。',
+        'manの検索はインデックスに依存します。mandb がDBを作り、whatis は名前の一行説明、apropos はキーワード検索、manpath は検索パス、accessdb はDBの内容ダンプ、catman は表示済み形式(cat)ページの事前生成です。whatisの採取記録を読み、5つの操作コマンドを書いてください。',
         ['セクションを特定', '5コマンドをcmds.txtへ'], s17, c17,
         "s=$(grep \"(\" whatis.txt | awk '/<<role>>/{print $2}')\n"
         "echo '{\"section\":\"<<sec>>\"}' > answer.json\nprintf '%s\\n' 'mandb -q' 'apropos -s 8 <<kw>>' 'manpath' 'accessdb' 'catman' > cmds.txt",
@@ -917,7 +917,7 @@ def c21(ctx):
 
 
 mission(21, 'script・scriptreplay・scriptliveで端末操作を記録・再生する',
-        '手順書や障害対応の証跡は script で端末を記録します。--log-timing でタイミング、--log-out で出力を別ファイルに残すと、scriptreplay が時間どおり(--divisorで倍速)に再生でき、scriptlive は記録した入力を実際のシェルで再実行します。session.tmを集計し、3つのコマンドを書いてください。',
+        '手順書や障害対応の証跡は script で端末を記録します。--log-timing でタイミング、--log-out で出力を別ファイルに残すと、scriptreplay が時間どおり(--divisorで倍速)に再生でき、scriptlive は記録した入力を実際のシェルで再実行します。採取済みのタイミング記録を集計し、3つのコマンドを書いてください。',
         ['待ち時間を合計', 'script/scriptreplay/scriptliveの行を書く'], s21, c21,
         "t=$(awk '{s+=$1} END{printf \"%.1f\", s}' session.tm)\necho \"{\\\"total_sec\\\":\\\"$t\\\"}\" > answer.json\necho 'script -q --log-timing session.tm --log-out session.log' > record.txt\n"
         "echo 'scriptreplay --timing session.tm --typescript session.log --divisor <<div>>' > replay.txt\necho 'scriptlive --timing session.tm session.log' > live.txt",
@@ -998,7 +998,7 @@ def c23(ctx):
 
 
 mission(23, 'FHSのディレクトリ配置(/usr/local /opt /srv /mnt /media /run /var/lib /tmp)',
-        'FHS(ファイル階層標準)は置き場所の約束です。自前ビルドは /usr/local、自己完結の外部ソフトは /opt、サービスの配信データは /srv、手動の一時マウントは /mnt、自動マウントの取り外しメディアは /media、実行時のPIDやソケットは /run、アプリの永続状態は /var/lib、一時ファイルは /tmp です。inventory.txtを読み、root/ 以下へ実際に配置してください。',
+        'FHS(ファイル階層標準)は置き場所の約束です。自前ビルドは /usr/local、自己完結の外部ソフトは /opt、サービスの配信データは /srv、手動の一時マウントは /mnt、自動マウントの取り外しメディアは /media、実行時のPIDやソケットは /run、アプリの永続状態は /var/lib、一時ファイルは /tmp です。配置する項目の一覧を読み、root/ 以下へ実際に配置してください。',
         ['8項目を正しい場所へ作成', '余計な場所に置かない'], s23, c23,
         "mkdir -p root/usr/local/bin root/opt/<<b>>/bin root/srv/www/<<c>> root/mnt/<<d>> root/media/trainee/<<e>> root/run root/var/lib/<<g>> root/tmp\n"
         "touch root/usr/local/bin/<<a>> root/opt/<<b>>/bin/run root/srv/www/<<c>>/index.html root/run/<<f>>.pid root/var/lib/<<g>>/state.db root/tmp/<<a>>.tmp",

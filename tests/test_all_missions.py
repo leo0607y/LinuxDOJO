@@ -5,7 +5,7 @@
   ① 初期状態で check が「未達成」になること
   ② 用意した「惜しい誤答」を実行しても check が「未達成」になること
   ③ 模範解答（想定解）をサンドボックス内の本物の bash で実行すると check が「達成」になること
-  ④ 問題文・ヒント3段階・解答・解説・ワンポイントが揃っていて、プレースホルダが全て埋まること
+  ④ 問題文・段階的ヒント・解答・解説・ワンポイントが揃っていて、プレースホルダが全て埋まること
 を検証する。セーブデータ (save_data.json) には一切触れない（一時ファイルを使用）。
 
 使い方:
@@ -67,8 +67,8 @@ def check_metadata(m, data):
     for f in ("title", "story", "answer", "explanation", "tip", "solution"):
         if not getattr(m, f).strip():
             errs.append(f"{f} が空です")
-    if len(m.hints) != 3:
-        errs.append(f"ヒントが3段階ではありません ({len(m.hints)})")
+    if not isinstance(m.hints, list) or not m.hints or any(not isinstance(h, str) or not h.strip() for h in m.hints):
+        errs.append("ヒントは空でない文字列のリストにします")
     if not m.objectives:
         errs.append("達成条件がありません")
     texts = [m.story, m.answer, m.explanation, m.tip, *m.hints, *m.objectives]

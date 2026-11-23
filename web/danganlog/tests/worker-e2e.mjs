@@ -68,3 +68,29 @@ test('worker: init, select, wrong answer, hint, correct answer, export/import', 
   assert.ok(fest.ok, fest.error);
   assert.ok(fest.result.lesson.task);
 });
+
+
+test('worker: answer adds review; a fresh independent retry clears it', { skip, timeout: 300000 }, async () => {
+  const send = startWorker();
+  const init = await send({ type: 'init' });
+  assert.ok(init.ok, init.error);
+  await send({ type: 'select', mode: 'intro', index: 1 });
+  let answer = await send({ type: 'answer' });
+  assert.ok(answer.result.state.review['intro:intro-02']);
+  const command = answer.result.output.split('\n')[0];
+  let right = await send({ type: 'execute', line: command });
+  assert.equal(right.result.completed, true);
+  assert.ok(right.result.state.review['intro:intro-02']);
+  const saved = await send({ type: 'export' });
+  assert.ok(saved.result.state.review['intro:intro-02']);
+  let retry = await send({ type: 'review', mode: 'intro', lessonId: 'intro-02' });
+  assert.equal(retry.result.completed, false);
+  answer = await send({ type: 'answer' });
+  assert.ok(answer.result.state.review['intro:intro-02']);
+  right = await send({ type: 'execute', line: command });
+  assert.ok(right.result.state.review['intro:intro-02']);
+  retry = await send({ type: 'review', mode: 'intro', lessonId: 'intro-02' });
+  right = await send({ type: 'execute', line: command });
+  assert.equal(right.result.completed, true);
+  assert.equal(right.result.state.review['intro:intro-02'], undefined);
+});

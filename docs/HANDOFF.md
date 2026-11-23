@@ -1,6 +1,54 @@
 # 引き継ぎ書（LinuxQuest 教材拡張）
 
-最終更新: 2026-11-22（Claude からCodexへ引き継ぎ） / ブランチ: `learning-expansion` / 状態を変えたら必ずこの表も更新する。
+最終更新: 2026-11-23（Codex 作業継続） / ブランチ: `learning-expansion` / 状態を変えたら必ずこの表も更新する。
+
+## 2026-11-23 最新チェックポイント（この節を優先）
+
+- 利用者の最新指示: 作業を続け、進捗ごとにコミットしてpushする。コミット `6a0f7f1 Add answer review flow and flexible hints` は作成済み。pushは拒否された。fetch後、origin/learning-expansion が `a7458d6` から `aabd59d` に更新され、ローカルにない18コミットとローカル固有42コミットがあり、通常のmergeは大規模な競合になった。mergeは中止し作業ツリーを復元済み。force pushは許可されていないため実行しない。変更はローカルブランチにある。
+- 以前依頼された05:00 JSTのタイマーは起動したが、この会話スレッドが動作中でresumeに失敗した。run.logにthread-store競合が記録され、タイマーによる作業再開は行われていない。
+- **レッスン全体の逐読監査は完了**: intro/basic、practice stages 1–34とExtra、advanced/readiness/festivalを分担して確認し、発見箇所を修正。既習コマンドで調べられる既存ファイル名・隠し場所・手順は課題文や事前説明から外してヒントへ。接続先、ユーザー、ポート、新規出力名、要件値は課題文に残す。新概念の説明は維持する。basic18、readiness07、Stage15-3/9など監査中に見つかった個別の問題も修正。
+- `engine/guidance.py` で、説明文に埋め込まれた完全解答（複数コマンド列を含む）をヒントから除外。guided/practice/readinessで共有し、静的走査では完全解答の漏れ0件。
+- 検証: 最新の全Python suiteは654件成功、50 skip（Stage15-9の最後の文面変更より前）。Stage15-9変更後にpy_compileとdiff --check成功。readiness/SSH/全ミッション等の該当テスト、Web build/npm/e2eを再実行する。
+- Webのreview/hint機能は一度 build・npm test・E2E 17件まで成功済みだが、今回の最終教材変更後の再確認は必要。デプロイはしていない。
+- これより下の2026-11-22節には再開前の予定・未完了リストが含まれる。事実として残すため削除しないが、上の最新チェックポイントで更新された状態を優先する。
+
+## 2026-11-22 夜・利用者指示で一時停止（ここを最優先）
+
+利用者は5時間制限を心配して一旦停止し、11月23日05:00（日本時間）からの自動再開を依頼。ユーザーsystemdの一回限りのタイマー codex-training-resume-20261123.timer を有効化し、NEXT=2026-11-23 05:00:00 JST を確認済み。codex exec resume でこのスレッドを再開する。実行ログはユーザーの .local/state/codex-training-resume-20261123/run.log。PC停止やログアウト中は動かず、Persistent設定で次回稼働時に遅延実行する。下記は未コミットのWIP。元の先頭節の「全コミット済み」「これから監査」はこの追記より古い。
+
+### 今回合意した仕様
+- 既習の道具を組み合わせれば分かる操作・既存の名前/場所は、課題文だけでなく出題前の説明にも先回りして書かずヒントへ。新概念の説明は必要。
+- 1ヶ月後にその問題から再開できるよう、サーバー名・ユーザー名・ポート、新規作成/保存名など調べても分からない指定は残す。
+- hintは3段階固定にしない。必要なだけ段階的な助言を示し、最終コマンドはanswerで表示。answer閲覧時点で未クリアでも復習対象へ自動登録し、reset後にhint/answerなしで達成すれば解除。
+- force push / push / 本番デプロイは許可待ち。今回も行わない。
+
+### 実施済み・WIPの状態
+- 入門24・基礎66・応用46を親が逐読して修正。basic43は鍵名の説明内漏れも削除し、5段階の助言を追加。
+- 実践501問（Stage1〜18=159、19〜34=337、Extra=5）を担当が逐読。変更は90+41+5問。合格後だけの解説は維持。
+- 達人246・課題まつり251を逐読。文言変更は達人103・まつり182（合計285）問。まつりincidentの鍵、scenarios27の鍵、config06/16の隠し設定等を探索へ。必要なlearner宛先も補足。
+- **範囲漏れ: curriculum/readiness.py の ready-01〜08 は未監査・未変更。** 次に読む。
+- engine/save.pyにreview辞書、mark_review/finish_review/review_idsを追加。旧実践セーブのanswer=Trueはreview未作成時に一度だけ移行する処理も追加（最後の移行変更は未検証）。
+- guided/readiness/実践cli/mainの任意hint・answer即登録・復習一覧・自力再挑戦解除を実装。guidedは選択画面rで絞込、実践とまつりもr。入力例そのもののhintは表示時に除外。
+- reset後も正解状態が残るex-users15/32/33とex-services41を修正。同じTerminalで全goal207問を解く→reset→無関係入力拒否を確認しtests/test_guided_reset.pyに追加。fresh時command_eventsも初期化。
+- **Webは実装途中・未検証**: public/worker.jsのreview永続化/validation/answer登録/reset後自力解除/review要求、lib/core.jsのreviewItems、components/Dojo.jsxのreview一覧/再開/helpまで担当が編集。新規Webテスト、衝突確認、build/npm/e2eは未実施。
+- 作業途中で**別の作業によるTab補完変更**がengine/guided.py、Dojo.jsx、worker.js、e2e、tests/test_completion.py等に入っている。保持する。今回担当の変更と一括で混ぜてコミットしない。初回statusはcleanだった。
+- コミット/push/deployは今回未実施。新規tests/test_guided_review.py、test_guided_reset.py、test_practice_assistance.pyも未追跡なので漏らさない。
+
+### 再開時に先に直す点（独立レビュー指摘・未修正）
+1. basic18はrmの初出だが、親が説明からrmの名前/書式まで消している。新概念の説明を戻す。
+2. basic24のapt removeも入門では未学習なので、新規書式説明を戻す。
+3. basic18は元とコピーが同内容。単独再開時にどちらが元か識別できる手がかりを調整（答えのパスの先回りに戻さない）。
+4. intro01/20/basic01等の「hintで入力例」という案内を助言/answer分離に揃える。README等にも固定3段階の記載がないか必要範囲を点検。
+5. 親の文言修正の独立再レビューはintro24とbasic01〜33/adv01〜21途中まで。basic34〜66とadv後半の見直しを終える。既習説明を削りすぎて新概念まで消さない。
+6. Web復習機能のレビュー/テストを追加し、reviewコマンドが教材と衝突しないか確認。旧データimport/export、未クリアanswer→再読込、reset→自力解除、hint使用時は解除しない、vim内answer、任意段階を検証。
+7. 全Pythonと501問の統合テスト、サイトbuild/npm/e2eを実行。画像でも代表的な変更問題を確認。検証済み単位で文言/CLI機能/Webを分けて小さくコミットし、HANDOFFを更新。
+
+### 検証の正確な状態
+- 親: 初期の既存69件成功。その後guided_review/units/guided/self_contained計52件成功、統合のguided_review/guided_reset/units/readiness/practice/self_contained計45件成功（最後の移行変更/選択Enter調整/Web途中変更より前）。
+- 担当: Stage1〜18の159/159、Extra5/5成功。Stage19〜34変更41問の個別テスト成功。readiness/festival26件成功。practice関連35件成功/既存skip1。reset関連28件成功。
+- 全Pythonと501問は実行途中で、利用者の停止指示によりSIGINTで止めた。**全体成功とは扱わない**。ログ: /tmp/training-review-python-all.log、/tmp/training-review-missions-all.log。
+- Web build/npm test/e2eは今回まだ一度も再実行していない。
+- 達人/まつり変更ID作業用JSONは /tmp/expert_audit_changed_ids.json（280件、fes-desktop_hw-11〜15の5件を足すと285）。再集計して正規の監査記録をdocsへ残す作業も未実施。
 
 ## Codexへ: いますぐやること（2026-11-22 最新・最優先。ここだけ読めば再開できる）
 

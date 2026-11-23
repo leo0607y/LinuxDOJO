@@ -168,14 +168,15 @@ def ce1(ctx):
 register(
     id="EX-1", stage=S, title="ブレース展開で一撃作成",
     story="""
-「`cp nginx.conf nginx.conf.bak` って毎回ファイル名を2回打つの、面倒じゃない？」と先輩がニヤリ。
+「バックアップのたびに同じファイル名を2回打つの、面倒じゃない？」と先輩がニヤリ。
 **ブレース展開** を使えば、ファイル名を1回打つだけでバックアップも、ディレクトリの量産も一瞬だ。
 """,
-    objectives=["`cp nginx.conf{,.bak}` で `nginx.conf.bak` を作る",
-                "`mkdir -p app/{src,test,docs}` で3つのディレクトリを一度に作る",
-                "`app/test/test_01.py` 〜 `test_05.py` の5ファイルを、連番のブレース展開 `{01..05}` で一度に作る"],
-    hints=["`{a,b}` は「a と b」に、`{1..5}` は「1 2 3 4 5」に展開されます。`echo` を前に付けると展開結果を確認できます。",
-           "`{,.bak}` は「空文字」と「.bak」の2つに展開される → `nginx.conf` と `nginx.conf.bak`。ゼロ埋めは `{01..05}`。",
+    objectives=["Webサーバーの設定ファイルを `nginx.conf.bak` へコピーする（元は変更しない）",
+                "`app/src`・`app/test`・`app/docs` の3ディレクトリを作る",
+                "`app/test/test_01.py` 〜 `app/test/test_05.py` の空ファイルを作る（01〜05 のゼロ埋め連番）",
+                "作成にはブレース展開を使い、同じ部分の入力をまとめる"],
+    hints=["繰り返す名前の共通部分と、末尾や連番など変わる部分を分けて考えましょう。",
+           "ls で元の設定を探し、コピーは cp、ディレクトリ作成は mkdir -p、空ファイルは touch を使います。`{a,b}` は候補の列挙、`{01..05}` はゼロ埋め連番です。echo を先頭に付ければ展開結果だけを確認できます。",
            "`cp nginx.conf{,.bak}` / `mkdir -p app/{src,test,docs}` / `touch app/test/test_{01..05}.py`"],
     answer="echo cp nginx.conf{,.bak}       # 展開結果の確認\ncp nginx.conf{,.bak}\nmkdir -p app/{src,test,docs}\ntouch app/test/test_{01..05}.py\nls -R app",
     explanation="""
@@ -221,13 +222,14 @@ def ce2(ctx):
 register(
     id="EX-2", stage=S, title="スペース入りファイル名の罠（xargs -0）",
     story="""
-`cache/` 配下の一時ファイル `*.tmp` を一括削除したい。`find | xargs rm` で消そうとしたら
+キャッシュ用ディレクトリの一時ファイルを一括削除したい。検索結果を xargs に渡したら
 「`old`: そのようなファイルはありません」と怒られた…。犯人は **ファイル名の中のスペース** だ。
 """,
-    objectives=["`find` で `cache/` 配下の `*.tmp` ファイルを探し、`xargs` に渡して **すべて** 削除する（スペース入りの名前も含む）",
-                "`.tmp` で終わらないファイル（`report.tmp.keep` など）は残す"],
-    hints=["まず `find cache -name '*.tmp' | xargs ls` を試して、どう壊れるか観察してみよう。xargs は空白や改行で引数を区切ります。",
-           "find の `-print0` は NUL 文字で区切って出力し、`xargs -0` は NUL 区切りで受け取ります。この2つはセットで使います。",
+    objectives=["キャッシュ用ディレクトリで `.tmp` で終わる通常ファイルをすべて削除する（スペース入りの名前も含む）",
+                "検索と一括処理には find と xargs を組み合わせる",
+                "`.tmp` で終わらないファイルは残す"],
+    hints=["ファイル名の途中の空白を、引数の区切りと取り違えていないか考えましょう。削除する前に対象を確認します。",
+           "ls で対象ディレクトリを探します。find の `-print0` は NUL 文字で区切って出力し、`xargs -0` は NUL 区切りで受け取ります。この2つはセットで使います。",
            "`find cache -name '*.tmp' -print0 | xargs -0 rm -v`"],
     answer="find cache -name '*.tmp' | xargs ls      # ← スペースで分割されて失敗するのを観察\nfind cache -name '*.tmp' -print0 | xargs -0 rm -v\nfind cache -type f",
     explanation="""
@@ -274,13 +276,13 @@ def ce3(ctx):
 register(
     id="EX-3", stage=S, title="tee で見ながら残す",
     story="""
-全Webサーバーのヘルスチェック `./healthcheck.sh` を実行する。結果は **画面で見ながら**、証跡として **全結果をファイルにも保存** したい。
+全Webサーバーのヘルスチェック用スクリプトを実行する。結果は **画面で見ながら**、証跡として **全結果をファイルにも保存** したい。
 さらにそのまま **NG の台数** も数えてしまおう。1行のパイプラインで！
 """,
-    objectives=["`./healthcheck.sh` の全出力を、画面に表示しつつ `health.log` に保存する（`tee` を使う）",
+    objectives=["ヘルスチェック用スクリプトの全出力を、表示用の処理に渡しつつ `health.log` に保存する（tee を使う）",
                 "同じパイプラインの続きで NG の行数を数え、その数を `submit` する"],
     hints=["パイプの途中に「T字の分岐管」を挟むと、流れているデータをファイルにも書き出しつつ、次のコマンドへ流し続けられます。",
-           "`cmd | tee ファイル | 次のコマンド`。行数を数えるのは `grep -c NG`。",
+           "ls でスクリプトを探します。`cmd | tee ファイル | 次のコマンド` で保存と後続処理を両立できます。条件に合う行を数える道具は grep です。",
            "`./healthcheck.sh | tee health.log | grep -c NG` → 出た数を `submit`"],
     answer="./healthcheck.sh | tee health.log | grep -c NG\nsubmit <<ng>>\ncat health.log",
     explanation="""
@@ -325,13 +327,13 @@ register(
     id="EX-4", stage=S, title="終了ステータスと && / || の連鎖",
     story="""
 CI もどきを1行で組みたい。「lint が通ったら test、test も通ったらデプロイ許可フラグ `deploy.ok` を作る。
-**どこかで失敗したら** `alert.log` に FAILED と書く」。ところで、`./test.sh` はどうやら失敗するらしい…。
+**どこかで失敗したら** `alert.log` に FAILED と書く」。ところで、テスト用スクリプトはどうやら失敗するらしい…。
 """,
-    objectives=["`./test.sh` を実行した直後に `echo $?` で終了ステータスを確認し、その値を `submit` する",
-                "`./lint.sh` → `./test.sh` → `touch deploy.ok` を `&&` で繋ぎ、失敗時は `|| echo FAILED > alert.log` となる1行を実行する",
+    objectives=["テスト用スクリプトの終了ステータスを確認し、その値を submit する",
+                "lint、test、空ファイル deploy.ok の作成をこの順に、成功したときだけ次へ進む1行にまとめる。途中で失敗したら alert.log に FAILED を保存する（&& と || を使う）",
                 "（test が失敗するので `deploy.ok` は作られず、`alert.log` に FAILED が残るのが正解）"],
     hints=["コマンドの成否は「終了ステータス」で判定されます。直前のコマンドの終了ステータスは特殊変数で見られます。",
-           "`$?` が直前の終了ステータス（0=成功）。`A && B` は A 成功時のみ B、`A || B` は A 失敗時のみ B。",
+           "ls と cat で各スクリプトの役割を確かめます。`$?` が直前の終了ステータス（0=成功）。`A && B` は A 成功時のみ B、`A || B` は A 失敗時のみ B。",
            "`./test.sh; echo $?` → `submit <数字>` / `./lint.sh && ./test.sh && touch deploy.ok || echo FAILED > alert.log`"],
     answer="./test.sh\necho $?                # → <<code>>\nsubmit <<code>>\n./lint.sh && ./test.sh && touch deploy.ok || echo FAILED > alert.log\nls; cat alert.log",
     explanation="""
@@ -390,15 +392,15 @@ def ce5(ctx):
 register(
     id="EX-5", stage=S, title="diff と patch、そしてプロセス置換",
     story="""
-本番の設定 `prod/app.conf` に対する変更案 `prod/app.conf.new` が出てきた。まずは **差分をパッチファイル** にしてレビューに回し、
-同じ変更をステージング環境 `staging/app.conf` に **patch で適用** しよう。
+本番の設定に対する変更案が出てきた。まずは **差分をパッチファイル** にしてレビューに回し、
+同じ変更をステージング環境の設定に **patch で適用** しよう。
 ついでに、2台のサーバーのパッケージ一覧（並び順がバラバラ）を比べて、**server_b にだけ入っているもの** を見つけてほしい。
 """,
-    objectives=["`diff -u` で `prod/app.conf` → `prod/app.conf.new` の差分を `changes.patch` に保存する",
-                "`patch` で `changes.patch` を `staging/app.conf` に適用する（prod 側は変更しない）",
-                "`diff <(sort server_a.txt) <(sort server_b.txt)` で比較し、server_b にだけあるパッケージ名を `submit` する"],
-    hints=["差分の出力形式は色々あるが、レビューやパッチには `-u`（unified）が標準。パッチの適用は `patch 対象 < パッチ`。",
-           "`<(コマンド)` は「コマンドの出力をファイルのように渡す」プロセス置換。`>` で始まる行が右側（server_b）にだけある行です。",
+    objectives=["本番の現設定から変更案への差分を、unified 形式の changes.patch に保存する",
+                "パッチをステージングの設定に適用する（本番側は変更しない）",
+                "並び順の違いを除いて2台のパッケージ一覧を比較し、server_b にだけあるパッケージ名を submit する"],
+    hints=["設定の変更内容と、一覧の並び順による見かけの差を分けて考えましょう。本番の原本は保持します。",
+           "ls や cat で現設定・変更案・比較資料を探します。差分は diff -u、適用は patch、一覧の並べ替えは sort です。`<(コマンド)` は出力を一時ファイルのように渡すプロセス置換です。",
            "`diff -u prod/app.conf prod/app.conf.new > changes.patch` / `patch staging/app.conf < changes.patch` / `diff <(sort server_a.txt) <(sort server_b.txt)`"],
     answer="diff -u prod/app.conf prod/app.conf.new > changes.patch\ncat changes.patch\npatch --dry-run staging/app.conf < changes.patch\npatch staging/app.conf < changes.patch\ndiff <(sort server_a.txt) <(sort server_b.txt)\nsubmit <<extra>>",
     explanation="""

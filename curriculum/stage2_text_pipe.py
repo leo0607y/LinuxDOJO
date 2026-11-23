@@ -76,12 +76,12 @@ def c21(ctx):
 register(
     id="2-1", stage=S, title="リダイレクトの使い分け",
     story="""
-デプロイスクリプト `deploy.sh` の実行結果を、運用ログ `deploy.log` に **追記** で残したい。
-ただし `deploy.sh` は通常メッセージ（標準出力）と警告（標準エラー出力）の両方を出す。**両方とも** 記録すること。
-また `noisy.sh` は大量の警告で画面を汚すので、警告は捨てて正常な結果だけ `result.txt` に保存したい。
+デプロイスクリプトの実行結果を、運用ログ `deploy.log` に **追記** で残したい。
+ただしデプロイスクリプトは通常メッセージ（標準出力）と警告（標準エラー出力）の両方を出す。**両方とも** 記録すること。
+もう1つのスクリプトは大量の警告で画面を汚すので、警告は捨てて正常な結果だけ `result.txt` に保存したい。
 """,
-    objectives=["`./deploy.sh` の標準出力と標準エラー出力の **両方** を、既存の記録を消さずに `deploy.log` へ追記する",
-                "`./noisy.sh` のエラー出力を `/dev/null` に捨て、標準出力だけを `result.txt` に保存する"],
+    objectives=["デプロイスクリプトの標準出力と標準エラー出力の **両方** を、既存の記録を消さずに `deploy.log` へ追記する",
+                "大量の警告を出すスクリプトのエラー出力を `/dev/null` に捨て、標準出力だけを `result.txt` に保存する"],
     hints=["出力には「標準出力(1番)」と「標準エラー出力(2番)」の2系統があります。`>` は上書き、`>>` は追記です。",
            "`2>&1` は「2番（エラー）を1番（標準出力）と同じ行き先へ」。`2>/dev/null` は「エラーをブラックホールへ捨てる」。",
            "`./deploy.sh >> deploy.log 2>&1` と `./noisy.sh 2>/dev/null > result.txt`。順番に注意！"],
@@ -136,13 +136,13 @@ def c22(ctx):
 register(
     id="2-2", stage=S, title="大文字も小文字もまとめて grep",
     story="""
-アプリのログ `app.log` には `ERROR` `error:` `Error` と、表記ゆれのあるエラーが混在している。
+アプリのログには `ERROR` `error:` `Error` と、表記ゆれのあるエラーが混在している。
 開発チームから「**エラー系の行を全部**抜き出して送って」「ついでに **警告(warn)系が何行あるか** も教えて」と頼まれた。
 """,
-    objectives=["`app.log` から、大文字小文字を問わず `error` を含む行をすべて `errors.txt` に保存する",
+    objectives=["アプリのログから、大文字小文字を問わず `error` を含む行をすべて `errors.txt` に保存する",
                 "大文字小文字を問わず `warn` を含む行の **行数** を数えて `submit` する"],
     hints=["`grep 文字列 ファイル` で一致する行を抽出できます。ただし標準では大文字小文字を区別します。",
-           "`-i` (ignore-case) で大文字小文字を無視。行数を数えるなら `-c`（count）か `| wc -l`。",
+           "ls でログの名前を調べます。`-i` (ignore-case) で大文字小文字を無視。行数を数えるなら `-c`（count）か `| wc -l`。",
            "`grep -i error app.log > errors.txt` と `grep -ic warn app.log` → 出た数字を `submit`。"],
     answer="grep -i error app.log > errors.txt\ngrep -ic warn app.log      # または grep -i warn app.log | wc -l\nsubmit <<warn>>",
     explanation="""
@@ -228,11 +228,11 @@ def c23(ctx):
 register(
     id="2-3", stage=S, title="ソースコードに埋まった秘密を暴け",
     story="""
-セキュリティ監査で「**パスワードのハードコード**」が見つかった。`src/` 配下のどのファイルに `PASSWORD=` という文字列が
+セキュリティ監査で「**パスワードのハードコード**」が見つかった。ソースコードのディレクトリ配下のどのファイルに `PASSWORD=` という文字列が
 書かれているかを洗い出し、該当ファイルの一覧を作って開発チームに渡したい。
-なお `src/private/` は権限がなく読めないので、エラーが出ても気にせず捨ててよい。
+なお権限がなく読めない場所もあるので、エラーが出ても気にせず捨ててよい。
 """,
-    objectives=["`src/` 配下を再帰的に検索し、`PASSWORD=` を含む **ファイルのパスだけ** を `leaked.txt` に1行ずつ保存する",
+    objectives=["ソースコードのディレクトリ配下を再帰的に検索し、`PASSWORD=` を含む **ファイルのパスだけ** を `leaked.txt` に1行ずつ保存する",
                 "読めないディレクトリの Permission denied エラーは `2>/dev/null` で捨てる"],
     hints=["`grep` はディレクトリの中身をまるごと再帰的に検索することもできます。ファイル名だけを出すオプションもあります。",
            "`-r`（recursive）で再帰検索、`-l`（files-with-matches）で一致したファイル名だけを表示。",
@@ -301,10 +301,10 @@ def c24(ctx):
 register(
     id="2-4", stage=S, title="コメントと空行を取り除け（grep -v と正規表現）",
     story="""
-設定ファイル `app.conf` はコメントだらけで、**実際に有効な設定がどれか** 分かりにくい。
+アプリの設定ファイルはコメントだらけで、**実際に有効な設定がどれか** 分かりにくい。
 コメント行と空行を取り除いた「有効な設定だけ」の一覧 `clean.conf` を作って、レビューに回したい。
 """,
-    objectives=["`app.conf` から、コメント行（行頭や **インデント後** が `#` の行）と空行を取り除いた結果を `clean.conf` に保存する"],
+    objectives=["アプリの設定ファイルから、コメント行（行頭や **インデント後** が `#` の行）と空行を取り除いた結果を `clean.conf` に保存する"],
     hints=["「マッチした行を **除外** する」オプションが grep にはあります。行頭は正規表現で `^` と書きます。",
            "`grep -v`（invert）で除外。`-E` で拡張正規表現。`^\\s*#` は「行頭から空白の後に #」、`^$` は空行。",
            "`grep -Ev '^\\s*(#|$)' app.conf > clean.conf` または `grep -v '^\\s*#' app.conf | grep -v '^$' > clean.conf`"],
@@ -364,7 +364,7 @@ register(
 深夜3時のバッチが `OutOfMemoryError` で落ちた。エラー行そのものだけでなく、
 **直前に何が起きていて、直後にどうなったか** が原因究明のカギになる。
 """,
-    objectives=["`batch.log` から `OutOfMemoryError` を含む行と、その **前後2行ずつ**（計5行）を `context.txt` に保存する"],
+    objectives=["バッチのログから `OutOfMemoryError` を含む行と、その **前後2行ずつ**（計5行）を `context.txt` に保存する"],
     hints=["grep には一致した行の「前」「後」「前後」の行も一緒に表示するオプションがあります。",
            "`-A n`（After）、`-B n`（Before）、`-C n`（Context: 前後）。",
            "`grep -C 2 OutOfMemoryError batch.log > context.txt`"],
@@ -434,11 +434,11 @@ register(
     id="2-6", stage=S, title="find で探して、古いものを片付ける",
     story="""
 ディスク使用率が 90% を超えたとアラートが鳴った！
-まず `project/` 配下で **1MB を超える巨大な .log ファイル** を洗い出してリストにまとめ、
-さらに `backups/` にある **7日より古いバックアップ (*.tar.gz)** を削除して空き容量を確保せよ。
+まずプロジェクトのディレクトリ配下で **1MB を超える巨大な .log ファイル** を洗い出してリストにまとめ、
+さらにバックアップのディレクトリにある **7日より古いバックアップ (*.tar.gz)** を削除して空き容量を確保せよ。
 """,
-    objectives=["`project/` 配下から「通常ファイル」かつ「名前が `.log` で終わる」かつ「1MB 超」のものを探し、パス一覧を `big_logs.txt` に保存する",
-                "`backups/` の `*.tar.gz` のうち、最終更新が **7日より前** のものを削除する（新しいものと README.txt は残す）"],
+    objectives=["プロジェクトのディレクトリ配下から「通常ファイル」かつ「名前が `.log` で終わる」かつ「1MB 超」のものを探し、パス一覧を `big_logs.txt` に保存する",
+                "バックアップのディレクトリの `*.tar.gz` のうち、最終更新が **7日より前** のものを削除する（新しいものと案内ファイルは残す）"],
     hints=["`find 探す場所 条件...` で条件に合うファイルを探せます。種類・名前・サイズ・更新日時を条件にできます。",
            "`-type f`（ファイルのみ）、`-name '*.log'`、`-size +1M`（1MB超）、`-mtime +7`（7日より前）、`-delete`（削除）。",
            "`find project -type f -name '*.log' -size +1M > big_logs.txt` / まず `find backups -name '*.tar.gz' -mtime +7` で確認 → 末尾に `-delete`。"],
@@ -509,10 +509,10 @@ register(
     story="""
 「ECサイトで 500 Internal Server Error が多発している。**どのIPからのアクセスでエラーが起きているか**、
 多い順のランキングを出してくれ！」とリーダーから緊急依頼。
-`access.log`（1000行、Nginx の combined 形式）を集計パイプラインで料理せよ。
+アクセスログ（1000行、Nginx の combined 形式）を集計パイプラインで料理せよ。
 """,
-    objectives=["`access.log` のうちステータスコードが **500** の行だけを対象にする（ステータスは9列目）",
-                "IPアドレス（1列目）ごとの件数を数え、**件数の多い順** に「件数 IP」の形式で `report.txt` に保存する"],
+    objectives=["アクセスログのうちステータスコードが **500** の行だけを対象にする",
+                "IPアドレスごとの件数を数え、**件数の多い順** に「件数 IP」の形式で `report.txt` に保存する"],
     hints=["「500の行を絞る → IPだけ取り出す → 並べる → 重複を数える → 件数で並べ直す」とパイプで段階的に加工します。まず `head -3 access.log` で形式を確認！",
            "`awk '$9 == 500 {print $1}'` で9列目が500の行の1列目を表示。`sort` → `uniq -c` → `sort -rn`。",
            "`awk '$9==500 {print $1}' access.log | sort | uniq -c | sort -rn > report.txt`"],
@@ -600,12 +600,12 @@ register(
     id="2-8", stage=S, title="CSV の列抽出と設定の一括置換",
     story="""
 2つの依頼が同時に来た。
-① 人事から「`users.csv` から **開発部(dev)** のメンバーのメールアドレス一覧が欲しい」。※ `devops` 部署もあるので注意！
-② 本番リリースに向けて `config.yaml` の **DBホストを `localhost` → `db.prod.internal` に一括置換**、デバッグモードも OFF にしたい。
+① 人事から「メンバー一覧のCSV から **開発部(dev)** のメンバーのメールアドレス一覧が欲しい」。※ `devops` 部署もあるので注意！
+② 本番リリースに向けてアプリのYAML設定の **DBホストを `localhost` → `db.prod.internal` に一括置換**、デバッグモードも OFF にしたい。
 """,
-    objectives=["`users.csv`（id,name,email,department）から、department が **ちょうど** `dev` の人の email だけを `dev_emails.txt` に保存する",
-                "`config.yaml` の `db_host: localhost` をすべて `db_host: db.prod.internal` に置換する（`cache_host` は変えない）",
-                "`config.yaml` の `debug: true` を `debug: false` にする（ファイルを直接書き換える）"],
+    objectives=["メンバー一覧のCSVから、department が **ちょうど** `dev` の人の email だけを `dev_emails.txt` に保存する",
+                "アプリのYAML設定の `db_host: localhost` をすべて `db_host: db.prod.internal` に置換する（`cache_host` は変えない）",
+                "アプリのYAML設定の `debug: true` を `debug: false` にする（ファイルを直接書き換える）"],
     hints=["CSV はカンマ区切りの「列」データ。列を指定して取り出すコマンドと、文字列を置換してファイルを書き換えるコマンドがあります。",
            "`awk -F, '$4 == \"dev\" {print $3}'`（-F で区切り文字指定）や `cut -d, -f3`。置換は `sed -i 's/旧/新/g' ファイル`。",
            "`awk -F, '$4==\"dev\"{print $3}' users.csv > dev_emails.txt` / `sed -i 's/db_host: localhost/db_host: db.prod.internal/; s/debug: true/debug: false/' config.yaml`"],

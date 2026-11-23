@@ -113,7 +113,7 @@ PY
 printf '%s\\n' "badblocks -sv -b 4096 <<d>>" "blockdev --setro <<d>>" > cmd.txt"""
 mission(1, 'badblocks・blkdiscard・blockdevで不良ブロック診断を読む',
         '古い外付けディスクの診断記録が届きました。blockdev でサイズとブロックサイズを確認し、badblocks の読み取りテストで不良ブロックを数えます。blkdiscard はSSD向けでデータを破棄する破壊的コマンドなので、診断には絶対使いません。',
-        ['record.txtを読みreport.jsonへ', '安全なbadblocksとblockdev --setroをcmd.txtへ'], s1, c1, SOL1,
+        ['診断記録を見つけて読みreport.jsonへ', '安全なbadblocksとblockdev --setroをcmd.txtへ'], s1, c1, SOL1,
         ['printf \'%s\\n\' "badblocks -wsv -b 4096 <<d>>" "blockdev --setro <<d>>" > cmd.txt',
          'printf \'%s\\n\' "blkdiscard <<d>>" "blockdev --setro <<d>>" > cmd.txt'],
         'blockdev --getsize64 はバイト数、--getbsz はブロックサイズ、--setro は読み取り専用化(--setrwで戻す)です。badblocksは既定が読み取りテスト、-nは非破壊の読書き、-wは破壊的な書込みテストです。blkdiscardはTRIM/DISCARDを全域に発行しデータが失われるため、診断ではなく処分・初期化の最後に使います。',

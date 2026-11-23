@@ -414,8 +414,8 @@ def c10(ctx):
 
 SOL10 = r'''{ for s in $(awk '/^ *services:/{$1=""; print}' fw.txt); do [ "$s" = ssh ] || echo "firewall-cmd --permanent --zone=public --remove-service=$s"; done; for p in $(awk '/^ *ports:/{$1=""; print}' fw.txt); do echo "firewall-cmd --permanent --zone=public --remove-port=$p"; done; echo "firewall-cmd --permanent --zone=public --add-service=https"; echo "firewall-cmd --reload"; } > fix.sh'''
 mission(10, 'firewall-cmdでゾーンとサービスを読み最小公開にする',
-        'firewalld は ゾーンにサービスやポートを割り当てて通信を制御します。fw.txt は firewall-cmd --list-all の出力です。--permanent は再起動後も残す設定で、実行中の状態に反映するには --reload が必要です。不要な公開を削り、必要最小限にしてください。',
-        ['fw.txtから不要な公開を洗い出す', '--permanent付きの削除とhttps追加、--reloadを書く'], s10, c10, SOL10,
+        'firewalld は ゾーンにサービスやポートを割り当てて通信を制御します。採取済みの firewall-cmd --list-all の出力を調べます。--permanent は再起動後も残す設定で、実行中の状態に反映するには --reload が必要です。不要な公開を削り、必要最小限にしてください。',
+        ['採取記録から不要な公開を洗い出す', '--permanent付きの削除とhttps追加、--reloadを書く'], s10, c10, SOL10,
         [r'''echo "firewall-cmd --permanent --zone=public --add-service=https" > fix.sh; echo "firewall-cmd --reload" >> fix.sh''',
          r'''{ for s in $(awk '/^ *services:/{$1=""; print}' fw.txt); do [ "$s" = ssh ] || echo "firewall-cmd --zone=public --remove-service=$s"; done; echo "firewall-cmd --reload"; } > fix.sh'''],
         'firewall-cmd --get-active-zones でゾーン、--list-all で内容を見ます。--add-service/--remove-service はサービス名（定義済みポート群）、--add-port/--remove-port は個別ポートです。--permanent なしの変更は reload や再起動で消え、--permanent だけだと実行中には反映されません。sshを誤って消すと接続不能になるので、必ず残します。',

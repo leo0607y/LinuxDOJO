@@ -591,7 +591,7 @@ def s16(ctx):
     except subprocess.TimeoutExpired:
         pr.kill()
     ctx.data['swap'] = any(ctx.work.glob('.notes.txt.sw*'))
-    ctx.write('requirements.txt', 'Vimが強制終了し、notes.txt には保存前の編集がありません。swapファイル（.notes.txt.swp）から vim -r で復旧した内容を recovered.txt に保存する（notes.txt自体は上書きしない）。\n')
+    ctx.write('requirements.txt', 'Vimが強制終了し、作業フォルダのメモには保存前の編集がありません。復旧候補を調べ、残った編集記録から vim -r で復旧した内容を recovered.txt に保存する（元のメモ自体は上書きしない）。\n')
 
 
 def c16(ctx):
@@ -604,11 +604,11 @@ SOL16 = """ls -a
 vim -Nu NONE -Es -r notes.txt -c 'w! recovered.txt' -c 'qa!'"""
 mission(16, 'swap ファイルからの復旧（vim -r）',
         'Vimは編集中の内容を .ファイル名.swp に定期保存し、異常終了すると残ります。vim -r（引数なし）で復旧可能なファイル一覧、vim -r ファイル名 で復旧できます。復旧後は内容を確認してから保存し、不要になった swap は消します（誰かが同じファイルを開いている場合の警告と区別しましょう）。',
-        ['recovered.txt に保存前の行を含む内容', 'notes.txt は変更なし'], s16, c16, SOL16,
+        ['recovered.txt に保存前の行を含む内容', '復旧元のファイルは変更なし'], s16, c16, SOL16,
         ["cp notes.txt recovered.txt",
          "vim -Nu NONE -Es notes.txt -c 'w! recovered.txt' -c 'qa!'"],
         'swap は隠しファイルなので ls -a で確認できます。通常の vim notes.txt で開くと「swapが存在する」警告が出て、R で復旧、D で swap 削除を選べます。復旧後は :w で保存しないと swap が残り続けます。',
-        'swap は ls -a で見える隠しファイルです。', 'vim -r ファイル名 でバッファへ復元し、:w! で別名保存します。')
+        'まず復旧できる編集記録を探し、保存済みの内容と区別しましょう。', 'ls -a で隠しファイルまで確認し、vim -r（引数なし）で復旧候補を調べます。対象を vim -r ファイル名 で復元し、:w! で別名保存します。')
 
 
 # ---------------------------------------------------------------- 17 big file / view / vimtutor

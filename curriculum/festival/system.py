@@ -175,8 +175,7 @@ SCENARIOS = [
         "id": "fes-system-08",
         "level": 1,
         "title": "いちばん大きいフォルダはどれ？",
-        "brief": "ホームに cache・logs・docs の3つのフォルダがあります。それぞれの合計サイズを調べ、いちばん大きいフォルダの名前だけを "
-                 "big.txt に1行で書いてください。調べずに当て推量で書くのはなしです。",
+        "brief": 'ホームにあるフォルダそれぞれの合計サイズを調べ、いちばん大きいフォルダの名前だけを big.txt に1行で書いてください。調べずに当て推量で書くのはなしです。',
         "files": {"cache/a.bin": _BIG, "cache/b.bin": _BIG, "logs/app.log": _SMALL * 5, "docs/readme.txt": _SMALL},
         "solution": ["du -sh cache logs docs", "echo cache > big.txt"],
         "alt_solutions": [["du -sh *", "echo cache > big.txt"], ["du -s cache", "du -s logs", "du -s docs", "echo cache > big.txt"]],
@@ -185,7 +184,7 @@ SCENARIOS = [
         "checks_commands": [["du -sh cache logs docs", "du -sh *", "du -s *", "du -h *", "du -sh ./*", "du -s cache logs docs",
                              "du -sh cache", "du -s cache", "du -h cache", "du -sh .", "du -h ."]],
         "hints": ["df はディスク全体の量、フォルダごとの大きさを見るのは別のコマンドです。",
-                  "du -sh フォルダ名 で、フォルダの合計サイズが読みやすい単位で表示されます。複数まとめて指定できます。",
+                  'ls と cat で対象の名前・場所・内容を確かめます。du -sh フォルダ名 で、フォルダの合計サイズが読みやすい単位で表示されます。複数まとめて指定できます。',
                   "du -sh cache logs docs で比べ、いちばん大きい名前を echo で big.txt に書きます。"],
         "explanation": "ディスクが逼迫したとき、df で「足りない」と分かったら、du で「どこが使っているか」を絞り込みます。"
                        "当て推量で消すと、大事なデータを消して容量も空かない、という最悪の結果になりがちです。",
@@ -295,8 +294,7 @@ SCENARIOS = [
         "id": "fes-system-14",
         "level": 2,
         "title": "去年のキャッシュだけを消して容量を空ける",
-        "brief": "tmp フォルダが大きくなっています。2024 年に作られたキャッシュ（ファイル名に 2024 が入る .tmp）だけを削除してください。"
-                 "今月（2025-11）のキャッシュと、使用中の印である app.lock は残します。消す前にフォルダの大きさを確認してください。",
+        "brief": '一時ファイル用フォルダが大きくなっています。2024 年に作られたキャッシュ（ファイル名に 2024 が入る .tmp）だけを削除してください。今月（2025-11）のキャッシュと、使用中の印である ロックファイル は残します。消す前にフォルダの大きさを確認してください。',
         "files": {"tmp/cache-2024-10-01.tmp": _BIG, "tmp/cache-2024-12-24.tmp": _BIG, "tmp/cache-2024-12-31.tmp": _BIG,
                   "tmp/cache-2025-11-20.tmp": "今月のキャッシュ\n", "tmp/app.lock": "pid=7000\n"},
         "solution": ["du -sh tmp", "ls tmp", "rm tmp/cache-2024-*.tmp", "du -sh tmp"],
@@ -307,7 +305,7 @@ SCENARIOS = [
         "expected_files": {"tmp/cache-2025-11-20.tmp": "今月のキャッシュ\n", "tmp/app.lock": "pid=7000\n"},
         "checks_commands": [["du -sh tmp", "du -h tmp", "du -s tmp", "du tmp", "du -sh tmp/", "du -sh *", "du -sh ."]],
         "hints": ["消す前に大きさを確かめ、ワイルドカードが何に一致するかを ls で確認すると安全です。",
-                  "du -sh tmp で大きさを見て、2024 を含む名前だけに一致するパターンで rm します。",
+                  'ls と cat で対象の名前・場所・内容を確かめます。du -sh tmp で大きさを見て、2024 を含む名前だけに一致するパターンで rm します。',
                   "du -sh tmp → rm tmp/cache-2024-*.tmp"],
         "explanation": "*.tmp のような広いパターンは、今使っているファイルまで消してしまいます。日付など「消してよい理由」がパターンに入っているかを確かめてから実行します。",
         "practice": ["2-6", "3-8"],
@@ -316,8 +314,7 @@ SCENARIOS = [
         "id": "fes-system-15",
         "level": 2,
         "title": "ローテート済みの圧縮ログを2か所で片付ける",
-        "brief": "logs と logs/nginx の2つのフォルダに、ローテート（世代分け）されて .gz で圧縮された古いログがたまっています。"
-                 "両方のフォルダの .gz だけを削除してください。いま書き込み中の .log と、直近の世代 .log.1 は残します。",
+        "brief": 'ログ用フォルダとその下の Web サーバー用フォルダに、ローテートされ gzip 圧縮された古いログがたまっています。両方のフォルダの圧縮ログだけを削除してください。書き込み中のログと直近の世代は残します。',
         "files": {"logs/app.log": "今のログ\n", "logs/app.log.1": "昨日のログ\n", "logs/app.log.2.gz": _OLD, "logs/app.log.3.gz": _OLD,
                   "logs/nginx/access.log": "アクセス\n", "logs/nginx/access.log.1": "昨日のアクセス\n",
                   "logs/nginx/access.log.2.gz": _OLD, "logs/nginx/access.log.3.gz": _OLD},
@@ -329,7 +326,7 @@ SCENARIOS = [
         "expected_files": {"logs/app.log": "今のログ\n", "logs/app.log.1": "昨日のログ\n",
                            "logs/nginx/access.log": "アクセス\n", "logs/nginx/access.log.1": "昨日のアクセス\n"},
         "hints": ["ワイルドカードは1つのフォルダの中だけに効きます。サブフォルダは別に指定が必要です。",
-                  "logs/*.gz と logs/nginx/*.gz の2つのパターンを rm に並べられます。find -name で先に一覧を見ても構いません。",
+                  'ls と cat で対象の名前・場所・内容を確かめます。logs/*.gz と logs/nginx/*.gz の2つのパターンを rm に並べられます。find -name で先に一覧を見ても構いません。',
                   "rm logs/*.gz logs/nginx/*.gz"],
         "explanation": "書き込み中のログ（.log）を消すと、アプリはファイルを掴んだままなので容量が空かないうえに、ログも失われます。"
                        "片付けてよいのは、ローテート済みで圧縮された古い世代です。",
@@ -455,12 +452,7 @@ SCENARIOS = [
         "id": "fes-system-21",
         "level": 3,
         "title": "【総合】ディスク 90% からの復旧",
-        "brief": "ディスク使用率が 90% になりました。次の作業をして report フォルダに記録を残してください。"
-                 "(1) ルート（/）のディスク行を report/disk.txt に保存。"
-                 "(2) backup・logs・tmp のうち大きいフォルダを調べる。"
-                 "(3) backup では最新の db-2025-11-20.sql.gz だけを残し、2024 年のバックアップを削除。"
-                 "(4) tmp の .tmp ファイルを全部削除（tmp/README は残す）。logs/current.log は消しません。"
-                 "(5) 片付け後の backup フォルダの中身の一覧を report/backup-after.txt に保存。",
+        "brief": 'ディスク使用率が90%になりました。report フォルダを作り、次を行ってください。(1) ルート（/）のディスク行を report/disk.txt に保存する。(2) ホーム内のフォルダの大きさを比較する。(3) バックアップ用フォルダでは最新の1件だけ残し、2024年分を削除する。(4) 一時ファイル用フォルダの .tmp だけ削除し、説明書は残す。ログは削除しない。(5) 片付け後のバックアップ用フォルダの一覧を report/backup-after.txt に保存する。',
         "files": {"backup/db-2024-09-30.sql.gz": _BIG, "backup/db-2024-10-31.sql.gz": _BIG, "backup/db-2024-12-31.sql.gz": _BIG,
                   "backup/db-2025-11-20.sql.gz": "最新のバックアップ\n", "tmp/upload-1.tmp": _OLD, "tmp/upload-2.tmp": _OLD,
                   "tmp/README": "このフォルダは一時ファイル用です\n", "logs/current.log": "今のログ\n"},
@@ -487,7 +479,7 @@ SCENARIOS = [
         "checks_commands": [["du -sh backup logs tmp", "du -sh *", "du -s *", "du -h *", "du -s backup", "du -sh backup",
                              "du -h backup", "du -s backup logs tmp", "du -sh ./*"]],
         "hints": ["全体（df）→ 場所（du）→ 消してよいものの見極め（ls）→ 削除 → 記録、の順に進めます。",
-                  "df -h | grep と du -sh で調べ、rm には 2024 や .tmp のように「消してよい理由」が入ったパターンを使います。",
+                  'ls と cat で対象の名前・場所・内容を確かめます。df -h | grep と du -sh で調べ、rm には 2024 や .tmp のように「消してよい理由」が入ったパターンを使います。',
                   "mkdir report → df -h | grep sda1 > report/disk.txt → du -sh backup logs tmp → rm backup/db-2024-*.sql.gz → rm tmp/*.tmp → ls backup > report/backup-after.txt"],
         "explanation": "容量対応で一番怖いのは、焦って最新のバックアップや使用中のファイルまで消すことです。"
                        "最新の世代が残っていることを一覧で記録しておけば、作業が安全だったことを後から証明できます。",
@@ -570,12 +562,7 @@ SCENARIOS = [
         "id": "fes-system-24",
         "level": 3,
         "title": "【総合】障害調査の後片付けと引き継ぎ",
-        "brief": "障害調査が終わったので、調査用に用意したものを片付けて引き継ぎます。"
-                 "(1) 調査用に立ち上げた python3 -m http.server（ポート 8000）を止める。本番の app.py は止めない。"
-                 "(2) 環境変数 DEBUG_MODE を消す（APP_ENV は残す）。"
-                 "(3) debug フォルダの .dump ファイルを削除し、debug/README.txt は残す。"
-                 "(4) 今後の調査用に jq を入れる。"
-                 "(5) 実施した内容を handover.txt に3行以上で書く。最後にディスクの空き容量を確認します。",
+        "brief": '障害調査が終わったので、調査用に用意したものを片付けて引き継ぎます。(1) 調査用に立ち上げた python3 -m http.server（ポート 8000）を止める。本番の app.py は止めない。(2) 環境変数 DEBUG_MODE を消す（APP_ENV は残す）。(3) 調査用フォルダの .dump ファイルを削除し、説明書 は残す。(4) 今後の調査用に jq を入れる。(5) 実施した内容を handover.txt に3行以上で書く。最後にディスクの空き容量を確認します。',
         "processes": [_APP, _HTTP_DEBUG],
         "env": {"DEBUG_MODE": "1", "APP_ENV": "production"},
         "files": {"debug/core-0101.dump": _BIG, "debug/heap-0102.dump": _BIG, "debug/README.txt": "調査手順のメモ\n"},
@@ -608,7 +595,7 @@ SCENARIOS = [
         "min_lines": {"handover.txt": 3},
         "checks_commands": [["df -h", "df", "df -h | grep sda1", "df -h | grep /dev/sda1"]],
         "hints": ["5つの作業は互いに独立しています。1つずつ片付けて、そのたびに確認しましょう。",
-                  "プロセスは ps aux で PID を確認して kill、変数は unset、ファイルは *.dump で rm、ソフトは update → install。メモは > と >> で書きます。",
+                  'ls と cat で対象の名前・場所・内容を確かめます。プロセスは ps aux で PID を確認して kill、変数は unset、ファイルは *.dump で rm、ソフトは update → install。メモは > と >> で書きます。',
                   "kill 7100 → unset DEBUG_MODE → rm debug/*.dump → sudo apt update → sudo apt install -y jq → echo ... > handover.txt（2行目以降は >>）→ df -h"],
         "explanation": "調査用に開いたポートや変数、巨大な dump を残すと、セキュリティの穴や次の容量逼迫の原因になります。"
                        "片付けた内容を書き残せば、次の担当者が同じことを二度調べずに済みます。",

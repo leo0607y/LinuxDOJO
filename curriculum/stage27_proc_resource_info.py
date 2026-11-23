@@ -507,7 +507,7 @@ disown
 # jobs で一覧、ps/pgrep でPIDを確認する
 EOF"""
 mission(10, 'nohup・&・disown・jobsでログアウト後も動かす',
-        '長い処理をSSHで実行中にログアウトしてもSIGHUPで死なないようにします。nohupは終了シグナル(SIGHUP)を無視させ、&でバックグラウンド化、jobsでジョブ番号を確認、disownでシェルのジョブ表から外します。',
+        '長い処理をSSHで実行中にログアウトしても、端末の切断に巻き込まれて終了しないようにします。以前学んだバックグラウンド処理と、切断後も処理を残す方法を組み合わせて、起動スクリプトを書いてください。',
         ['launcher.shを書く(実行して出力が残ること)'], s10, c10, SOL10,
         ["cat > launcher.sh <<'EOF'\n#!/bin/bash\n./job.sh > job.log 2>&1 &\n# jobs\nEOF", "cat > launcher.sh <<'EOF'\n#!/bin/bash\nnohup ./job.sh > job.log 2>&1 &\n# jobs\nEOF"],
         'nohupはSIGHUPを無視して起動し(出力先未指定ならnohup.out)、&はバックグラウンド、jobsは現在のシェルのジョブ一覧、disownはジョブ表から外してシェル終了時のSIGHUP送信を防ぎます(bg/fgで戻せなくなる)。ログの出力先は明示します。長期運用にはsystemdやtmuxが望ましいです。',

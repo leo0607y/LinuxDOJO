@@ -262,8 +262,8 @@ def c3(ctx):
 SOL3 = """sed -i 's/^TAX_RATE = .*/TAX_RATE = <<good>>/' calc.py
 echo 'test_calc.py::test_with_tax' > failed.txt"""
 mission(3, 'pytestの失敗ログから原因を見つけて直す',
-        'CIで pytest が1件失敗しました。pytest.log の assert の左右の値を比べ、どちらが期待値でどちらが実際の値かを読み、原因のコードを直します。',
-        ['failed.txtに失敗テストIDを書く', 'calc.pyを直してテストを通す'], s3, c3, SOL3,
+        'CIで pytest が1件失敗しました。pytestの採取記録でassertの左右の値を比べ、どちらが期待値でどちらが実際の値かを読み、原因のコードを直します。',
+        ['failed.txtに失敗テストIDを書く', '失敗原因のコードを見つけて直しテストを通す'], s3, c3, SOL3,
         ["echo 'test_calc.py::test_with_tax' > failed.txt\nsed -i 's/^TAX_RATE = .*/TAX_RATE = 0.5/' calc.py",
          "echo 'test_calc.py::test_total' > failed.txt\nsed -i 's/^TAX_RATE = .*/TAX_RATE = <<good>>/' calc.py"],
         'pytestの失敗ログは「>」で失敗した行、「E」で実際の値と期待値、最後の FAILED 行でテストIDを示します。assert 実際 == 期待 の左が実際の値です。テストを書き換えて通すのは本末転倒で、期待値が仕様なら製品コードを直します。pytest -k 名前 や pytest test_calc.py::test_with_tax で1件だけ再実行できます。',
@@ -336,7 +336,7 @@ def <<fn>>(a, b):
 EOF
 printf '%s\\n' 'flake8 .' 'black --check .' 'ruff check .' > lint.sh"""
 mission(4, 'flake8・black・ruffの指摘を直す',
-        'レビューで flake8 の指摘が大量に出ました。コード規約はツールに任せたいので、black（整形）と ruff（高速なlinter）も使えるようにしておきます。flake8.log の各コード（E・F）の意味を読んで直してください。',
+        'レビューで flake8 の指摘が大量に出ました。コード規約はツールに任せたいので、black（整形）と ruff（高速なlinter）も使えるようにしておきます。flake8の採取記録の各コード（E・F）の意味を読んで直してください。',
         ['messy.pyの指摘を全て直す', 'lint.shにflake8・black・ruffを書く'], s4, c4, SOL4,
         ["sed -i '/^import <<um>>$/d' messy.py\nprintf '%s\\n' 'flake8 .' 'black --check .' 'ruff check .' > lint.sh",
          "echo 'flake8 .' > lint.sh"],
@@ -1269,8 +1269,8 @@ def s22(ctx):
     ctx.data['sec'] = sec
     put(ctx, '.env', f'APP_DB_PASSWORD={sec}\nAPP_DB_USER=admin\nAPP_LOG_LEVEL=info\n')
     ctx.write('app.py', f'DB_PASSWORD = "{sec}"\nprint("connecting as admin with password " + DB_PASSWORD)\n')
-    req(ctx, '設定とログを 12-factor app に沿って直す。app.py: パスワードは環境変数 APP_DB_PASSWORD から取得（未設定なら終了コード非0で失敗）、ユーザーは APP_DB_USER（既定 admin）。ログはパスワードを含めず、標準出力へ構造化ログ（level と event を含む1行のJSON）で出す。'
-        '.env は秘密を含むので .gitignore に .env を書いてコミットしない。代わりに .env.example を作り、.env と同じキーを値を空にして書く（.env 自体は変更しない）。')
+    req(ctx, '設定とログを 12-factor app に沿って直す。アプリのコードはパスワードを環境変数 APP_DB_PASSWORD から取得（未設定なら終了コード非0で失敗）、ユーザーは APP_DB_USER（既定 admin）。ログはパスワードを含めず、標準出力へ構造化ログ（level と event を含む1行のJSON）で出す。'
+        '秘密を含む環境設定ファイルは .gitignore に記録してコミットしない。共有用の見本 .env.example を作り、元ファイルと同じキーを値を空にして書く（秘密を含む元ファイルは変更しない）。')
 
 
 def c22(ctx):

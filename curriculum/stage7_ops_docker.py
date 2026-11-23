@@ -135,7 +135,7 @@ Web サーバーを **Apache から nginx へ移行** することになった�
 まだ古い `apache2` が動いていて、`nginx` は止まったままだ。
 **systemd**（`systemctl`）を使ってサービスを切り替え、**サーバーを再起動しても nginx が自動で立ち上がる** 状態にしてほしい。
 
-この訓練サーバーでは、root 権限が必要なコマンドは本物そっくりの模擬コマンドで動きます（作業ディレクトリの `README.md` 参照）。
+この訓練サーバーでは、root 権限が必要なコマンドは本物そっくりの模擬コマンドで動きます（作業ディレクトリの案内を参照）。
 """,
     objectives=["`systemctl status nginx` / `systemctl status apache2` で現在の状態（Active / Loaded の enabled・disabled）を確認する",
                 "`apache2` を **停止** し、**自動起動も解除** する",
@@ -431,10 +431,10 @@ register(
     story="""
 自作のレポート配信プログラム `report-server` を、**systemd のサービスとして常駐** させたい。
 前任者がユニットファイル `report.service` を書きかけたまま異動してしまい、起動しようとしても失敗する状態だ。
-`依頼メモ.txt` の要件どおりにユニットファイルを完成させ、**今すぐ起動 & 再起動後も自動起動** にせよ。
+依頼メモの要件どおりにユニットファイルを完成させ、**今すぐ起動 & 再起動後も自動起動** にせよ。
 """,
     objectives=["`systemctl status report` / `journalctl -u report` で、前任者のユニットファイルが起動できない理由を確認する",
-                "`sysroot/etc/systemd/system/report.service` を要件どおりに直す（`[Unit]` `[Service]` `[Install]` の3セクション）",
+                "作業フォルダ内の report のユニットファイルを要件どおりに直す（`[Unit]` `[Service]` `[Install]` の3セクション）",
                 "変更を systemd に読み込ませる（`daemon-reload`）",
                 "サービスを起動し、自動起動も有効にする（`systemctl status report` が active (running)・enabled）"],
     hints=["ユニットファイルは INI 形式。`[Unit]` に説明と起動順序、`[Service]` に実行コマンドと動作、`[Install]` に「どのタイミングで自動起動するか」を書きます。systemd は書き換えただけでは新しい内容を読みません。",
@@ -556,7 +556,7 @@ register(
     id="7-4", stage=S, title="新メンバーのアカウントを作成せよ", sim=True,
     story="""
 開発サーバー `<<host>>` に新メンバー **<<newu>>** さんが加わる。さらに新プロジェクトの共有グループ `<<proj>>` を作り、
-既存メンバーの **<<u2>>** さんにも Docker とプロジェクトの権限を追加してほしい、という申請が届いた（`アカウント申請.txt`）。
+既存メンバーの **<<u2>>** さんにも Docker とプロジェクトの権限を追加してほしい、という申請が届いた（作業フォルダのアカウント申請を参照）。
 ユーザー・グループ管理は root 権限の仕事。**既存メンバーの権限を壊さないよう** 慎重に作業しよう。
 """,
     objectives=["`sudo groupadd` でグループ `<<proj>>` を作成する",

@@ -70,10 +70,10 @@ SCENARIOS = [
     {
         "id": "ready-06",
         "title": "接続先を確かめて成果物を受け取る",
-        "brief": "管理者から別経路で受け取った訓練用指紋を、training-server の接続確認表示と比べてください。一致する場合だけ learner として接続し、接続先の名前と案内メモの内容を確認します。接続を閉じて手元へ戻り、サーバーにある成果物を手元の received.txt としてコピーしてください。実通信は行いません。",
+        "brief": "管理者から別経路で受け取った訓練用指紋を、training-server（SSH port 22）の接続確認表示と比べてください。一致する場合だけ learner として接続し、接続先の名前と案内メモの内容を確認します。接続を閉じて手元へ戻り、サーバーにある成果物を手元の received.txt としてコピーしてください。実通信は行いません。",
         "files": {"server-fingerprint.txt": "training-server: " + _FINGERPRINT + "\nこれは教材専用の架空の指紋です。\n"},
         "remote_files": {"server-note.txt": "接続先は training-server です。\n", "download.txt": "訓練サーバーの成果物です。\n"},
-        "solution": ["cat server-fingerprint.txt", "ssh learner@training-server", "yes", "hostname", "cat server-note.txt", "exit", "scp learner@training-server:download.txt received.txt"],
+        "solution": ["cat server-fingerprint.txt", "ssh -p 22 learner@training-server", "yes", "hostname", "cat server-note.txt", "exit", "scp -P 22 learner@training-server:download.txt received.txt"],
         "expected_files": {"received.txt": "訓練サーバーの成果物です。\n"},
         "checks_commands": ["cat server-fingerprint.txt", "hostname", "cat server-note.txt"],
         "require_disconnected": True,

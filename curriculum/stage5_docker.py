@@ -155,14 +155,14 @@ def c53(ctx):
 register(
     id="5-3", stage=S, title="コンテナの中に潜入せよ（docker exec）", docker=True,
     story="""
-DBコンテナ `lq-db` の接続パスワードが分からなくなった。設定はコンテナの **中** の `/etc/app/` にあるらしい。
+DBコンテナ `lq-db` の接続パスワードが分からなくなった。アプリの設定はコンテナの **中** にあるらしい。
 コンテナを止めずに中に入り（または中でコマンドを実行し）、`DB_PASSWORD` の値を確認せよ。
 """,
-    objectives=["`docker exec -it lq-db sh` でコンテナ内のシェルに入り、`/etc/app/` の中を調べる（`exit` で戻る）",
+    objectives=["`docker exec` でコンテナ内のシェルに入り、アプリの設定を探す（`exit` で戻る）",
                 "設定ファイルに書かれた `DB_PASSWORD` の値を `submit` する",
                 "（おまけ）`docker inspect lq-db` でコンテナの詳細情報（IPアドレスなど）も眺めてみよう"],
     hints=["実行中のコンテナの中でコマンドを実行する `docker exec` を使います。対話的に操作するにはオプションが必要です。",
-           "`-i`（標準入力を開く）＋ `-t`（端末を割り当てる）＝ `-it`。alpine には bash が無いので `sh` を使います。",
+           "`-i`（標準入力を開く）＋ `-t`（端末を割り当てる）＝ `-it`。alpine には bash が無いので `sh` を使います。入ったら ls や cat でアプリの設定を探します。",
            "`docker exec -it lq-db sh` → `ls /etc/app` → `cat /etc/app/secret.conf` → `exit`。1発なら `docker exec lq-db cat /etc/app/secret.conf`。"],
     answer="docker exec -it lq-db sh\n  ls /etc/app\n  cat /etc/app/secret.conf\n  exit\n# 1行で: docker exec lq-db cat /etc/app/secret.conf\nsubmit <<pw>>\ndocker inspect lq-db | grep IPAddress",
     explanation="""
@@ -216,12 +216,12 @@ def c54(ctx):
 register(
     id="5-4", stage=S, title="ボリュームと環境変数、そして使い捨てコンテナ", docker=True,
     story="""
-デザイナーが作った `html/` をすぐ確認できる開発サーバーが欲しい。HTML を書き換えるたびにイメージを作り直すのは大変なので、
+デザイナーが作ったHTMLのディレクトリをすぐ確認できる開発サーバーが欲しい。HTML を書き換えるたびにイメージを作り直すのは大変なので、
 **ホストのディレクトリをそのままコンテナにマウント** しよう。ログの時刻を日本時間にするため、環境変数 `TZ` も渡すこと。
 最後に、OS のバージョン確認だけをする **使い捨てコンテナ** の作法も覚えよう。
 """,
     objectives=["`nginx` で `lq-site` をバックグラウンド起動し、ホスト `8081` → コンテナ `80` を公開する",
-                "作業ディレクトリの `html/` をコンテナの `/usr/share/nginx/html` にマウントし、環境変数 `TZ=Asia/Tokyo` を渡す",
+                "作業フォルダ内のHTMLのディレクトリをコンテナの `/usr/share/nginx/html` にマウントし、環境変数 `TZ=Asia/Tokyo` を渡す",
                 "`docker run --rm alpine cat /etc/os-release` で使い捨てコンテナを実行する（停止コンテナを残さない）"],
     hints=["`docker run` にはホストのディレクトリをコンテナに見せるオプションと、環境変数を渡すオプションがあります。",
            "`-v ホストの絶対パス:コンテナのパス`（`\"$PWD/html\"` が便利）、`-e 変数=値`、終了時自動削除は `--rm`。",
@@ -464,11 +464,11 @@ def c57(ctx):
 register(
     id="5-7", stage=S, title="【実践】起動直後に落ちるコンテナを救え", docker=True,
     story="""
-警告: 障害発生！ 注文API `lq-order` のコンテナが **起動直後に落ちる**。前任者のメモ（`障害報告.txt`）にある起動コマンドには、
+警告: 障害発生！ 注文API `lq-order` のコンテナが **起動直後に落ちる**。前任者の障害報告メモにある起動コマンドには、
 どうやら **設定ミスが2つ** あるらしい。`docker logs` と `docker inspect` で原因を突き止め、正しいパラメータで起動し直せ。
 """,
     objectives=["`docker ps -a` / `docker logs lq-order` で落ちた原因を調べる",
-                "`docker inspect` などでアプリが待ち受けるコンテナ側ポートを確認する（ヒント: `ExposedPorts`）",
+                "`docker inspect` などでアプリが待ち受けるコンテナ側ポートを確認する（イメージの情報やアプリのログを調べる）",
                 "壊れた `lq-order` を削除し、正しい環境変数とポートで `lq-order` をバックグラウンド起動する（ホスト側は 9090 のまま）"],
     hints=["コンテナが落ちたらまずログ。直しても繋がらないときは「アプリがコンテナの中で何番ポートで待っているか」を疑おう。",
            "`docker logs lq-order` で足りない環境変数が分かる。`docker image inspect lq/order-api:1.0` の `ExposedPorts` や、直した後のログの `listening on` で待受ポートが分かる。",

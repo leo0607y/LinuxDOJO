@@ -159,7 +159,7 @@ restic check
 restic restore latest --target restore
 EOF"""
 mission(1, 'restic: 暗号化リポジトリのバックアップと保持ポリシー',
-        '小規模サーバーのデータ data/ をrestic（init / backup / prune / check / restore）で暗号化バックアップします。requirements.txtの保持ポリシーに合わせて restic.sh を書いてください。',
+        '小規模サーバーの用意された業務データをrestic（init / backup / prune / check / restore）で暗号化バックアップします。requirements.txtの保持ポリシーに合わせて restic.sh を書いてください。',
         ['restic.sh に5工程を書く', '保持ポリシーとprune、パスワードファイルを正しく指定する'], s1, c1, SOL1,
         ["echo 'restic backup data' > restic.sh",
          "printf 'restic -r <<repo>> init\\nrestic -r <<repo>> backup data\\nrestic -r <<repo>> forget --keep-last 3 --prune\\nrestic -r <<repo>> check\\nrestic -r <<repo>> restore latest --target restore\\n' > restic.sh"],
@@ -298,7 +298,7 @@ def c4(ctx):
 SOL4 = """echo '{"rpo_hours": <<rpo>>, "rto_hours": <<rto>>, "meets_rpo": <<mrpo>>, "meets_rto": <<mrto>>, "meets_321": <<m321>>}' > plan.json"""
 mission(4, 'RPOとRTOを計算し3-2-1原則で評価する',
         '経営層から「バックアップは大丈夫か」と聞かれました。RPO（許容できるデータ損失時間）とRTO（復旧にかかる時間）を現状から算出し、3-2-1原則（3コピー・2種類の媒体・1つはオフサイト）を満たすか評価してください。',
-        ['policy.txtからRPO/RTOを算出', 'inventory.txtで3-2-1を判定しplan.jsonへ'], s4, c4, SOL4,
+        ['運用方針からRPO/RTOを算出', 'バックアップ一覧で3-2-1を判定しplan.jsonへ'], s4, c4, SOL4,
         ["echo '{\"rpo_hours\": 1, \"rto_hours\": 1, \"meets_rpo\": true, \"meets_rto\": true, \"meets_321\": true}' > plan.json", 'echo "{}" > plan.json'],
         'RPOは最後のバックアップから障害までに失う最大時間で、バックアップ間隔が下限になります。RTOは復旧完了までの時間で、データ転送だけでなく検証や切替も含みます。3-2-1原則は、データのコピーを3つ、2種類の媒体、1つはオフサイトに置くことで、同時に壊れる原因（災害・ランサムウェア）を分散します。',
         '数字は policy.txt、コピーの属性は inventory.txt を読みます。', 'RTO = GB×1000÷100MB/s÷3600 + 検証。媒体の種類数は重複を除いて数えます。')
@@ -349,7 +349,7 @@ def s5b(ctx):
 
 
 mission(5, 'mysqldump --single-transaction とbinlogによる時点復旧',
-        'MySQL/MariaDBの日次ダンプと、binlogを使った事故直前までの復旧手順を用意します。ダンプ先頭のコメント（dump_head.sql）とSHOW BINARY LOGSの結果（binlogs.txt）を読み、mysqldumpの行とmysqlbinlogの行を書いてください。',
+        'MySQL/MariaDBの日次ダンプと、binlogを使った事故直前までの復旧手順を用意します。ダンプ先頭のコメントとSHOW BINARY LOGSの採取結果を読み、mysqldumpの行とmysqlbinlogの行を書いてください。',
         ['dump.sh に一貫性のあるmysqldump', 'recover.sh にbinlogの時点指定再生'], s5b, c5, SOL5,
         ["echo 'mysqldump <<db>> > <<out>>' > dump.sh\necho 'mysqlbinlog <<f0>> | mysql' > recover.sh",
          "echo \"mysqldump --lock-all-tables <<db>> | gzip > <<out>>\" > dump.sh\necho \"mysqlbinlog --stop-datetime='<<stop>>' <<f0>> | mysql\" > recover.sh"],
@@ -410,7 +410,7 @@ EOF
 echo <<worst>> > worst.txt"""
 mission(6, 'MySQL: GRANT最小権限・my.cnfチューニング・スロークエリログ',
         'MySQL/MariaDBの運用設定を整えます。my.cnfのチューニング項目を読み書きし、スロークエリログ（mysqldumpslow などで集計する元データ）を有効化、アプリ用ユーザーへは GRANT で必要最小限の権限だけ与えます。',
-        ['my.cnfを編集', 'grants.sqlを書く', 'slow.logから最悪クエリの値をworst.txtへ'], s6, c6, SOL6,
+        ['my.cnfを編集', 'grants.sqlを書く', 'スロークエリの記録から最悪クエリの値をworst.txtへ'], s6, c6, SOL6,
         ["echo 'GRANT ALL PRIVILEGES ON *.* TO \"app\"@\"%\";' > grants.sql", "sed -i 's/slow_query_log=0/slow_query_log=1/' my.cnf"],
         'innodb_buffer_pool_size は専用DBサーバーならRAMの50〜70%が目安です。slow_query_log=1 と long_query_time でしきい値を超えたクエリを記録し、mysqldumpslow -s t や Rows_examined の大きさで索引不足を探します。GRANT は ON db.* で対象を絞り、権限も必要最小限にします。',
         'my.cnfは[mysqld]セクションの項目、権限は ON と TO の範囲を意識します。', 'slow.logは Query_time の最大の行に付いている Rows_examined を読みます。')
@@ -622,7 +622,7 @@ iscsiadm -m node -T <<iqn>> -p <<ip>>:3260 --login
 EOF"""
 mission(10, 'multipath -ll の障害パスとiSCSI initiator設定',
         'SANストレージの片系障害の疑いです。multipath -ll の出力から障害パスを見つけ、iSCSI initiatorの設定（iscsid.conf）と iscsiadm のログイン手順を整えてください。',
-        ['multipath.txtから障害パスをfault.jsonへ', 'iscsid.confを編集', 'iscsiadmの2行を書く'], s10, c10, SOL10,
+        ['multipathの採取記録から障害パスをfault.jsonへ', 'iscsid.confを編集', 'iscsiadmの2行を書く'], s10, c10, SOL10,
         ["echo '{\"map\": \"mpatha\"}' > fault.json", "echo 'iscsiadm -m node --login' > iscsi.sh"],
         'multipath -ll はマップ(mpathX)ごとにパスグループと各パスの状態を示し、「failed faulty」が障害パスです（もう片系の active ready で通信は継続）。iSCSIは iscsiadm -m discovery -t sendtargets で探索し、-m node -T IQN --login でログインします。iscsid.conf の node.startup=automatic で起動時に自動接続し、replacement_timeout は経路障害時にI/Oを諦める時間です。',
         '出力の状態語（active ready / failed faulty）を探します。', 'grep -B で障害パスの親マップを確認し、iscsiadm の -m を使い分けます。')

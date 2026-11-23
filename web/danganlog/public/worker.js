@@ -44,7 +44,7 @@ if 'curriculum' not in sys.modules:
     _package = types.ModuleType('curriculum')
     _package.__path__ = [str(Path('/dojo-src/curriculum'))]
     sys.modules['curriculum'] = _package
-from engine import guided, readiness, vim_sim
+from engine import guided, readiness, save, vim_sim
 from curriculum.beginner_lessons import LESSONS
 
 guided.Terminal.VIRTUAL_MODES = True
@@ -52,6 +52,7 @@ _WEB_ROOT = Path('/dojo-work/session')
 _web_sessions = {}
 _web_completed = {mode: [] for mode in LESSONS}
 _web_completed['festival'] = {}
+_web_review = {}
 _web_selected = None
 _web_terminal = None
 _web_step = None
@@ -98,7 +99,8 @@ def _web_capture():
 def _web_export():
     _web_capture()
     return {'version': 1, 'selected': copy.deepcopy(_web_selected),
-            'sessions': copy.deepcopy(_web_sessions), 'completed': copy.deepcopy(_web_completed)}
+            'sessions': copy.deepcopy(_web_sessions), 'completed': copy.deepcopy(_web_completed),
+            'review': copy.deepcopy(_web_review)}
 
 
 def _web_validate(state):
@@ -141,6 +143,16 @@ def _web_validate(state):
             raise ValueError('達成記録の保存形式が不正です。')
     if not isinstance(completed.get('festival', {}), dict):
         raise ValueError('総合課題の達成記録が不正です。')
+    review = state.get('review', {})
+    if not isinstance(review, dict) or len(review) > 1000:
+        raise ValueError('復習対象の保存形式が不正です。')
+    known = {mode + ':' + item['id'] for mode, items in LESSONS.items() for item in items}
+    known.update('festival:' + item['id'] for item in _web_scenarios)
+    for key, item in review.items():
+        if (not isinstance(item, dict) or not isinstance(item.get('mode'), str)
+                or not isinstance(item.get('id'), str)
+                or key != item['mode'] + ':' + item['id'] or key not in known):
+            raise ValueError('復習対象の課題情報が不正です。')
     selected = state.get('selected')
     if selected is not None:
         if not isinstance(selected, dict):
@@ -181,7 +193,8 @@ def _web_select(mode, index, fresh=False):
         else:
             terminal = guided.Terminal(_WEB_ROOT, progress)
             guided.prepare_step(terminal, step, fresh=True)
-        session = {'progress': progress, 'files': [], 'hintLevel': 0, 'assisted': False, 'done': False}
+        session = {'progress': progress, 'files': [], 'hintLevel': 0, 'assisted': False,
+                   'done': False, 'reviewReady': fresh}
         _web_sessions[key] = session
     else:
         _web_restore_files(session.get('files', []))
@@ -213,16 +226,20 @@ def _web_view(output='', code=0):
 def _web_complete():
     mode = _web_selected['mode']; key, _ = _web_key(mode, _web_selected['index'])
     session = _web_sessions[key]; session['done'] = True
+    reviewed = key in _web_review and session.get('reviewReady') and not session['assisted']
+    if reviewed:
+        save.finish_review({'review': _web_review}, mode, _web_step['id'])
     if mode == 'festival':
         previous = _web_completed['festival'].get(_web_step['id'])
         if previous is None or not session['assisted']:
             _web_completed['festival'][_web_step['id']] = {'assisted': session['assisted']}
     elif _web_step['id'] not in _web_completed[mode]:
         _web_completed[mode].append(_web_step['id'])
+    return reviewed
 
 
 def browser_request(request_json):
-    global _web_sessions, _web_completed, _web_selected, _web_terminal, _web_step
+    global _web_sessions, _web_completed, _web_review, _web_selected, _web_terminal, _web_step
     request = json.loads(request_json)
     kind = request.get('type')
     if kind == 'init':
@@ -234,6 +251,7 @@ def browser_request(request_json):
         _web_sessions = candidate.get('sessions', {})
         _web_completed = {mode: candidate.get('completed', {}).get(mode, []) for mode in LESSONS}
         _web_completed['festival'] = candidate.get('completed', {}).get('festival', {})
+        _web_review = candidate.get('review', {})
         selected = candidate.get('selected')
         _web_selected = _web_terminal = _web_step = None
         if selected:
@@ -241,6 +259,15 @@ def browser_request(request_json):
         return json.dumps(_web_view('保存データを読み込みました。'), ensure_ascii=False)
     if kind == 'select':
         return json.dumps(_web_select(request.get('mode'), request.get('index', 0)), ensure_ascii=False)
+    if kind == 'review':
+        review_mode, lesson_id = request.get('mode'), request.get('lessonId')
+        if not isinstance(review_mode, str) or not isinstance(lesson_id, str):
+            raise ValueError('復習する課題を選んでください。')
+        if review_mode + ':' + lesson_id not in _web_review:
+            raise ValueError('その課題は復習対象ではありません。')
+        items = _web_scenarios if review_mode == 'festival' else LESSONS[review_mode]
+        index = next(i for i, item in enumerate(items) if item['id'] == lesson_id)
+        return json.dumps(_web_select(review_mode, index, True), ensure_ascii=False)
     if _web_selected is None:
         raise ValueError('先に課題を選んでください。')
     mode = _web_selected['mode']; key, _ = _web_key(mode, _web_selected['index'])
@@ -250,13 +277,22 @@ def browser_request(request_json):
     if kind == 'hint':
         session['assisted'] = True
         level = session.get('hintLevel', 0)
-        hints = _web_step.get('hints')
-        output = hints[min(level, len(hints)-1)] if hints else guided.hint_text(_web_step, level)[0]
+        if mode == 'festival':
+            hints = readiness.advice_hints(_web_step)
+            output = hints[min(level, len(hints)-1)] if hints else '追加のヒントはありません。'
+            last = level >= len(hints) - 1
+        else:
+            output, last = guided.hint_text(_web_step, level)
+        if last and 'answer' not in output:
+            output += '\nanswer で入力例を確認できます（見ると復習対象に追加されます）。'
         session['hintLevel'] = level + 1
         return json.dumps(_web_view(output), ensure_ascii=False)
     if kind == 'answer':
         session['assisted'] = True
+        session['reviewReady'] = session.get('reviewReady', False) and session.get('done', False)
+        save.mark_review({'review': _web_review}, mode, _web_step['id'])
         output = '\n'.join(_web_step['solution']) if mode == 'festival' else '\n'.join(guided.answers(_web_step))
+        output += '\n[INFO] 復習対象に追加しました。review で一覧を開けます。reset 後にヒント・答えを使わず達成すると外れます。'
         return json.dumps(_web_view(output), ensure_ascii=False)
     if kind == 'complete':
         text = request.get('line', '')
@@ -276,12 +312,14 @@ def browser_request(request_json):
     if mode == 'festival' and line.strip() == 'check':
         good, output = readiness.check(_web_step, _web_terminal)
         if good:
-            _web_complete(); output += '\n[OK] 達成しました。\n'+_web_step['explanation']
+            reviewed = _web_complete(); output += '\n[OK] 達成しました。\n'+_web_step['explanation']
+            if reviewed: output += '\n[OK] 自力で解き直したので復習対象から外しました。'
         return json.dumps(_web_view(output, 0 if good else 1), ensure_ascii=False)
     result = _web_terminal.execute(line)
     output = result.output
     if mode != 'festival' and guided.accepted(line, result, _web_step, _web_terminal):
-        _web_complete(); output += '\n[OK] '+_web_step.get('success', '達成しました。')
+        reviewed = _web_complete(); output += '\n[OK] '+_web_step.get('success', '達成しました。')
+        if reviewed: output += '\n[OK] 自力で解き直したので復習対象から外しました。'
     return json.dumps(_web_view(output, result.code), ensure_ascii=False)
 `;
 

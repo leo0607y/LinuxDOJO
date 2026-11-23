@@ -214,9 +214,7 @@ SCENARIOS = [
         "id": "fes-incident-01",
         "level": 1,
         "title": "サーバーの掲示を読んで手元に控える",
-        "brief": "管理者から届いた fingerprint.txt の指紋と見比べてから、training-server に learner として接続してください。"
-                 "サーバーにある notice.txt を読み、書かれているメンテナンス番号（MT- で始まる値）だけを、"
-                 "手元のパソコンの maint-id.txt に1行で控えます。作業の最後は手元に戻っていてください。",
+        "brief": '管理者から届いた指紋の記録を見つけ、接続時の表示と比べてから training-server に learner として接続してください。サーバーの掲示を読み、メンテナンス番号（MT- で始まる値）だけを、手元の maint-id.txt に1行で控えます。最後は手元へ戻ってください。',
         "files": {"fingerprint.txt": _FP},
         "remote_files": {"notice.txt": _NOTICE},
         "solution": ["cat fingerprint.txt", f"ssh {_T}", "yes", "hostname", "cat notice.txt", "exit",
@@ -233,7 +231,7 @@ SCENARIOS = [
         "checks_commands": [_FP_CHECK],
         "require_disconnected": True,
         "hints": ["サーバーで読んだ内容は、手元に戻ってから手元のファイルに書きます。プロンプトのホスト名に注目しましょう。",
-                  "cat で指紋を読む → ssh で接続して一致を確かめ yes → cat で掲示を読む → exit で戻る、の順です。",
+                  'ls -a で隠れた項目も調べ、ls フォルダ名 や cat で用途と内容を確かめます。cat で指紋を読む → ssh で接続して一致を確かめ yes → cat で掲示を読む → exit で戻る、の順です。',
                   "手元に戻ってから echo MT-0412 > maint-id.txt。サーバーにいるまま書くと、サーバー側にファイルができます。"],
         "explanation": "SSH で接続している間のコマンドは、すべて相手のサーバーで動きます。同じ「ファイルを作る」でも、"
                        "どちらの機械にいるかで保存先が変わります。作業の前後にプロンプトや hostname で今いる場所を確かめる習慣が、"
@@ -244,9 +242,7 @@ SCENARIOS = [
         "id": "fes-incident-02",
         "level": 1,
         "title": "決められたポートで入って、戻る",
-        "brief": "training-server は今回、SSH を通常の 22 番ではなく 2222 番ポートで受け付けています。"
-                 "fingerprint.txt の指紋と見比べてから 2222 番で接続し、接続先のコンピューター名を確かめてください。"
-                 "作業を終えたら手元へ戻り、手元のコンピューター名も確かめて終わります。",
+        "brief": 'training-server へ learner として、SSH の2222番ポートで接続します。管理者から届いた指紋の記録と表示を比べてから接続し、接続先のコンピューター名を確かめてください。最後は手元へ戻り、手元のコンピューター名も確かめます。',
         "files": {"fingerprint.txt": _FP},
         "solution": ["cat fingerprint.txt", f"ssh -p 2222 {_T}", "yes", "hostname", "exit", "hostname"],
         "alt_solutions": [
@@ -259,7 +255,7 @@ SCENARIOS = [
         "checks_commands": [_FP_CHECK, _ssh_forms(port="2222"), "hostname"],
         "require_disconnected": True,
         "hints": ["ポートの指定は ssh のオプションで行います。戻ったあとの確認も条件です。",
-                  "ssh -p ポート番号 ユーザー@ホスト の形です。接続後は hostname、戻るのは exit です。",
+                  'ls -a で隠れた項目も調べ、ls フォルダ名 や cat で用途と内容を確かめます。ssh -p ポート番号 ユーザー@ホスト の形です。接続後は hostname、戻るのは exit です。',
                   "cat fingerprint.txt → ssh -p 2222 learner@training-server → yes → hostname → exit → hostname。"],
         "explanation": "外部からの攻撃を減らすため、SSH を 22 番以外のポートで受け付けるサーバーは珍しくありません。"
                        "ポートを間違えると Connection refused になります。また、戻ったつもりで本番サーバーに残っている事故を防ぐため、"
@@ -270,9 +266,7 @@ SCENARIOS = [
         "id": "fes-incident-03",
         "level": 1,
         "title": "鍵の権限を直してから鍵で入る",
-        "brief": "keys/training_key（教材用の無効な鍵）を使って training-server に接続してください。"
-                 "今の鍵ファイルはほかの人にも読める権限になっていて、ssh に使用を断られます。"
-                 "自分だけが読み書きできる権限に直し、鍵を指定して接続し、確認が済んだら手元に戻ります。鍵の中身は変えません。",
+        "brief": '用意された訓練用の鍵（無効な教材用ダミー）を使い、training-server に learner として接続してください。鍵の権限を自分だけが読み書きできる状態に直し、鍵を指定して接続し、確認が済んだら手元に戻ります。鍵の中身は変えません。接続前に管理者から届いた指紋と照合します。',
         "files": {"fingerprint.txt": _FP, "keys/training_key": _KEY},
         "solution": ["ls -l keys", "chmod 600 keys/training_key", "cat fingerprint.txt",
                      f"ssh -i keys/training_key {_T}", "yes", "hostname", "exit"],
@@ -289,8 +283,8 @@ SCENARIOS = [
         "expected_modes": {"keys/training_key": 0o600},
         "checks_commands": [_FP_CHECK, _ssh_forms(key="keys/training_key")],
         "require_disconnected": True,
-        "hints": ["まず ssh を試して、表示される警告を読んでみましょう。権限は ls -l で見られます。",
-                  "秘密鍵は「自分だけ読み書きできる」600 にします。鍵の指定は ssh の -i オプションです。",
+        "hints": ['鍵の名前や場所も自分で調べます。対象と権限を確かめてから接続し、接続先と手元を取り違えないようにしましょう。',
+                  'ls -a で隠れた項目も調べ、ls フォルダ名 や cat で用途と内容を確かめます。秘密鍵は「自分だけ読み書きできる」600 にします。鍵の指定は ssh の -i オプションです。',
                   "chmod 600 keys/training_key → ssh -i keys/training_key learner@training-server → yes → exit。"],
         "explanation": "ssh は、ほかの人も読める秘密鍵を危険とみなして使いません（UNPROTECTED PRIVATE KEY FILE）。"
                        "鍵を受け取ったりコピーしたりしたら、まず chmod 600 にするのが定番です。本物の秘密鍵は人に渡したり画面に貼ったりしません。",
@@ -300,8 +294,7 @@ SCENARIOS = [
         "id": "fes-incident-04",
         "level": 1,
         "title": "サーバーのログを受け取りフォルダへ",
-        "brief": "調査用に、training-server の logs/app-0501.log を、手元の incoming フォルダへ同じ名前でコピーしてください。"
-                 "接続先は fingerprint.txt で確かめてから使います。転送は手元に戻ってから行い、最後も手元にいる状態で終えます。",
+        "brief": 'training-server に learner として接続し、調査用のアプリのログを探してください。手元の受け取り用フォルダへ同じ名前でコピーします。接続先は管理者から届いた指紋と照合し、転送は手元に戻って行います。最後も手元にいる状態で終えます。',
         "files": {"fingerprint.txt": _FP, "incoming/README.txt": "サーバーから受け取ったファイルを置く場所です。\n"},
         "remote_files": {"logs/app-0501.log": _APP_0501},
         "solution": ["cat fingerprint.txt", f"ssh {_T}", "yes", "ls logs", "exit",
@@ -320,7 +313,7 @@ SCENARIOS = [
         "checks_commands": [_FP_CHECK],
         "require_disconnected": True,
         "hints": ["scp は「コピー元 → コピー先」の順に書き、サーバー側だけに ユーザー@ホスト: を付けます。",
-                  "受け取るときはサーバー側が先です。送り先にフォルダを書くと、同じ名前でその中に入ります。",
+                  'ls -a で隠れた項目も調べ、ls フォルダ名 や cat で用途と内容を確かめます。受け取るときはサーバー側が先です。送り先にフォルダを書くと、同じ名前でその中に入ります。',
                   "接続して確かめ exit したあと、scp learner@training-server:logs/app-0501.log incoming/ を実行します。"],
         "explanation": "scp は cp と同じく「元 先」の順で、遠い側を ユーザー@ホスト:パス で表します。"
                        "向きを逆にすると、取り寄せるつもりが送ってしまったり、手元のファイルを上書きしたりします。"
@@ -331,9 +324,7 @@ SCENARIOS = [
         "id": "fes-incident-05",
         "level": 1,
         "title": "指紋が確かめられないときは接続しない",
-        "brief": "training-server が作り直されたと連絡がありました。fingerprint-list.txt を読み、接続を試みて表示される指紋と比べてください。"
-                 "確かめられない場合は接続を中止します。そのうえで、管理者に照会できるよう、"
-                 "表示された指紋（SHA256: から始まる値）だけを手元の hold.txt に1行で記録してください。",
+        "brief": 'training-server が作り直されたと連絡がありました。管理者から届いた指紋一覧を読み、learner として接続を試みて表示される指紋と比べてください。確かめられなければ接続を中止します。表示された指紋（SHA256:から始まる値）だけを、手元の hold.txt に1行で記録してください。',
         "files": {"fingerprint-list.txt": _FP_PENDING},
         "solution": ["cat fingerprint-list.txt", f"ssh {_T}", "no", f"echo {_FP_VALUE} > hold.txt"],
         "alt_solutions": [
@@ -348,7 +339,7 @@ SCENARIOS = [
         "checks_commands": [["cat fingerprint-list.txt", "cat -n fingerprint-list.txt"], [f"ssh {_T}", f"ssh -p 22 {_T}"]],
         "require_disconnected": True,
         "hints": ["接続確認の質問には、指紋が一致すると確認できたときだけ yes と答えます。",
-                  "一覧に training-server の指紋がないなら、yes ではなく no で中止します。表示された値は画面に残っています。",
+                  'ls -a で隠れた項目も調べ、ls フォルダ名 や cat で用途と内容を確かめます。一覧に training-server の指紋がないなら、yes ではなく no で中止します。表示された値は画面に残っています。',
                   "ssh learner@training-server → no → echo SHA256:TRAINING-NOT-A-REAL-FINGERPRINT > hold.txt。"],
         "explanation": "初回接続の指紋確認は、なりすましサーバーにつながっていないかを見分ける唯一の機会です。"
                        "「いつも yes で進む」癖は、パスワードを攻撃者に渡す入口になります。確かめられないときは中止し、"
@@ -359,9 +350,7 @@ SCENARIOS = [
         "id": "fes-incident-06",
         "level": 1,
         "title": "直した設定をサーバーへ送る",
-        "brief": "手元の release/app.conf は、レビュー済みの新しい設定です。これを training-server のホーム直下に app.conf という名前で送ってください。"
-                 "サーバーにある古い app.conf で手元の新しい設定を上書きしないよう、転送の向きに注意します。"
-                 "接続先は fingerprint.txt で確かめ、最後は手元にいる状態で終えます。",
+        "brief": '手元にあるレビュー済みの新しいアプリ設定を探し、training-server の learner のホーム直下に app.conf という名前で送ってください。サーバーの古い設定で手元の新しいものを上書きしないよう、向きに注意します。接続先は管理者から届いた指紋と照合し、最後は手元へ戻ります。',
         "files": {"fingerprint.txt": _FP, "release/app.conf": _CONF_NEW},
         "remote_files": {"app.conf": _CONF_OLD},
         "solution": ["cat fingerprint.txt", f"ssh {_T}", "yes", "cat app.conf", "exit",
@@ -378,7 +367,7 @@ SCENARIOS = [
         "checks_commands": [_FP_CHECK, _scp_up("release/app.conf", "app.conf")],
         "require_disconnected": True,
         "hints": ["送るときは、手元のファイルが先、サーバー側が後ろです。",
-                  "scp 手元のパス learner@training-server:サーバーのパス の形です。scp は手元で実行します。",
+                  'ls -a で隠れた項目も調べ、ls フォルダ名 や cat で用途と内容を確かめます。scp 手元のパス learner@training-server:サーバーのパス の形です。scp は手元で実行します。',
                   "接続して確かめ exit したあと、scp release/app.conf learner@training-server:app.conf。"],
         "explanation": "アップロードとダウンロードは、引数の順番が入れ替わるだけです。逆向きに打つと、"
                        "せっかく直した手元の設定が古いもので上書きされます。送る前に「元はどっち、先はどっち」と声に出すくらいの慎重さが役立ちます。",
@@ -388,8 +377,7 @@ SCENARIOS = [
         "id": "fes-incident-07",
         "level": 1,
         "title": "エラー行を行番号つきで抜き出す",
-        "brief": "logs/app.log から、大文字の ERROR を含む行だけを、何行目にあったかが分かる形で errors.txt に保存してください。"
-                 "小文字の error を含むだけの行は入れません。元のログは変更しません。",
+        "brief": 'アプリのログから、大文字の ERROR を含む行だけを行番号つきで errors.txt に保存してください。小文字の error を含むだけの行は入れず、元のログは変更しません。',
         "files": {"logs/app.log": _LOG07},
         "solution": ["grep -n ERROR logs/app.log > errors.txt", "cat errors.txt"],
         "alt_solutions": [
@@ -403,7 +391,7 @@ SCENARIOS = [
         ],
         "expected_files": {"errors.txt": _grep_n(_LOG07, "ERROR"), "logs/app.log": _LOG07},
         "hints": ["文字を含む行を探すのは grep です。行番号を付けるオプションがあります。",
-                  "grep の -n で「行番号:行」の形になります。大文字小文字を無視する -i は今回は使いません。",
+                  'ls -a で隠れた項目も調べ、ls フォルダ名 や cat で用途と内容を確かめます。grep の -n で「行番号:行」の形になります。大文字小文字を無視する -i は今回は使いません。',
                   "grep -n ERROR logs/app.log > errors.txt。"],
         "explanation": "障害報告では「何行目に出ていたか」が重要な手がかりになります。行番号があれば、"
                        "前後の行を見に戻ったり、ほかの人に場所を伝えたりできます。-i は便利ですが、拾いすぎることもあります。",
@@ -413,8 +401,7 @@ SCENARIOS = [
         "id": "fes-incident-08",
         "level": 1,
         "title": "障害メモを上書きせずに書き足す",
-        "brief": "incident-note.txt には見出しが1行だけ書かれています。見出しを残したまま、次の3行をこの順番で書き足してください。"
-                 "「02:10 アラート受信」「02:25 原因: ディスク不足」「02:40 復旧を確認」。",
+        "brief": '障害メモには見出しが1行だけあります。それを残したまま「02:10 アラート受信」「02:25 原因: ディスク不足」「02:40 復旧を確認」の3行を、この順で書き足してください。',
         "files": {"incident-note.txt": _NOTE_HEAD},
         "initial_packages": ["vim"],
         "solution": [f"echo '{line}' >> incident-note.txt" for line in _NOTE_LINES] + ["cat incident-note.txt"],
@@ -429,7 +416,7 @@ SCENARIOS = [
         ],
         "expected_files": {"incident-note.txt": _NOTE_HEAD + "".join(x + "\n" for x in _NOTE_LINES)},
         "hints": ["> は上書き、>> は書き足しです。空白を含む文は引用符で囲みます。",
-                  "echo '文' >> ファイル を3回、書く順番どおりに実行します。vim で末尾に書き足しても構いません。",
+                  "ls -a で隠れた項目も調べ、ls フォルダ名 や cat で用途と内容を確かめます。echo '文' >> ファイル を3回、書く順番どおりに実行します。vim で末尾に書き足しても構いません。",
                   "echo '02:10 アラート受信' >> incident-note.txt のように3行続けて追記します。"],
         "explanation": "障害対応中のメモは、時刻順に事実を積み上げていく記録です。> と >> を取り違えると、それまでの記録が一瞬で消えます。"
                        "報告書は後で原因分析や再発防止に使われるので、上書きしない書き方を手に覚えさせておきます。",
@@ -440,9 +427,7 @@ SCENARIOS = [
         "id": "fes-incident-09",
         "level": 2,
         "title": "鍵とポートで入り、居場所の証拠を持ち帰る",
-        "brief": "training-server には 2222 番ポートと鍵 keys/ops_key（教材用の無効な鍵）で接続します。鍵は使える権限に整えてください。"
-                 "接続したらサーバー上で whereami.txt を作り、1行目にコンピューター名、2行目に今いる場所のパスを記録します。"
-                 "それを手元へ remote-whereami.txt という名前で持ち帰り、手元にいる状態で終えます。",
+        "brief": 'training-server へ learner として2222番ポートで接続します。用意された訓練用の鍵を探し、使える権限に整えて指定してください。管理者から届いた指紋とも照合します。サーバー上の whereami.txt に、1行目にコンピューター名、2行目に現在地のパスを記録し、手元へ remote-whereami.txt として持ち帰ります。最後は手元へ戻ります。',
         "files": {"fingerprint.txt": _FP, "keys/ops_key": _KEY},
         "solution": ["chmod 600 keys/ops_key", "cat fingerprint.txt", f"ssh -p 2222 -i keys/ops_key {_T}", "yes",
                      "hostname > whereami.txt", "pwd >> whereami.txt", "cat whereami.txt", "exit",
@@ -464,8 +449,8 @@ SCENARIOS = [
         "expected_modes": {"keys/ops_key": 0o600},
         "checks_commands": [_FP_CHECK, _ssh_forms(port="2222", key="keys/ops_key")],
         "require_disconnected": True,
-        "hints": ["鍵の権限 → 接続（ポートと鍵の両方を指定）→ サーバーで記録 → 戻る → 受け取る、の順です。",
-                  "hostname と pwd の結果は > と >> でファイルに残せます。ssh の -p と -i は同時に使えます。",
+        "hints": ['鍵の名前や場所も自分で調べます。対象と権限を確かめてから接続し、接続先と手元を取り違えないようにしましょう。',
+                  'ls -a で隠れた項目も調べ、ls フォルダ名 や cat で用途と内容を確かめます。hostname と pwd の結果は > と >> でファイルに残せます。ssh の -p と -i は同時に使えます。',
                   "chmod 600 keys/ops_key → ssh -p 2222 -i keys/ops_key learner@training-server → yes → hostname > whereami.txt → pwd >> whereami.txt → exit → scp learner@training-server:whereami.txt remote-whereami.txt。"],
         "explanation": "「確かにそのサーバーで作業した」という証拠を残すのは、変更作業の記録の基本です。"
                        "手元で hostname を実行すると dojo-local になり、証拠になりません。ポート・鍵・ユーザーを1行の ssh にまとめて書けると、"
@@ -476,9 +461,7 @@ SCENARIOS = [
         "id": "fes-incident-10",
         "level": 2,
         "title": "サーバーの最新ログでエラーを数える",
-        "brief": "手元の app.log は昨日の古い写しで、比較に使うので変更しません。training-server にある最新の app.log で、"
-                 "ERROR を含む行がいくつあるかを数え、数字だけを手元の error-count.txt に保存してください。"
-                 "接続先は fingerprint.txt で確かめ、最後は手元にいる状態で終えます。",
+        "brief": '手元のアプリのログは昨日の写しなので比較用に残します。training-server に learner として接続し、最新のアプリのログで ERROR を含む行数を調べ、数字だけを手元の error-count.txt に保存してください。接続先は管理者から届いた指紋と照合し、最後は手元へ戻ります。',
         "files": {"fingerprint.txt": _FP, "app.log": _LOG_STALE},
         "remote_files": {"app.log": _LOG_FRESH},
         "solution": ["cat fingerprint.txt", f"ssh {_T}", "yes", "grep -c ERROR app.log > error-count.txt", "exit",
@@ -498,8 +481,8 @@ SCENARIOS = [
         "expected_files": {"error-count.txt": "5\n", "app.log": _LOG_STALE},
         "checks_commands": [_FP_CHECK],
         "require_disconnected": True,
-        "hints": ["同じ名前の app.log が手元とサーバーの両方にあります。どちらを数えるべきでしょうか。",
-                  "サーバー上で数えて結果を持ち帰るか、サーバーのログを別名で取り寄せて手元で数えます。数えるのは grep -c です。",
+        "hints": ['同じ名前の 対象のファイル が手元とサーバーの両方にあります。どちらを数えるべきでしょうか。',
+                  'ls -a で隠れた項目も調べ、ls フォルダ名 や cat で用途と内容を確かめます。サーバー上で数えて結果を持ち帰るか、サーバーのログを別名で取り寄せて手元で数えます。数えるのは grep -c です。',
                   "接続して grep -c ERROR app.log > error-count.txt → exit → scp learner@training-server:error-count.txt error-count.txt。"],
         "explanation": "障害調査で一番多い失敗の一つが「古いコピーを調べていた」です。同じ名前のファイルが複数の機械にあるときは、"
                        "どの機械のどの時点のものかを意識します。取り寄せるときも、手元の比較用ファイルを上書きしないよう別名にします。",
@@ -509,8 +492,7 @@ SCENARIOS = [
         "id": "fes-incident-11",
         "level": 2,
         "title": "アクセスの多い IP 上位3件を出す",
-        "brief": "access.log の各行の先頭は、アクセス元の IP アドレスです。IP ごとのアクセス回数を数え、多い順に並べた上位3件を top-ip.txt に保存してください。"
-                 "各行は「回数 IP」の形（uniq -c の表示のまま）にします。",
+        "brief": 'アクセスログの各行の先頭は、アクセス元 IP です。IP ごとのアクセス回数を数え、多い順の上位3件を top-ip.txt に保存してください。各行は「回数 IP」の形（uniq -c の表示のまま）にします。',
         "files": {"access.log": _ACCESS11},
         "solution": ["head -3 access.log", "cut -d ' ' -f 1 access.log | sort | uniq -c | sort -rn | head -3 > top-ip.txt",
                      "cat top-ip.txt"],
@@ -525,7 +507,7 @@ SCENARIOS = [
         ],
         "expected_files": {"top-ip.txt": _TOP3, "access.log": _ACCESS11},
         "hints": ["列を取り出す → 並べる → 数える → 多い順に並べ直す → 先頭だけ、をパイプでつなぎます。",
-                  "cut -d ' ' -f 1 で IP、uniq -c は隣り合う同じ行しかまとめないので、その前に sort が必要です。",
+                  "ls -a で隠れた項目も調べ、ls フォルダ名 や cat で用途と内容を確かめます。cut -d ' ' -f 1 で IP、uniq -c は隣り合う同じ行しかまとめないので、その前に sort が必要です。",
                   "cut -d ' ' -f 1 access.log | sort | uniq -c | sort -rn | head -3 > top-ip.txt。"],
         "explanation": "sort | uniq -c | sort -rn は、ログから「何が一番多いか」を出す定番の組み合わせです。"
                        "最初の sort を忘れると、同じ IP がばらばらに数えられて順位が狂います。攻撃元の特定や負荷の原因調査で毎日のように使います。",
@@ -535,9 +517,7 @@ SCENARIOS = [
         "id": "fes-incident-12",
         "level": 2,
         "title": "エラーが集中した時間帯を突き止める",
-        "brief": "training-server の logs/app.log を手元に取り寄せ、ERROR の行がいちばん多かった「時」を調べてください。"
-                 "各行は「日付 時:分:秒 レベル …」の形です。ERROR の行を「日付 時」ごとに数えたランキングの1位の行だけを、"
-                 "uniq -c の表示のまま peak.txt に保存します。最後は手元にいる状態で終えます。",
+        "brief": '管理者から届いた接続先の指紋を確認し、training-server（SSH port 22）の表示と照合してから learner として接続してください。アプリのログを探して手元に取り寄せ、ERROR がいちばん多かった「時」を調べます。各行は「日付 時:分:秒 レベル …」です。「日付 時」ごとの ERROR 件数ランキングの1位だけを、uniq -c の表示のまま peak.txt に保存します。最後は手元へ戻ります。',
         "files": {"fingerprint.txt": _FP},
         "remote_files": {"logs/app.log": _LOG12},
         "solution": ["cat fingerprint.txt", f"ssh {_T}", "yes", "exit", f"scp {_T}:logs/app.log server-app.log",
@@ -559,7 +539,7 @@ SCENARIOS = [
         "checks_commands": [_FP_CHECK],
         "require_disconnected": True,
         "hints": ["「時」までを取り出すには、: を区切りにした1列目が使えます。全体の行数ではなく ERROR だけを数えます。",
-                  "grep ERROR → cut -d ':' -f 1 → sort → uniq -c → sort -rn → head -1 の順につなぎます。",
+                  "ls -a で隠れた項目も調べ、ls フォルダ名 や cat で用途と内容を確かめます。grep ERROR → cut -d ':' -f 1 → sort → uniq -c → sort -rn → head -1 の順につなぎます。",
                   "scp でログを取り寄せ、grep ERROR server-app.log | cut -d ':' -f 1 | sort | uniq -c | sort -rn | head -1 > peak.txt。"],
         "explanation": "エラーが「いつ」増えたかが分かると、その時刻に何が起きたか（リリース、バッチ、アクセス集中）と結び付けられます。"
                        "区切り文字を変えれば、cut で時刻の一部だけを切り出せます。絞り込み（grep）を先にしないと、普通のアクセスが多い時間帯を拾ってしまいます。",
@@ -599,9 +579,7 @@ SCENARIOS = [
         "id": "fes-incident-14",
         "level": 2,
         "title": "ローテートされた古いログだけを片付ける",
-        "brief": "ディスクの空きが少なくなっています。まず全体の空き容量を確認してください。logs フォルダには app.log（今書き込み中）と、"
-                 "古い順に番号の付いた app.log.1〜app.log.4 があります。調査で使う app.log と、直近の app.log.1 は残し、"
-                 "app.log.2 以降だけを削除してください。",
+        "brief": 'ディスクの空きが少なくなっています。まず全体の空きを確認してください。アプリのログ用フォルダを見つけ、書き込み中のログと直近の1世代は残し、それより古い世代だけを削除してください。',
         "files": dict(_ROTATED),
         "solution": ["df -h", "du -sh logs", "ls -l logs", "rm logs/app.log.2 logs/app.log.3 logs/app.log.4", "du -sh logs"],
         "alt_solutions": [
@@ -617,7 +595,7 @@ SCENARIOS = [
         "expected_files": {"logs/app.log": _ROTATED["logs/app.log"], "logs/app.log.1": _ROTATED["logs/app.log.1"]},
         "checks_commands": [["df -h", "df"]],
         "hints": ["消す前に容量を確かめ、消す対象を ls で一覧して、残すものが含まれないか考えます。",
-                  "app.log.* は app.log.1 も含みます。番号を並べるか、[2-4] のような範囲指定を使います。",
+                  'ls -a で隠れた項目も調べ、ls フォルダ名 や cat で用途と内容を確かめます。app.log.* は app.log.1 も含みます。番号を並べるか、[2-4] のような範囲指定を使います。',
                   "df -h → rm logs/app.log.2 logs/app.log.3 logs/app.log.4。"],
         "explanation": "ログは日ごとに app.log.1、app.log.2 … と名前を変えて保管されます（ローテート）。"
                        "直近の世代は障害調査で見返すことが多いので残し、古いものから消すのが基本です。"
@@ -628,8 +606,7 @@ SCENARIOS = [
         "id": "fes-incident-15",
         "level": 2,
         "title": "調査用のデバッグ設定を後片付けする",
-        "brief": "障害調査のために app.conf へ一時的に入れた設定を元に戻します。編集の前に、今の内容を app.conf.bak に残してください。"
-                 "そのうえで debug_dump の行を丸ごと削除し、log_level を debug から warn に変えます。ほかの行と順番はそのままにします。",
+        "brief": 'アプリの設定に調査用の指定が残っています。編集前の内容を app.conf.bak に残し、debug_dump の行を削除して log_level を warn に変えてください。ほかの行と順番はそのままにします。',
         "files": {"app.conf": _CONF15},
         "initial_packages": ["vim"],
         "solution": ["cp app.conf app.conf.bak", "vim app.conf", "/debug_dump", "dd", ":%s/log_level=debug/log_level=warn/",
@@ -646,7 +623,7 @@ SCENARIOS = [
         ],
         "expected_files": {"app.conf": _CONF15_FIXED, "app.conf.bak": _CONF15},
         "hints": ["順番は「退避 → 編集」です。行の削除と文字の置き換えの2つの操作が必要です。",
-                  "vim では /文字 で行を探し、dd でその行を削除、:%s/前/後/ で置き換え、:wq で保存します。",
+                  'ls -a で隠れた項目も調べ、ls フォルダ名 や cat で用途と内容を確かめます。vim では /文字 で行を探し、dd でその行を削除、:%s/前/後/ で置き換え、:wq で保存します。',
                   "cp app.conf app.conf.bak → vim app.conf → /debug_dump → dd → :%s/log_level=debug/log_level=warn/ → :wq。"],
         "explanation": "調査のために入れたデバッグ設定は、消し忘れるとディスクを埋めたり、内部情報をログに出したりします。"
                        "置き換えの対象を広く取りすぎる（debug をすべて warn にする）と、消すべき行が別の値に化けて残ります。"
@@ -657,9 +634,7 @@ SCENARIOS = [
         "id": "fes-incident-16",
         "level": 2,
         "title": "サーバーの設定を取り寄せ、直して送り返す",
-        "brief": "training-server の site.conf の max_clients=10 が少なすぎて接続があふれています。"
-                 "site.conf を手元に同じ名前で取り寄せ、直す前の内容を site.conf.orig として残してから、max_clients=200 に直してください。"
-                 "直したものをサーバーの site.conf に送り返し、最後は手元にいる状態で終えます。timeout の行は変えません。",
+        "brief": '管理者から届いた接続先の指紋を確認し、training-server（SSH port 22）の表示と照合してから learner として接続してください。Web サイト設定で max_clients=10 が少なすぎます。設定を探し、手元に同じ名前で取り寄せます。変更前の内容を site.conf.orig に残し、max_clients=200 に直してサーバーの元の場所へ送り返してください。timeout の行は変えず、最後は手元へ戻ります。',
         "files": {"fingerprint.txt": _FP},
         "remote_files": {"site.conf": _SITE},
         "initial_packages": ["vim"],
@@ -684,7 +659,7 @@ SCENARIOS = [
         "checks_commands": [_FP_CHECK, _scp_up("site.conf", "site.conf")],
         "require_disconnected": True,
         "hints": ["取り寄せ → 退避 → 編集 → 送り返す、の4段階です。それぞれ向きと順番を意識します。",
-                  "scp でサーバー側を先に書けば取り寄せ、後ろに書けば送り返しです。退避は cp、編集は vim が使えます。",
+                  'ls -a で隠れた項目も調べ、ls フォルダ名 や cat で用途と内容を確かめます。scp でサーバー側を先に書けば取り寄せ、後ろに書けば送り返しです。退避は cp、編集は vim が使えます。',
                   "scp learner@training-server:site.conf site.conf → cp site.conf site.conf.orig → vim で直して :wq → scp site.conf learner@training-server:site.conf。"],
         "explanation": "本番サーバーの上で直接編集せず、手元に取り寄せて直してから戻す運用はよくあります。"
                        "このとき元の版を残しておけば、直した設定で問題が出てもすぐ戻せます。"
@@ -695,7 +670,7 @@ SCENARIOS = [
         "id": "fes-incident-17",
         "level": 2,
         "title": "止める前に証拠を残す",
-        "brief": "メモリを大量に使っているプロセスがあります。どれかを特定し、止める前に ps aux の表示のうちそのプロセスの行だけを evidence.txt に保存してください。"
+        "brief": "メモリを大量に使っているプロセスがあります。プロセス一覧から対象を特定し、止める前にそのプロセスの行だけを evidence.txt に保存してください。"
                  "保存したら止め、もう動いていないことを一覧で確かめます。同じ node で動いている api-server は止めません。",
         "processes": [_LEAK, _API],
         "solution": ["ps aux", "ps aux | grep leak-server > evidence.txt", "cat evidence.txt", "kill 6200", "ps aux"],
@@ -723,9 +698,7 @@ SCENARIOS = [
         "id": "fes-incident-18",
         "level": 2,
         "title": "容量を食っているフォルダを突き止めて片付ける",
-        "brief": "ディスクが逼迫しています。全体の空きを確認したあと、data・cache・logs のどれが大きいかを調べてください。"
-                 "原因のフォルダにある一時ファイル（.tmp）だけを削除し、同じフォルダの index.db や、ほかのフォルダのファイルは残します。"
-                 "最後にそのフォルダの大きさをもう一度確かめます。",
+        "brief": 'ディスクが逼迫しています。全体の空きを確認した後、ホーム内のフォルダの大きさを比較してください。原因のフォルダにある一時ファイル（.tmp）だけを削除し、索引データや他のフォルダのファイルは残します。最後に原因のフォルダの大きさをもう一度確かめます。',
         "files": dict(_CACHE),
         "solution": ["df -h", "du -sh data cache logs", "ls cache", "rm cache/*.tmp", "du -sh cache"],
         "alt_solutions": [
@@ -743,7 +716,7 @@ SCENARIOS = [
         "checks_commands": [["df -h", "df"], ["du -sh cache", "du -sh cache/", "du -sh ./cache", "du -sh *",
                                              "du -sh data cache logs"]],
         "hints": ["df は全体、du はフォルダごとの大きさです。いきなり消さず、まず原因を特定します。",
-                  "du -sh にフォルダ名を並べると比べられます。消すのは .tmp で終わるものだけです。",
+                  'ls -a で隠れた項目も調べ、ls フォルダ名 や cat で用途と内容を確かめます。du -sh にフォルダ名を並べると比べられます。消すのは .tmp で終わるものだけです。',
                   "df -h → du -sh data cache logs → rm cache/*.tmp → du -sh cache。"],
         "explanation": "「ディスクがいっぱい」と言われたら、df で全体を見て、du で犯人のフォルダを絞り込むのが定石です。"
                        "原因が分かっても、同じフォルダの必要なファイル（索引やデータ）まで消すと別の障害になります。"
@@ -755,11 +728,7 @@ SCENARIOS = [
         "id": "fes-incident-19",
         "level": 3,
         "title": "深夜2時のアラート：応答しない Web アプリ",
-        "brief": "深夜に「Web が遅い」とアラートが鳴りました。次をすべて行ってください。"
-                 "(1) logs/app.log の ERROR の行を行番号つきで errors.txt に保存する。"
-                 "(2) ERROR の種類（各行の3列目）ごとの件数を多い順に並べ、uniq -c の表示のまま error-rank.txt に保存する。"
-                 "(3) CPU を使い切っている report-batch を、まず通常の停止要求で、止まらなければ強制終了で止める。web-app と rsync は止めない。"
-                 "(4) incident.txt に、時刻・原因・対応を上書きせずに1行ずつ書き足し、3行以上の報告にする。",
+        "brief": '深夜に「Web が遅い」と連絡が来ました。(1) アプリのログの ERROR 行を行番号つきで errors.txt に保存する。(2) ERROR の種類（各行の3列目）ごとの件数を多い順に、uniq -c の表示のまま error-rank.txt に保存する。(3) CPU を使い切るプロセスを通常の停止要求で、止まらなければ強制終了で止める。Web アプリと rsync は止めない。(4) incident.txt に時刻・原因・対応を上書きせず追記し、3行以上の報告にする。',
         "files": {"logs/app.log": _LOG19},
         "processes": [_BATCH, _WEBAPP, _RSYNC],
         "solution": ["grep -n ERROR logs/app.log > errors.txt",
@@ -795,7 +764,7 @@ SCENARIOS = [
         "process_kept": ["web-app", "rsync", "sshd", "cron"],
         "checks_commands": [["kill 7001", "kill -15 7001", "kill -TERM 7001", "kill -SIGTERM 7001", "kill -s TERM 7001"]],
         "hints": ["調査（行番号つき抽出・ランキング）→ 復旧（段階的な停止）→ 報告（追記）の3段で考えます。",
-                  "種類は grep ERROR のあと cut -d ' ' -f 3、数えるのは sort | uniq -c | sort -rn。停止は kill → 確認 → kill -9。",
+                  "ls -a で隠れた項目も調べ、ls フォルダ名 や cat で用途と内容を確かめます。種類は grep ERROR のあと cut -d ' ' -f 3、数えるのは sort | uniq -c | sort -rn。停止は kill → 確認 → kill -9。",
                   "grep -n ERROR logs/app.log > errors.txt → grep ERROR logs/app.log | cut -d ' ' -f 3 | sort | uniq -c | sort -rn > error-rank.txt → kill 7001 → kill -9 7001 → echo '…' >> incident.txt を3回。"],
         "explanation": "実際の当番では、調べる・止める・記録するを同時並行でこなします。どのエラーが最も多いかを数字で示し、"
                        "止めたプロセスと手順を時刻つきで残しておけば、朝に引き継ぐ人が状況をすぐ把握できます。"
@@ -806,11 +775,7 @@ SCENARIOS = [
         "id": "fes-incident-20",
         "level": 3,
         "title": "ディスク満杯：ログが書けない夜",
-        "brief": "「ディスクがいっぱいでログが書けない」と連絡がありました。原因は、調査のあと log_level=debug のままにされた設定で、詳細ログが大量に出たことです。"
-                 "(1) 全体の空き容量とフォルダの大きさを確認する。"
-                 "(2) logs の app.log（書き込み中）と app.log.1（直近）は残し、app.log.2 と app.log.3 だけ削除する。"
-                 "(3) app.conf を app.conf.bak に退避してから、log_level=info に直す（この環境にはまだ vim がありません）。ほかの行は変えない。"
-                 "(4) incident.txt に上書きせず追記して、3行以上の報告を残す。",
+        "brief": 'ディスクがいっぱいでログが書けません。(1) 全体の空きとフォルダの大きさを調べる。(2) アプリのログは書き込み中と直近の1世代を残し、それより古い世代だけ削除する。(3) アプリ設定を app.conf.bak に退避し、log_level=info に直す（vim はまだありません）。ほかの行は変えない。(4) incident.txt に追記し、3行以上の報告を残す。',
         "files": {**_LOGS20, "app.conf": _CONF20},
         "solution": ["df -h", "du -sh logs", "ls -l logs", "rm logs/app.log.2 logs/app.log.3", "du -sh logs",
                      "cp app.conf app.conf.bak", "sudo apt update", "sudo apt install vim", "vim app.conf",
@@ -841,7 +806,7 @@ SCENARIOS = [
         "min_lines": {"incident.txt": 3},
         "checks_commands": [["df -h", "df"], ["du -sh logs", "du -sh logs/", "du -sh *", "du -sh ."]],
         "hints": ["応急処置（容量を空ける）と根本対策（設定を直す）の両方が必要です。設定は退避してから触ります。",
-                  "df -h と du -sh で確認 → 番号の大きいログだけ rm → cp で退避 → apt で vim を入れて置換 → >> で報告。",
+                  'ls -a で隠れた項目も調べ、ls フォルダ名 や cat で用途と内容を確かめます。df -h と du -sh で確認 → 番号の大きいログだけ rm → cp で退避 → apt で vim を入れて置換 → >> で報告。',
                   "rm logs/app.log.2 logs/app.log.3 → cp app.conf app.conf.bak → sudo apt update → sudo apt install vim → vim app.conf → :%s/log_level=debug/log_level=info/ → :wq。"],
         "explanation": "ログを消すだけでは、数時間後にまたディスクが埋まります。応急処置で時間を稼ぎ、原因の設定を直してはじめて障害が終わります。"
                        "書き込み中のログまで消すと調査の手がかりが失われ、退避前に編集すると元に戻せません。応急・恒久・記録の3点セットを意識しましょう。",
@@ -851,10 +816,7 @@ SCENARIOS = [
         "id": "fes-incident-21",
         "level": 3,
         "title": "遠隔の障害：サーバーに入って原因を持ち帰る",
-        "brief": "training-server でエラーが多発しています。接続は 2222 番ポートと鍵 keys/oncall_key（教材用の無効な鍵）を使います。"
-                 "(1) サーバー上の logs/app.log から ERROR の行を行番号つきで抜き出し、手元に server-errors.txt として持ち帰る。"
-                 "(2) 手元で、そのエラーを種類（行番号つき表示で3列目）ごとに数えて多い順に並べ、uniq -c の表示のまま rank.txt に保存する。"
-                 "(3) incident.txt に追記で3行以上の報告を書く。手元の logs/app.log は昨日の写しなので調査に使いません。最後は必ず手元に戻ってください。",
+        "brief": 'training-server でエラーが多発しています。管理者から届いた指紋を表示と照合し、learner として2222番ポートへ接続してください。用意された訓練用の鍵を探して指定します。(1) サーバーのアプリのログから ERROR を行番号つきで抜き出し、手元へ server-errors.txt として持ち帰る。(2) 種類（行番号つき表示で3列目）ごとの件数を多い順に、uniq -c の表示のまま rank.txt に保存する。(3) incident.txt に追記して3行以上の報告を書く。手元の同名ログは昨日の写しなので使いません。最後は手元へ戻ります。',
         "files": {"fingerprint.txt": _FP, "keys/oncall_key": _KEY, "logs/app.log": _LOG21_STALE},
         "remote_files": {"logs/app.log": _LOG21_REMOTE},
         "solution": ["chmod 600 keys/oncall_key", "cat fingerprint.txt", f"ssh -p 2222 -i keys/oncall_key {_T}", "yes",
@@ -891,8 +853,8 @@ SCENARIOS = [
         "min_lines": {"incident.txt": 3},
         "checks_commands": [_FP_CHECK, _ssh_forms(port="2222", key="keys/oncall_key")],
         "require_disconnected": True,
-        "hints": ["接続の準備（鍵の権限・ポート・指紋）→ サーバーで抽出 → 戻って受け取る → 手元で集計 → 報告、の流れです。",
-                  "サーバー上で grep -n の結果を > で保存し、exit してから scp で受け取ります。集計は cut -d ' ' -f 3 | sort | uniq -c | sort -rn。",
+        "hints": ['鍵の名前や場所も自分で調べます。対象と権限を確かめてから接続し、接続先と手元を取り違えないようにしましょう。',
+                  "ls -a で隠れた項目も調べ、ls フォルダ名 や cat で用途と内容を確かめます。サーバー上で grep -n の結果を > で保存し、exit してから scp で受け取ります。集計は cut -d ' ' -f 3 | sort | uniq -c | sort -rn。",
                   "chmod 600 keys/oncall_key → ssh -p 2222 -i keys/oncall_key learner@training-server → yes → grep -n ERROR logs/app.log > server-errors.txt → exit → scp learner@training-server:server-errors.txt server-errors.txt → cut … > rank.txt → echo … >> incident.txt。"],
         "explanation": "遠隔のサーバーでは、重い集計をせず必要な行だけを抜き出して持ち帰るのが、相手の負荷を増やさないやり方です。"
                        "手元に同じ名前の古いログがあると、気づかずにそちらを調べてしまいがちです。調べ終わったら接続を閉じ、"
@@ -903,11 +865,7 @@ SCENARIOS = [
         "id": "fes-incident-22",
         "level": 3,
         "title": "壊れた設定のロールバックと再配布",
-        "brief": "夕方の変更で app.conf の port の値が 8O80（数字の0ではなく英字のO）になり、サイトが起動しなくなりました。"
-                 "(1) 調査のため、今の壊れた app.conf を app.conf.broken として残す。"
-                 "(2) 前日の正しい設定 app.conf.bak は消さずに使い、app.conf を正しい内容に戻す。ただし今回追加した cache=on の行は必要なので、最後の行に残す。"
-                 "(3) 直った app.conf を training-server のホーム直下の app.conf として送る（接続先は fingerprint.txt で確認）。"
-                 "(4) incident.txt に追記で3行以上の報告を書き、手元にいる状態で終える。",
+        "brief": 'アプリ設定の変更後にサイトが起動しなくなりました。(1) 壊れた設定を app.conf.broken として残す。(2) 前日の正しい控えから設定を戻す。控えは残し、今回追加された cache=on は最後の行に残す。(3) 直った設定を training-server の learner のホーム直下の app.conf として送る。接続先は管理者から届いた指紋と照合する。(4) incident.txt に追記で3行以上の報告を書き、最後は手元へ戻る。',
         "files": {"fingerprint.txt": _FP, "app.conf": _CONF22_BROKEN, "app.conf.bak": _CONF22_GOOD},
         "remote_files": {"app.conf": _CONF22_BROKEN},
         "initial_packages": ["vim"],
@@ -941,7 +899,7 @@ SCENARIOS = [
         "checks_commands": [_FP_CHECK, _scp_up("app.conf", "app.conf")],
         "require_disconnected": True,
         "hints": ["壊れた版・正しい版・これから使う版の3つを区別します。mv で動かすと元の名前のファイルがなくなります。",
-                  "壊れた版を cp で残し、bak から cp で戻して cache=on を >> で足すか、vim で打ち間違いだけを直します。",
+                  'ls -a で隠れた項目も調べ、ls フォルダ名 や cat で用途と内容を確かめます。壊れた版を cp で残し、bak から cp で戻して cache=on を >> で足すか、vim で打ち間違いだけを直します。',
                   "cp app.conf app.conf.broken → cp app.conf.bak app.conf → echo cache=on >> app.conf → 接続確認 → exit → scp app.conf learner@training-server:app.conf → echo … >> incident.txt。"],
         "explanation": "ロールバック（元に戻す）は障害対応の最速の手段ですが、壊れた版を残さないと原因の検証ができず、"
                        "正しい版の控えを mv で使い切ると次に戻す先がなくなります。戻したうえで必要な変更だけを再適用し、"
@@ -952,11 +910,7 @@ SCENARIOS = [
         "id": "fes-incident-23",
         "level": 3,
         "title": "ログイン失敗の嵐：攻撃元を遮断リストへ",
-        "brief": "ログイン画面へのアクセスが急増しています。access.log の各行は「IP … ステータス番号 サイズ」の形です。"
-                 "(1) ステータス 401（認証失敗）の行だけを IP ごとに数え、多い順に並べて uniq -c の表示のまま suspect.txt に保存する。"
-                 "(2) 401 がいちばん多い IP を遮断するため、deny.conf に「deny IP;」の1行だけを書く（例: deny 192.0.2.1;）。アクセス数が多いだけの普通の利用者を遮断しないこと。"
-                 "(3) deny.conf を training-server のホーム直下に送る（接続先は fingerprint.txt で確認）。"
-                 "(4) incident.txt に追記で3行以上の報告を書き、手元にいる状態で終える。",
+        "brief": 'ログイン画面へのアクセスが急増しています。アクセスログを調べ、(1) ステータス401の行だけをIPごとに数え、多い順に uniq -c の表示で suspect.txt に保存する。(2) 401が最多のIPを遮断するため deny.conf に「deny IP;」の1行を書く（例: deny 192.0.2.1;）。普通の利用者を遮断しない。(3) deny.conf を training-server の learner のホーム直下に送り、管理者から届いた指紋で接続先を確かめる。(4) incident.txt に追記で3行以上の報告を書き、最後は手元へ戻る。',
         "files": {"fingerprint.txt": _FP, "access.log": _ACCESS23},
         "solution": ["head -3 access.log", "grep ' 401 ' access.log | cut -d ' ' -f 1 | sort | uniq -c | sort -rn > suspect.txt",
                      "cat suspect.txt", "echo 'deny 203.0.113.66;' > deny.conf", "cat fingerprint.txt", f"ssh {_T}", "yes",
@@ -991,7 +945,7 @@ SCENARIOS = [
         "checks_commands": [_FP_CHECK, _scp_up("deny.conf", "deny.conf")],
         "require_disconnected": True,
         "hints": ["「アクセスが多い」と「認証失敗が多い」は別物です。まず 401 の行だけに絞ってから数えます。",
-                  "grep で 401 の行 → cut で IP → sort | uniq -c | sort -rn。; を含む文は引用符で囲んで echo します。",
+                  'ls -a で隠れた項目も調べ、ls フォルダ名 や cat で用途と内容を確かめます。grep で 401 の行 → cut で IP → sort | uniq -c | sort -rn。; を含む文は引用符で囲んで echo します。',
                   "grep ' 401 ' access.log | cut -d ' ' -f 1 | sort | uniq -c | sort -rn > suspect.txt → echo 'deny 203.0.113.66;' > deny.conf → 接続確認 → exit → scp deny.conf learner@training-server:deny.conf。"],
         "explanation": "攻撃対応で怖いのは、正しい利用者を巻き込んで遮断することです。単純なアクセス数ではなく、"
                        "認証失敗という「攻撃らしさ」で絞り込んでから順位を付けます。遮断リストは配布して初めて効くので、送り先と向きも確実に。",
@@ -1001,13 +955,7 @@ SCENARIOS = [
         "id": "fes-incident-24",
         "level": 3,
         "title": "夜明けまでの総仕上げ：当番の一晩",
-        "brief": "朝4時、書き出しバッチが止まらずサービスが重くなっています。次をすべて行い、最後は手元のコンピューターであることを確かめて終えてください。"
-                 "(1) 鍵 keys/night_key（教材用の無効な鍵）を使える権限にし、fingerprint.txt で確認のうえ 2222 番ポートで training-server に入って様子を見る。"
-                 "(2) サーバーの logs/app.log を手元に server-app.log として取り寄せ、ERROR の種類（3列目）ごとの件数を多い順に uniq -c の表示のまま rank.txt に保存する。"
-                 "(3) root が動かしている /opt/export.py を、まず通常の停止要求で、止まらなければ強制終了で止める。nginx・sshd・cron は止めない。"
-                 "(4) 手元の logs の export.log と export.log.1 は残し、それより古い世代だけ削除する。"
-                 "(5) export.conf を export.conf.bak に退避してから max_connections=100 に直す（vim はまだ入っていません）。"
-                 "(6) incident.txt に追記で5行以上の報告を書く。",
+        "brief": '書き出しバッチが止まらず、サービスが重くなっています。(1) 訓練用の鍵を探し、使える権限にして、管理者から届いた指紋を照合し、learner として2222番ポートで training-server に接続する。(2) サーバーのアプリのログを手元に server-app.log として取り寄せ、ERROR の種類（3列目）ごとの件数を多い順に uniq -c の表示で rank.txt に保存する。(3) root の書き出しプロセスを通常の停止要求で、止まらなければ強制終了で止める。nginx・sshd・cron は止めない。(4) 手元の書き出しログは使用中と直近の1世代を残し、それより古い世代だけ削除する。(5) 書き出し設定を export.conf.bak に退避し、max_connections=100 に直す（vim はまだありません）。(6) incident.txt に追記して5行以上の報告を書く。最後は手元のコンピューターであることを確かめる。',
         "files": {"fingerprint.txt": _FP, "keys/night_key": _KEY, "export.conf": _CONF24, **_LOGS24},
         "remote_files": {"logs/app.log": _LOG24_REMOTE},
         "processes": [_EXPORT, _NGINX],
@@ -1083,8 +1031,8 @@ SCENARIOS = [
                              "sudo kill -s TERM 8101"],
                             "hostname"],
         "require_disconnected": True,
-        "hints": ["一晩の流れは「接続して状況を見る → 証拠を手元へ → 止める → 空ける → 直す → 書く → 手元で確かめる」です。1つずつ片付けましょう。",
-                  "鍵は chmod 600、接続は -p と -i、取り寄せは exit 後の scp、集計は grep | cut | sort | uniq -c | sort -rn、停止は sudo kill → sudo kill -9、設定は退避してから apt で vim を入れて置換、報告は >>。",
+        "hints": ['鍵の名前や場所も自分で調べます。対象と権限を確かめてから接続し、接続先と手元を取り違えないようにしましょう。',
+                  'ls -a で隠れた項目も調べ、ls フォルダ名 や cat で用途と内容を確かめます。鍵は chmod 600、接続は -p と -i、取り寄せは exit 後の scp、集計は grep | cut | sort | uniq -c | sort -rn、停止は sudo kill → sudo kill -9、設定は退避してから apt で vim を入れて置換、報告は >>。',
                   "chmod 600 keys/night_key → ssh -p 2222 -i keys/night_key learner@training-server → yes → exit → scp …:logs/app.log server-app.log → grep ERROR server-app.log | cut -d ' ' -f 3 | sort | uniq -c | sort -rn > rank.txt → sudo kill 8101 → sudo kill -9 8101 → rm logs/export.log.2 logs/export.log.3 → cp で退避 → apt で vim → :%s で置換 → echo … >> incident.txt を5回 → hostname。"],
         "explanation": "ここまでの操作をすべて組み合わせると、実際の当番の一晩になります。接続先を確かめ、証拠を残し、"
                        "影響の少ない手段から順に試し、消すもの・直すものの範囲を正確に絞り、元に戻せる状態を保ち、記録を積み上げる。"
