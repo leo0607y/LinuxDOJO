@@ -93,9 +93,15 @@ test('Windows・Mac両方のLinux環境ガイドと練習経路を確認でき�
   assert.match(await page.locator('main').textContent(), /WSL 2 と Ubuntu/);
   assert.match(await page.locator('main').textContent(), /wsl --install/);
   assert.match(await page.locator('main').textContent(), /UTMでUbuntuを仮想マシンに入れる/);
+  assert.match(await page.locator('main').textContent(), /ターミナルを開く/);
+  assert.match(await page.locator('main').textContent(), /PowerShell/);
+  assert.match(await page.locator('main').textContent(), /Command \+ Space/);
   assert.match(await page.locator('main').textContent(), /uname -s/);
   assert.match(await page.locator('main').textContent(), /専用VM/);
   assert.ok(await page.locator('a[href="/course/"]').count());
+  assert.equal(await page.getByRole('link', { name: '環境の準備' }).count(), 1);
+  await page.setViewportSize({ width: 320, height: 740 });
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'environment guide fits a narrow screen');
   await page.close();
 });
 

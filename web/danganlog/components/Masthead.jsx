@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 export default function Masthead() {
   const path = usePathname();
   useEffect(() => { applyTheme(readPrefs().theme); }, []);
-  const links = [['/', '学習画面'], ['/course/', '常用コース'], ['/course/coverage/', '網羅性と未達']];
+  const links = [['/', '学習画面'], ['/course/', '常用コース'], ['/course/real-linux/', '環境の準備'], ['/course/coverage/', '網羅性と未達']];
   return (
     <header className="masthead">
       <div className="masthead-inner">

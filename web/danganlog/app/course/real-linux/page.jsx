@@ -17,6 +17,16 @@ export default function RealLinuxGuide() {
       </p>
 
       <section>
+        <h2>まず、ターミナルを開く</h2>
+        <p>このページを見ているブラウザー版には、コマンドを入力する欄があります。サイト内の練習には別のターミナルを開く必要はありません。自分のPCでコマンドを試すときは、次のアプリを開きます。</p>
+        <ul className={styles.list}>
+          <li><strong>Windows:</strong> スタートメニューを開き、「PowerShell」と検索します。WSLを導入するときは、検索結果を右クリックして「管理者として実行」を選びます。導入後にLinuxコマンドを入力する画面はPowerShellではなく、スタートメニューから開く「Ubuntu」です。</li>
+          <li><strong>Mac:</strong> Spotlightを開き (Command + Space)、「ターミナル」と入力してReturnキーを押します。これはmacOSを操作する画面です。Linuxの操作とは異なる部分があります。</li>
+          <li><strong>Linuxデスクトップ:</strong> アプリ一覧で「Terminal」または「端末」を検索します。多くの環境では Ctrl + Alt + T でも開けます。</li>
+        </ul>
+      </section>
+
+      <section>
         <h2>Windows: WSL 2 と Ubuntu</h2>
         <ol className={styles.list}>
           <li>
@@ -25,7 +35,7 @@ export default function RealLinuxGuide() {
           </li>
           <li>
             <strong>管理者として PowerShell を開きます。</strong>
-            <p>スタートメニューで PowerShell を検索し、「管理者として実行」を選んで次を入力します。</p>
+            <p>先ほど開いた管理者PowerShellで次を入力します。</p>
             <pre className={styles.pre}><code>wsl --install</code></pre>
             <p>標準の手順でWSL 2とUbuntuを導入します。Windowsの再起動を求められたら再起動してください。</p>
           </li>
@@ -54,7 +64,7 @@ export default function RealLinuxGuide() {
 
       <section>
         <h2>Mac: UTMでUbuntuを仮想マシンに入れる</h2>
-        <p>まずはMacに標準で入っている「ターミナル」を使えます。Spotlightを開いて「ターミナル」と検索してください。macOSでも多くのUnixコマンドを練習できます。</p>
+        <p>macOSのターミナルでも、多くの共通コマンドを練習できます。</p>
         <pre className={styles.pre}><code>{'uname -s\npwd'}</code></pre>
         <p><code>uname -s</code> の結果が <code>Darwin</code> ならmacOS上で動いています。macOSはLinuxではないため、Linux固有のサービスや管理操作を練習するときは、Mac上に専用のLinux仮想マシンを作ります。</p>
         <ol className={styles.list}>
