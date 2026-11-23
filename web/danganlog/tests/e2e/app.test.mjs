@@ -39,6 +39,29 @@ test('起動 → モードとレッスン選択 → 誤答でも課題は見え�
   await context.close();
 });
 
+test('未完了の課題・選択中のレッスン・作業ファイルをリロード後に復元', async () => {
+  const { context, page } = await openApp(env.browser, env.url);
+  await run(page, 'modes'); await run(page, '2');
+  await page.waitForFunction(() => document.querySelector('.motd').textContent.includes('基本コマンド'));
+  await run(page, 'goto 5');
+  await page.waitForFunction(() => document.querySelector('#lesson-title').textContent.includes('表示した文字をファイルに保存する'));
+  await run(page, 'echo partial > memo.txt');
+  assert.ok(await page.evaluate(() => localStorage.getItem('dangan-log:state:v1')));
+
+  await page.close();
+  const resumed = await context.newPage();
+  await resumed.goto(env.url);
+  await resumed.waitForSelector('.rt.ready', { timeout: 120000 });
+  assert.match(await resumed.textContent('#lesson-title'), /表示した文字をファイルに保存する/);
+  assert.match(await resumed.textContent('#mission-text'), /memo\.txt/);
+  await run(resumed, 'cat memo.txt');
+  await resumed.waitForFunction(() => [...document.querySelectorAll('.out')].some((el) => el.textContent.includes('partial')));
+  const output = await resumed.locator('.out').filter({ hasText: 'partial' }).last().textContent();
+  assert.match(output, /partial/);
+  assert.equal(await resumed.locator('.tag-ok').count(), 0, 'a newly opened page restores an unfinished attempt without marking it complete');
+  await context.close();
+});
+
 test('学習データの書き出しと読み込み', async () => {
   const { context, page } = await openApp(env.browser, env.url);
   await run(page, 'echo こんにちは');
@@ -59,6 +82,17 @@ test('学習データの書き出しと読み込み', async () => {
   assert.match(await progressLine(page, 'はじめての'), /1\/24/);
   fs.unlinkSync(file);
   await context.close();
+});
+
+test('実Linux環境ガイドからWSL導入手順と練習経路を確認できる', async () => {
+  const page = await env.browser.newPage();
+  await page.goto(env.url + '/course/real-linux/');
+  await page.waitForSelector('h1');
+  assert.match(await page.locator('main').textContent(), /WSL 2 と Ubuntu/);
+  assert.match(await page.locator('main').textContent(), /wsl --install/);
+  assert.match(await page.locator('main').textContent(), /専用VM/);
+  assert.ok(await page.locator('a[href="/course/"]').count());
+  await page.close();
 });
 
 test('総合復習 (festival) モード: 課題が出て、check の失敗でも課題は残る', async () => {

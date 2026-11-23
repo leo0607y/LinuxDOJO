@@ -21,7 +21,10 @@ export default function CourseIndex() {
             日常のファイル操作から小規模サービスの運用まで、{topics.length}のトピックを収録。
             各トピックでコマンド、練習ミッション、実機実習と検証状況を確認できます。
           </p>
-          <Link href="/course/coverage/">資格試験の目標との対応と未達</Link>
+          <p className={styles.links}>
+            <Link href="/course/real-linux/">模擬端末から実Linuxへ進む</Link>
+            <Link href="/course/coverage/">資格試験の目標との対応と未達</Link>
+          </p>
         </div>
         <CourseSearch />
       </div>
