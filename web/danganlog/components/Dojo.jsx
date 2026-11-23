@@ -7,6 +7,7 @@ import {
 } from '../lib/core.js';
 
 import Masthead from './Masthead.jsx';
+import SupportRail from './SupportRail.jsx';
 import { applyTheme, readPrefs, savePrefs } from './preferences.js';
 
 const MAX_ENTRIES = 200;
@@ -538,6 +539,7 @@ export default function Dojo() {
             <button type="button" className="nav-list" disabled={off} onClick={act('menu')}>問題一覧</button>
           </nav>
         </div>
+        <SupportRail />
       </main>
       <footer className="foot">
         <span className="foot-keys">help / {completionOn ? 'Tab 補完 / ' : ''}↑↓ 履歴</span>
