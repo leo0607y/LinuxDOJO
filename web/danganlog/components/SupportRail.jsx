@@ -73,7 +73,7 @@ export default function SupportRail() {
       {adsLive ? <AdSlot /> : null}
       {adsPreview ? <div className="ad-unit">
         <span className="ad-label">広告</span>
-        <div className="ad-placeholder">AdSense枠のプレビュー<br />広告通信は発生しません</div>
+        <div className="ad-placeholder">広告のイメージ 300x250<br />広告通信は発生しません</div>
       </div> : null}
     </aside>
   );

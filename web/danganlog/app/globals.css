@@ -79,7 +79,7 @@ html.app-lock, html.app-lock body { height: 100%; overflow: hidden; overscroll-b
   .ad-slot { min-height: 250px; max-width: 100%; overflow: hidden; }
   .ad-consent { margin-top: .35rem; padding: 0; border: 0; background: none; color: var(--dim); font: inherit; text-decoration: underline; cursor: pointer; }
   .ad-consent:hover, .ad-consent:focus-visible { color: var(--fg); }
-  .ad-placeholder { min-height: 250px; display: grid; place-content: center; border: 1px dashed var(--line); text-align: center; }
+  .ad-placeholder { width: 300px; height: 250px; display: grid; place-content: center; background: #e8e8e8; color: #333; text-align: center; }
   .coffee-link { display: flex; justify-content: center; align-items: center; gap: .45rem; min-height: 3.1rem; padding: .45rem .5rem; border: 1px solid var(--user); background: var(--user); color: var(--bg); font-weight: 700; text-align: center; text-decoration: none; }
   .coffee-link svg { width: 1.45rem; height: 1.45rem; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .coffee-link:hover { background: transparent; color: var(--user); text-decoration: underline; }
