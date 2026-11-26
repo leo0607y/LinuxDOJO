@@ -37,6 +37,43 @@ class WebBridgeTest(unittest.TestCase):
                         failed.append(step["id"])
             self.assertEqual(failed, [])
 
+    def test_export_is_plain_json_and_import_restores_state(self):
+        def plain(o):
+            if type(o) in (str, int, float, bool, type(None)):
+                return True
+            if type(o) is list:
+                return all(plain(v) for v in o)
+            return type(o) is dict and all(type(k) is str and plain(v) for k, v in o.items())
+        with tempfile.TemporaryDirectory() as work:
+            ns = _load_bridge(Path(work) / "session")
+            req = lambda d: json.loads(ns["browser_request"](json.dumps(d)))
+            picks = [(m, i) for m, items in ns["LESSONS"].items() for i in range(0, len(items), 9)]
+            for mode, i in picks:
+                step = ns["LESSONS"][mode][i]
+                req({"type": "select", "mode": mode, "index": i})
+                req({"type": "hint"}); req({"type": "answer"})
+                cmds = [step["command"]] if isinstance(step["command"], str) else list(step["command"])
+                for c in cmds:
+                    for line in c.split("\n"):
+                        view = req({"type": "execute", "line": line})
+                state = req({"type": "export"})["state"]
+                self.assertTrue(plain(state), step["id"])
+                back = json.loads(json.dumps(state))
+                self.assertEqual(back, state)
+                req({"type": "import", "state": back})
+                self.assertEqual(req({"type": "export"})["state"], back, step["id"])
+                self.assertTrue(req({"type": "select", "mode": mode, "index": i})["completed"], step["id"])
+            scenario = ns["_web_scenarios"][0]
+            req({"type": "select", "mode": "festival", "index": 0})
+            sol = scenario["solution"]
+            for line in ("\n".join(sol) if isinstance(sol, list) else sol).split("\n"):
+                req({"type": "execute", "line": line})
+            self.assertTrue(req({"type": "execute", "line": "check"})["completed"])
+            state = json.loads(json.dumps(req({"type": "export"})["state"]))
+            req({"type": "import", "state": state})
+            self.assertEqual(req({"type": "export"})["state"], state)
+            self.assertTrue(req({"type": "select", "mode": "festival", "index": 0})["completed"])
+
     def test_reset_mode_clears_only_that_mode(self):
         with tempfile.TemporaryDirectory() as work:
             ns = _load_bridge(Path(work) / "session")

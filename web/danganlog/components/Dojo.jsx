@@ -114,7 +114,7 @@ export default function Dojo() {
   const persist = useCallback((state) => {
     stateRef.current = state;
     setProgress(state);
-    if (storageRef.current) saveState(storageRef.current, state);
+    if (storageRef.current && !saveState(storageRef.current, state)) setDataMessage('ブラウザに保存できません（容量不足など）。「学習データを書き出す」で控えを保存してください。');
   }, []);
 
   const applyView = useCallback((v) => {
