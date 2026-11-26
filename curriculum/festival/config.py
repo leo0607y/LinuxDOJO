@@ -147,8 +147,8 @@ SCENARIOS = [
         "expected_files": {"check.txt": _MEMO},
         "packages": _VIM,
         "hints": ["vim が無いと開けません。まず道具を入れ、開いたら「書く状態」に切り替えます。",
-                  "sudo apt update → sudo apt install vim で入れます。vim では i で入力モード、esc で戻り、:wq で保存して閉じます。",
-                  "vim check.txt → i → 1行ずつ入力して Enter → esc → :wq。"],
+                  "道具を入れるには管理者権限と apt を使います。先に一覧を更新してから、本体を追加します。",
+                  "開いた直後は入力できません。入力モードに切り替えて1行ずつ書き、esc で戻ってから、保存して閉じる操作をします。"],
         "explanation": "サーバーには vim が入っていないこともあります。自分で入れられれば、どこでも設定を書けます。"
                        "vim は「開いた直後は入力できない」「保存して閉じるまでファイルは変わらない」の2点を体で覚えるのが近道です。",
         "practice": ["6-6", "3-4"],
@@ -170,8 +170,8 @@ SCENARIOS = [
         "expected_files": {"hosts.txt": _HOSTS_LIST, "db_line.txt": "4\n"},
         "checks_commands": [["vim hosts.txt", "vi hosts.txt"]],
         "hints": ["vim の画面の左に行番号が出ます。検索して位置を確かめましょう。",
-                  'ls と cat で対象の名前・場所・内容を確かめます。/文字 で検索できます。うっかり変えてしまったら :q! で「保存せずに閉じる」ができます。',
-                  "vim hosts.txt → /db01 → :q で閉じ、echo 4 > db_line.txt。"],
+                  "ls と cat で対象の名前・場所・内容を確かめます。vim の中では / のあとに文字を打つと検索できます。うっかり変えてしまったら :q! で「保存せずに閉じる」ができます。",
+                  "vim でファイルを開いて検索し、カーソルのある行番号を読み取ります。:q で閉じたあと、その番号を echo で > を使って db_line.txt に書きます。"],
         "explanation": "設定ファイルは「見るだけ」のつもりで開いて、誤操作で壊すことがよくあります。"
                        "保存しない限り元のままなので、迷ったら :q! で捨てて閉じる、が一番安全な逃げ道です。",
         "practice": ["6-6", "2-1"],
@@ -322,8 +322,8 @@ SCENARIOS = [
                   ["vim db.conf", "/debug_sql", "dd", "u", ":wq"]],
         "expected_files": {"db.conf": _DB_FIXED},
         "hints": ["まず消したい行の位置を確かめ、その行へ移動してから消します。",
-                  'ls と cat で対象の名前・場所・内容を確かめます。grep -n で行番号が分かります。vim では :行番号 か /文字 で移動し、dd で今の行を消します。',
-                  "vim db.conf → :4（または /debug_sql）→ dd → :wq。"],
+                  "ls と cat で対象の名前・場所・内容を確かめます。grep の -n で行番号が分かります。vim では :行番号 か /文字 で移動し、dd で今の行を消します。",
+                  "vim で設定ファイルを開き、カーソルが目的の行にあることを確かめてから dd で消します。保存して閉じるには :wq です。"],
         "explanation": "dd は「今カーソルがある行」を消します。開いた直後は1行目にいるので、移動を忘れると見出しを消してしまいます。"
                        "消しすぎたときは u で1つ戻せます。",
         "practice": ["6-6", "2-1"],
@@ -401,7 +401,7 @@ SCENARIOS = [
         "expected_modes": {".env": 0o600},
         "hints": ["中身を書くことと、読める人を絞ることの2つが必要です。",
                   "vim で i を押して3行書き、:wq で保存します。権限は 600 が「所有者だけ読み書き」です。",
-                  "vim .env → i → 3行入力 → esc → :wq → chmod 600 .env（先に touch と chmod をしても構いません）。"],
+                  "vim で隠しファイルを開き、i で挿入モードに入って3行を書き、esc のあと保存します。権限は chmod で数字を指定します。先に chmod をしても構いません。"],
         "explanation": ".env はデータベースや外部サービスの鍵を置く定番の場所です。作った直後はほかの人も読める権限なので、"
                        "600 にするところまでが「作る」作業です。先に空ファイルを 600 にしてから書くと、秘密が見える瞬間もなくなります。",
         "practice": ["6-6", "3-2", "2-8"],
@@ -611,9 +611,8 @@ SCENARIOS = [
         "packages": _VIM,
         "checks_commands": [["ls -l", "ls -la", "ls -al", "ls -l secrets.env", "ls -l start.sh"]],
         "hints": ["道具の用意 → 控え → 編集 → 権限 → 確認、と作業を区切って1つずつ片付けます。",
-                  'ls と cat で対象の名前・場所・内容を確かめます。sudo apt update と install で vim を入れ、cp で控えを取ってから :%s や :行番号 + :s で直します。末尾の追加は G → o か >> です。',
-                  "sudo apt update → sudo apt install vim → cp app.conf app.conf.bak → vim app.conf → :%s/8080/3000/ → "
-                  ":%s/debug/info/ → G → o → timeout=30 → esc → :wq → chmod 600 secrets.env → chmod 755 start.sh → ls -l。"],
+                  "ls と cat で対象の名前・場所・内容を確かめます。apt の update と install で vim を入れ、cp で控えを取ってから :%s や :行番号 + :s で直します。末尾の追加は G → o か >> です。",
+                  "置換は :%s/古い/新しい/ の形です。権限は chmod に数字を渡し、秘密のファイルは所有者だけ、スクリプトは実行できる値にします。最後に ls に -l を付けて確認します。"],
         "explanation": "新しいサーバーの初期設定は、この順番の繰り返しです。どれか1つでも抜けると、"
                        "「戻せない」「起動しない」「秘密が読める」といった問題になります。最後の ls -l は、自分の作業を自分で検査する習慣です。",
         "practice": ["6-6", "3-4", "1-5", "3-2"],
@@ -648,9 +647,8 @@ SCENARIOS = [
         "expected_files": {"backup/api.conf": _API21, "backup/worker.conf": _WORKER21, "conf/api.conf": _API21_FIXED,
                            "conf/worker.conf": _WORKER21_FIXED, "levels.txt": _LEVELS21},
         "hints": ["複数ファイルの作業は、全部控える → 全部直す → まとめて確かめる、の順に進めると漏れません。",
-                  'ls と cat で対象の名前・場所・内容を確かめます。cp は最後にフォルダを書くと、複数のファイルをまとめてその中へ写せます。grep に複数のファイルを渡すとファイル名が付き、-n で行番号も付きます。',
-                  "mkdir backup → cp conf/api.conf conf/worker.conf backup/ → 各ファイルを vim で :%s/=debug/=warn/ → :wq → "
-                  "grep -n log_level conf/*.conf > levels.txt。"],
+                  "ls と cat で対象の名前・場所・内容を確かめます。cp は最後にフォルダを書くと、複数のファイルをまとめてその中へ写せます。grep に複数のファイルを渡すとファイル名が付き、-n で行番号も付きます。",
+                  "控えは backup フォルダを作ってから cp します。置換は2つのファイルそれぞれを vim で開いて行います。最後に grep の結果を > で levels.txt に保存します。"],
         "explanation": "同じ役割の設定が複数のサービスに散らばっていると、1つだけ直し忘れることがよくあります。"
                        "最後に grep で全ファイルを横断して確かめれば、直し漏れや巻き込みがひと目で分かります。",
         "practice": ["1-5", "2-1", "2-6", "6-6"],
@@ -695,10 +693,8 @@ SCENARIOS = [
                            "notice.sh": _NOTICE_SH, "work.log": _WORKLOG22 + "maintenance started\n"},
         "expected_modes": {"notice.sh": 0o755},
         "hints": ["4つの作業は互いに独立しています。1つ終えるごとに cat で確かめてから次へ進むと安心です。",
-                  'ls と cat で対象の名前・場所・内容を確かめます。cron は /send_mail で移動して :s で行頭に「# 」を足します。対象のファイル は =on や =off だけで置き換えると、もう片方の行まで巻き込みます。記録は >> で追記します。',
-                  "cp cron.txt cron.txt.bak → vim cron.txt → /send_mail → :s/0 9/# 0 9/ → :wq → vim flags.conf → "
-                  ":%s/maintenance=off/maintenance=on/ → :%s/signup=on/signup=off/ → :wq → vim notice.sh で2行書く → "
-                  "chmod 755 notice.sh → echo maintenance started >> work.log。"],
+                  "ls と cat で対象の名前・場所・内容を確かめます。cron は / で検索して移動し :s で行頭に「# 」を足します。flags のファイルは =on や =off だけで置き換えると、もう片方の行まで巻き込みます。記録は >> で追記します。",
+                  "cron の控えは cp で .bak を付けた名前にします。flags は2つの項目を :%s で別々に置換します。notice.sh は2行を書いたあと、chmod で実行できる権限にします。"],
         "explanation": "メンテナンス前の作業は「止める」「切り替える」「知らせる」「記録する」の組み合わせです。"
                        "定期ジョブは消さずにコメントで止め、記録は上書きせず追記する。どれも、あとで元へ戻すための作法です。",
         "practice": ["6-6", "1-5", "2-8", "3-1"],
@@ -734,9 +730,8 @@ SCENARIOS = [
         "expected_modes": {"shared.conf": 0o644, "shared.conf.bak": 0o600, "secret.conf": 0o600},
         "checks_commands": [["ls -l", "ls -la", "ls -al", "ls -l secret.conf", "ls -l shared.conf.bak"]],
         "hints": ["「移す」は「写す」と「消す」の組み合わせです。控えの中身も秘密を含むことを忘れずに。",
-                  'ls と cat で対象の名前・場所・内容を確かめます。vim の /db_password と dd で行を消し、対象のファイル では G → o で末尾に書きます。grep と >> でも写せます。',
-                  "cp shared.conf shared.conf.bak → chmod 600 shared.conf.bak → vim shared.conf → /db_password → dd → :wq → "
-                  "vim secret.conf → G → o → 行を入力 → esc → :wq → chmod 600 secret.conf → chmod 644 shared.conf → ls -l。"],
+                  "ls と cat で対象の名前・場所・内容を確かめます。vim の / で検索して dd で行を消し、書き込み先では G → o で末尾に書きます。grep と >> でも写せます。",
+                  "共有側の控えは cp で .bak を作り、chmod で所有者だけが読める値にします。秘密側は書き込み後に同じ権限にし、共有側は誰でも読める値に戻します。最後に ls に -l を付けて確認します。"],
         "explanation": "秘密が紛れ込んだ設定を直すときは、控えや作業途中のファイルにも秘密が残ることを意識します。"
                        "「控えを取ったら控えも守る」「共有するものと秘密を分ける」は、情報漏えいを防ぐ基本の考え方です。",
         "practice": ["6-6", "3-2", "2-1", "1-5"],

@@ -74,7 +74,7 @@ SCENARIOS = [
         "expected_files": {"handover/memo.txt": "担当: 佐藤\n期限: 金曜日\n"},
         "hints": ["フォルダを作ってから、その中にファイルを書きます。2行目は1行目を消さずに足す必要があります。",
                   "mkdir でフォルダを作り、echo の結果を > で新しく書き、>> で末尾に追記します。",
-                  "mkdir handover → echo 担当: 佐藤 > handover/memo.txt → echo 期限: 金曜日 >> handover/memo.txt"],
+                  "1行目は > で、2行目は >> で書きます。2回とも > にすると1行目が消えます。ファイルはフォルダの中に置くので、パスにフォルダ名を付けます。最後に cat で2行になっているか確かめます。"],
         "explanation": "> は「上書き」、>> は「追記」です。2回とも > を使うと1行目が消えます。"
                        "引き継ぎメモや作業記録のように積み重ねるファイルでは、この違いが事故の分かれ目になります。",
         "practice": ["2-1", "1-4"],
@@ -97,8 +97,8 @@ SCENARIOS = [
                   ["mkdir -p project/src project/tests project/docs", "touch project/main.py project/test_main.py project/README.md"]],
         "expected_files": {"project/src/main.py": "", "project/tests/test_main.py": "", "project/docs/README.md": ""},
         "hints": ["ファイルを置くには、先に入れ物のフォルダが必要です。フォルダは入れ子になっています。",
-                  "mkdir -p を使うと、途中のフォルダもまとめて作れます。空のファイルは touch で作ります。",
-                  "mkdir -p project/src project/tests project/docs のあと、touch で3つのファイルを作ります。"],
+                  "mkdir に -p を付けると、途中のフォルダもまとめて作れます。空のファイルは touch で作ります。",
+                  "フォルダは src・tests・docs の3つで、project の下に作ります。touch には3つのファイルをパス付きで並べます。"],
         "explanation": "決まった形の雛形をすばやく作れると、新しい作業の立ち上げが速くなります。"
                        "mkdir -p は途中のフォルダがなくても作り、すでにあってもエラーにならないので、手順書やスクリプトでもよく使います。",
         "practice": ["1-4", "EX-2"],
@@ -118,8 +118,8 @@ SCENARIOS = [
         "expected_files": {"report_final.txt": "6月の月次報告\n売上は前月比 105% でした。\n"},
         "absent": ["report_fianl.txt"],
         "hints": ["名前を変えるのは「移動」と同じ操作です。",
-                  'ls と cat で対象の名前・場所・内容を確かめます。mv 元の名前 新しい名前 で名前が変わります。cp だと元のファイルが残ります。',
-                  "mv report_fianl.txt report_final.txt"],
+                  "ls と cat で対象の名前・場所・内容を確かめます。mv 元の名前 新しい名前 で名前が変わります。cp だと元のファイルが残ります。",
+                  "ls で打ち間違いの綴りを正確に見て、mv の1つ目にその間違った名前、2つ目に正しい名前を書きます。"],
         "explanation": "Linux に「名前を変える」専用の基本コマンドはなく、mv で同じフォルダ内に移動させて名前を変えます。"
                        "打ち間違えた名前を放置すると、検索やスクリプトで見つからない原因になります。",
         "practice": ["1-2", "1-8"],
@@ -139,8 +139,8 @@ SCENARIOS = [
         "expected_files": {"inbox/order_a.txt": "注文A: りんご 3箱\n", "inbox/order_c.txt": "注文C: みかん 5箱\n"},
         "absent": ["inbox/order_b.txt", "inbox/order_d.txt"],
         "hints": ["名前だけでは中身が空かどうか分かりません。大きさを表示できる一覧の出し方があります。",
-                  'ls と cat で対象の名前・場所・内容を確かめます。ls -l inbox でサイズの列を見て、0 のものを探します。',
-                  "ls -l inbox でサイズ 0 は order_b.txt と order_d.txt。rm inbox/order_b.txt inbox/order_d.txt で消します。"],
+                  "ls と cat で対象の名前・場所・内容を確かめます。ls に -l を付けると、サイズの列が出ます。0 のものを探します。",
+                  "サイズが 0 のファイルだけを rm の引数に並べます。ファイルは inbox フォルダの中にあるので、パスの付け忘れに注意します。消したあとにもう一度一覧で確かめましょう。"],
         "explanation": "rm は確認なしで消え、ゴミ箱もありません。消す前に ls -l で大きさや名前を確かめる癖をつけると、"
                        "必要なファイルを巻き込む事故を防げます。",
         "practice": ["1-3", "1-6"],
@@ -162,8 +162,8 @@ SCENARIOS = [
                            "photos/dog.jpg": "犬の写真\n", "shopping.txt": "牛乳\n卵\n"},
         "absent": ["beach.jpg", "cake.jpg", "dog.jpg", "photos/shopping.txt"],
         "hints": ["まず入れ物のフォルダを作ります。そのあと「.jpg で終わるもの」をまとめて指定できると楽です。",
-                  'ls と cat で対象の名前・場所・内容を確かめます。* は「何文字でも」を表すワイルドカードです。*.jpg で jpg だけを選べます。',
-                  "mkdir photos のあと mv *.jpg photos で移動します。"],
+                  "ls と cat で対象の名前・場所・内容を確かめます。* は「何文字でも」を表すワイルドカードです。*.jpg で jpg だけを選べます。",
+                  "mkdir で photos を作り、mv の移動元にワイルドカードのパターン、移動先に photos を書きます。買い物メモは .jpg ではないので対象外です。"],
         "explanation": "ワイルドカードを使うと、同じ種類のファイルを1回で扱えます。"
                        "送り先のフォルダがないまま複数のファイルを mv するとエラーになるので、入れ物を先に作るのが基本の順番です。",
         "practice": ["1-8", "1-4"],
@@ -184,8 +184,8 @@ SCENARIOS = [
                   ["echo debug=on >> settings.conf"]],
         "expected_files": {"settings.conf": _SETTINGS + "debug=on\n", "settings.conf.bak": _SETTINGS},
         "hints": ["順番が大切です。控えは、変えてしまった後では取れません。",
-                  'ls と cat で対象の名前・場所・内容を確かめます。cp で .bak を作ってから、>> で末尾に1行足します。> だと中身が消えます。',
-                  "cp settings.conf settings.conf.bak → echo debug=on >> settings.conf"],
+                  "ls と cat で対象の名前・場所・内容を確かめます。cp で .bak を作ってから、>> で末尾に1行足します。> だと中身が消えます。",
+                  "控えの名前は元の名前の後ろに .bak を付けます。そのあと echo で debug=on を >> で追記します。最後に cat で末尾の行を確認します。"],
         "explanation": "設定変更の前に控えを取っておけば、うまく動かなくなっても cp で一瞬で戻せます。"
                        "現場では「変更前のバックアップ」は手順書の最初に書かれていることがほとんどです。",
         "practice": ["1-5", "2-1"],
@@ -205,8 +205,8 @@ SCENARIOS = [
         "expected_files": {"work/keep_license.tmp": "LICENSE-TRAINING-0001\n", "work/draft.txt": "企画の下書き\n"},
         "absent": ["work/cache_01.tmp", "work/cache_02.tmp", "work/cache_03.tmp"],
         "hints": ["*.tmp だと、残すべき keep_license.tmp まで一致してしまいます。",
-                  'ls と cat で対象の名前・場所・内容を確かめます。名前の頭が共通している部分（cache_）をワイルドカードに含めると、対象を絞れます。',
-                  "rm work/cache_*.tmp で cache_ で始まる .tmp だけを消します。"],
+                  "ls と cat で対象の名前・場所・内容を確かめます。名前の頭が共通している部分（cache_）をワイルドカードに含めると、対象を絞れます。",
+                  "rm の引数は work フォルダのパスから始め、cache_ のあとに * を置き、最後に拡張子を付けます。消す前に ls で対象を確かめると安心です。"],
         "explanation": "ワイルドカードは便利な反面、思ったより多くのファイルに一致することがあります。"
                        "rm の前に同じパターンで ls してみると、何が消えるかを先に確かめられます。",
         "practice": ["1-6", "2-6"],
@@ -226,8 +226,8 @@ SCENARIOS = [
         "expected_files": {"archive/order.txt": "注文書 ACME-2025-031\n", "archive/index.txt": "保管庫の目録\n"},
         "absent": ["clients/acme/2025/inbox/order.txt"],
         "hints": ["場所の書き方は2通りあります。/ から始まる絶対パスと、今いる場所から数える相対パスです。",
-                  'ls と cat で対象の名前・場所・内容を確かめます。どこにいても同じ場所を指せるのが /home/learner/archive のような絶対パスです。.. は1つ上のフォルダです。',
-                  "mv clients/acme/2025/inbox/order.txt /home/learner/archive/"],
+                  "ls と cat で対象の名前・場所・内容を確かめます。どこにいても同じ場所を指せるのが /home/learner/archive のような絶対パスです。.. は1つ上のフォルダです。",
+                  "mv の移動元は今いる場所から数えた相対パスで、奥のフォルダまで順にたどって書きます。移動先は絶対パスで書き、最後に / を付けるとフォルダだと分かりやすくなります。"],
         "explanation": "深いフォルダに cd した後で相対パスを書くと、思わぬ場所に archive という名前のファイルができてしまいます。"
                        "迷ったら pwd で現在地を確かめるか、絶対パスで書くと確実です。",
         "practice": ["1-2", "1-1"],
@@ -250,8 +250,8 @@ SCENARIOS = [
         "expected_files": {"desk/invoice_0417.pdf": "請求書 No.0417 金額 48,000円\n",
                            "shared/2025/q2/misc/invoice_0417.pdf": "請求書 No.0417 金額 48,000円\n"},
         "hints": ["フォルダを1つずつ開いて探すより、名前で一気に探すコマンドがあります。",
-                  'ls と cat で対象の名前・場所・内容を確かめます。find 探し始める場所 -name ファイル名 で、奥のフォルダまで探せます。見つかった場所をそのまま cp に使います。',
-                  "find shared -name invoice_0417.pdf で場所が分かったら、cp shared/2025/q2/misc/invoice_0417.pdf desk/"],
+                  "ls と cat で対象の名前・場所・内容を確かめます。find 探し始める場所 -name ファイル名 で、奥のフォルダまで探せます。見つかった場所をそのまま cp に使います。",
+                  "まず find で場所を突き止めます。表示されたパスを cp の1つ目に貼り、2つ目に desk フォルダを書きます。"],
         "explanation": "どこに置いたか分からないファイルは find で探すのが早道です。"
                        "共有フォルダの元ファイルは他の人も使うので、自分の作業には cp で写して使います。",
         "practice": ["2-6", "1-2"],
@@ -276,8 +276,8 @@ SCENARIOS = [
                            "delivery/readme.txt": "納品物の説明\n"},
         "absent": ["delivery/delivery_list.txt"],
         "hints": ["画面に出る結果は、そのままファイルに保存できます。最後の1行は消さずに足します。",
-                  'ls と cat で対象の名前・場所・内容を確かめます。ls delivery の結果を > で保存し、echo の結果を >> で追記します。',
-                  "ls delivery > delivery_list.txt → echo 以上3件 >> delivery_list.txt"],
+                  "ls と cat で対象の名前・場所・内容を確かめます。ls の結果を > で保存し、echo の結果を >> で追記します。",
+                  "1回目は > で ls の結果を保存し、2回目は >> で最後の1行を足します。> を2回使うと一覧が消えます。cat で3件の一覧と最後の行が並ぶか確かめます。"],
         "explanation": "納品や引き継ぎでは「何を渡したか」を記録に残すことが求められます。"
                        "手で書き写すと漏れや打ち間違いが起きるので、コマンドの出力をそのまま保存するのが確実です。",
         "practice": ["2-1", "1-8"],
@@ -296,8 +296,8 @@ SCENARIOS = [
                   ["mv logs/day1.log logs/week.log", "cat logs/day2.log >> logs/week.log", "cat logs/day3.log >> logs/week.log"]],
         "expected_files": {"logs/week.log": _WEEK_LOG, **_DAY_LOGS},
         "hints": ["cat は、並べたファイルを順番につなげて表示できます。",
-                  'ls と cat で対象の名前・場所・内容を確かめます。cat に3つのファイルを日付順で並べ、結果を > で week.log に保存します。1つずつ足すなら >> を使います。',
-                  "cat logs/day1.log logs/day2.log logs/day3.log > logs/week.log"],
+                  "ls と cat で対象の名前・場所・内容を確かめます。cat に3つのファイルを日付順で並べ、結果を > で week.log に保存します。1つずつ足すなら >> を使います。",
+                  "ファイルは logs フォルダの中にあるので、パスを付けて day の番号順に並べます。保存先も logs の中です。最後に cat で3日分が順に並んでいるか確かめます。"],
         "explanation": "cat は「concatenate（連結する）」の略で、本来はファイルをつなげる道具です。"
                        "まとめる順番を間違えると時系列が崩れ、障害調査で原因と結果を読み違える元になります。",
         "practice": ["2-1", "1-7"],
@@ -323,8 +323,8 @@ SCENARIOS = [
         "absent": ["delivery/2025-06/client_a/report_draft.pdf", "delivery/2025-06/client_a/slides_draft.pdf",
                    "delivery/2025-06/client_a/memo.txt"],
         "hints": ["入れ子のフォルダを一度に作る方法と、「移動」ではなく「複製」する方法を組み合わせます。",
-                  'ls と cat で対象の名前・場所・内容を確かめます。mkdir -p で3段のフォルダを作り、cp で清書の2つだけを写します。*.pdf でまとめて写したなら、下書きを納品側から消します。',
-                  "mkdir -p delivery/2025-06/client_a → cp work/report.pdf work/slides.pdf delivery/2025-06/client_a/"],
+                  "ls と cat で対象の名前・場所・内容を確かめます。mkdir に -p を付けて3段のフォルダを作り、cp で清書の2つだけを写します。*.pdf でまとめて写したなら、下書きを納品側から消します。",
+                  "cp は複数のファイルを並べ、最後にコピー先のフォルダを書きます。コピー元は work の中の清書2つです。最後に ls でコピー先の中身を確かめます。"],
         "explanation": "納品物に下書きや社内メモが混じるのは、実際によくある情報漏えいの入口です。"
                        "手元の控えは cp で残し、納品フォルダの中身は ls で最後に確かめましょう。",
         "practice": ["1-4", "1-8"],
@@ -345,8 +345,8 @@ SCENARIOS = [
                            **{f"photos/IMG_{n}.jpg": f"写真 {n}\n" for n in (10, 11, 12)}},
         "absent": [f"photos/IMG_{n}.jpg" for n in (1, 2, 3, 4)] + [f"photos/batch1/IMG_{n}.jpg" for n in (10, 11, 12)],
         "hints": ["* は「何文字でも」なので、IMG_1 も IMG_10 も一致してしまいます。「ちょうど1文字」を表す記号があります。",
-                  'ls と cat で対象の名前・場所・内容を確かめます。? はちょうど1文字に一致するワイルドカードです。IMG_?.jpg なら1桁の番号だけが選ばれます。',
-                  "mkdir photos/batch1 → mv photos/IMG_?.jpg photos/batch1"],
+                  "ls と cat で対象の名前・場所・内容を確かめます。? はちょうど1文字に一致するワイルドカードです。IMG_ のあとに ? を置くと、1桁の番号だけが選ばれます。",
+                  "mkdir で photos の中に batch1 を作ってから、mv の移動元に ? を使ったパターンを書きます。2桁の番号の写真が残っているか ls で確かめましょう。"],
         "explanation": "* と ? を使い分けられると、名前の長さで対象を絞り込めます。"
                        "IMG_1*.jpg のように書くと IMG_10〜12 も一致するので、パターンが何に一致するか必ず意識しましょう。",
         "practice": ["2-6", "1-8"],
@@ -370,8 +370,8 @@ SCENARIOS = [
         "absent": ["project/structure.txt"],
         "packages": ["tree"],
         "hints": ["ない道具は自分で入れます。入れる前に、取得できるソフトの一覧を最新にする操作が必要です。",
-                  'ls と cat で対象の名前・場所・内容を確かめます。sudo apt update で一覧を更新し、sudo apt install tree で入れます。表示結果は > でファイルに保存できます。',
-                  "sudo apt update → sudo apt install tree → tree project > structure.txt"],
+                  "ls と cat で対象の名前・場所・内容を確かめます。apt の update で一覧を更新し、apt の install で tree を入れます。どちらも管理者権限の sudo が要ります。表示結果は > でファイルに保存できます。",
+                  "tree のあとに調べたいフォルダを書き、その出力を > で structure.txt に保存します。最後に cat で保存された内容を確かめます。"],
         "explanation": "tree はフォルダの入れ子を一目で見せてくれるので、引き継ぎ資料や報告に便利です。"
                        "apt install の前に apt update を忘れると「見つからない」と言われるのは、実機でもよくあるつまずきです。",
         "practice": ["1-4", "2-1"],
@@ -396,8 +396,8 @@ SCENARIOS = [
                            "photos/album_memo.txt": _YEARS["photos/album_memo.txt"]},
         "absent": ["photos/2023_0101.jpg", "photos/2023_0815.jpg", "photos/2024_0301.jpg", "photos/2024_1224.jpg"],
         "hints": ["年ごとに入れ物を作り、年ごとにパターンを変えて2回に分けて移動します。",
-                  'ls と cat で対象の名前・場所・内容を確かめます。2023_*.jpg のように、年とアンダースコアまで含めて書くと、その年の写真だけが一致します。',
-                  "mkdir photos/2023 photos/2024 → mv photos/2023_*.jpg photos/2023 → mv photos/2024_*.jpg photos/2024"],
+                  "ls と cat で対象の名前・場所・内容を確かめます。年とアンダースコアまで含めて * を使うと、その年の写真だけが一致します。mkdir は2つのフォルダ名を並べて一度に作れます。",
+                  "mv は2回に分けます。1回目は 2023 の写真を 2023 フォルダへ、2回目は 2024 の写真を 2024 フォルダへ移します。パスには photos を付けます。"],
         "explanation": "2023* と書くと、作ったばかりのフォルダ 2023 自身まで一致してしまいます。"
                        "パターンに区切り文字（_ や .jpg）まで含めると、狙ったファイルだけを確実に選べます。",
         "practice": ["1-8", "2-6"],
@@ -421,8 +421,8 @@ SCENARIOS = [
                   ["mkdir backup", "cp members.txt backup/members_old.txt", "echo 山本 >> members.txt"]],
         "expected_files": {"members.txt": "田中\n高橋\n山本\n", "backup/members_old.txt": _MEMBERS},
         "hints": ["退避 → 作り直し、の順番です。退避先のフォルダもまだありません。",
-                  'ls と cat で対象の名前・場所・内容を確かめます。mkdir で入れ物を作り、cp でコピー先の名前まで指定して退避します。新しい名簿は echo と > / >> で書きます。',
-                  "mkdir backup → cp members.txt backup/members_old.txt → echo 田中 > members.txt → echo 高橋 >> … → echo 山本 >> …"],
+                  "ls と cat で対象の名前・場所・内容を確かめます。mkdir で入れ物を作り、cp でコピー先の名前まで指定して退避します。新しい名簿は echo と > / >> で書きます。",
+                  "退避する名前は members_old.txt です。名簿を作り直す1人目は > で、2人目以降は >> で足します。1人目も >> にすると古い内容が残ります。"],
         "explanation": "上書きは元に戻せません。退避してから作り直す、という順番を守れば、間違えても旧版と見比べて直せます。"
                        "cp はコピー先に別の名前を付けられるので、退避と同時に分かりやすい名前に変えられます。",
         "practice": ["1-5", "2-1"],
@@ -447,8 +447,8 @@ SCENARIOS = [
                            "data/README.txt": _CSV["data/README.txt"]},
         "absent": ["a/sales_04.csv", "reports/2025/sales_05.csv", "tmp/old/sales_06.csv", "data/notes.txt"],
         "hints": ["ワイルドカードは1つのフォルダの中しか見ません。奥のフォルダまで探す道具を使います。",
-                  'ls と cat で対象の名前・場所・内容を確かめます。find . -name "*.csv" で、すべての場所が一覧で分かります。その場所を mv に並べます。',
-                  "find . -name \"*.csv\" の結果を見て、mv a/sales_04.csv reports/2025/sales_05.csv tmp/old/sales_06.csv data/"],
+                  "ls と cat で対象の名前・場所・内容を確かめます。find で探し始める場所に今のフォルダを指定し、-name に csv のパターンを渡すと、すべての場所が一覧で分かります。",
+                  "一覧に出た3つのパスを mv の移動元に並べ、最後に移動先の data フォルダを書きます。終わったら ls で data の中身を確かめます。"],
         "explanation": "find は「どこにあるか分からない」を「この場所にある」に変えてくれます。"
                        "探す → 一覧を確かめる → 動かす、の順にすれば、取りこぼしも巻き込みも防げます。",
         "practice": ["2-6", "EX-3"],
@@ -471,8 +471,8 @@ SCENARIOS = [
                            "config_backup/.gitignore": _GITIGNORE, "config/app.conf": _APP_CONF,
                            "config/.env": _ENV_SAMPLE, "config/.gitignore": _GITIGNORE},
         "hints": ["ls だけでは見えないファイルがあります。まず全部を表示して、何があるか確かめましょう。",
-                  'ls -a で隠れた項目も調べ、ls フォルダ名 や cat で用途と内容を確かめます。ls -a で隠しファイルも表示されます。* は . で始まる名前に一致しないので、隠しファイルは別に指定します。',
-                  "ls -a config で3つを確かめ、mkdir config_backup → cp config/app.conf config/.env config/.gitignore config_backup"],
+                  "ls に -a を付けると隠れた項目も調べられます。* は . で始まる名前に一致しないので、隠しファイルは別に指定します。",
+                  "バックアップ先のフォルダを作ってから、cp に3つのファイル名を並べて最後にそのフォルダを書きます。隠しファイルは . から始まる名前をそのまま書きます。"],
         "explanation": ".env や .gitignore のような設定ファイルは隠しファイルになっていることが多く、* だけのコピーでは漏れます。"
                        "バックアップで一番大事な設定だけが抜けていた、という事故は現場で本当に起こります。",
         "practice": ["1-1", "1-5"],
@@ -497,8 +497,8 @@ SCENARIOS = [
         "absent": ["report_w1.txt", "report_w2.txt", "report_w3.txt", "archive/report_w1.txt", "archive/report_w2.txt",
                    "archive/report_w3.txt"],
         "hints": ["移動と名前の変更は、1回の操作で同時にできます。",
-                  'ls と cat で対象の名前・場所・内容を確かめます。mv 元の名前 送り先フォルダ/新しい名前 と書くと、移動しながら名前が変わります。',
-                  "mv report_w1.txt archive/2025-06-02_report_w1.txt を、w2・w3 にも同じように行います。"],
+                  "ls と cat で対象の名前・場所・内容を確かめます。mv の2つ目に、送り先フォルダ/新しい名前 の形で書くと、移動しながら名前が変わります。",
+                  "新しい名前は日付、アンダースコア、元の名前の順に並びます。日付はタスクの説明を見直して週ごとに確認し、3つのファイルそれぞれに mv を行います。"],
         "explanation": "名前の頭に 2025-06-02 のような日付を付けると、ls で並べたときに自然に日付順になります。"
                        "保管庫の整理で広く使われる名付け方です。",
         "practice": ["1-8", "6-3"],
@@ -538,9 +538,8 @@ SCENARIOS = [
                            "handover/README.txt": _HANDOVER_README, **_HANDOVER_SRC},
         "absent": ["handover/docs/private_memo.txt", "handover/private_memo.txt"],
         "hints": ["(1)〜(3) を順番に片付けます。最初に入れ物のフォルダ2つ、次にコピー、最後に README です。",
-                  'ls と cat で対象の名前・場所・内容を確かめます。mkdir -p で handover/docs と handover/scripts を作り、cp で写します。notes/* だと個人メモまで入るので注意します。README は echo と > / >> で3行にします。',
-                  "mkdir -p handover/docs handover/scripts → cp notes/setup_guide.md notes/faq.md handover/docs → "
-                  "cp scripts/*.sh handover/scripts → echo 引き継ぎ資料 > handover/README.txt → 残り2行は >> で追記"],
+                  "ls と cat で対象の名前・場所・内容を確かめます。mkdir に -p を付けて2つのフォルダを作り、cp で写します。notes/* だと個人メモまで入るので注意します。README は echo と > / >> で3行にします。",
+                  "cp は docs 側に2つの文書、scripts 側には .sh のパターンを使います。README の1行目は > 、残りの2行は >> で書き足します。"],
         "explanation": "引き継ぎでは「必要なものが全部ある」と「渡してはいけないものが入っていない」の両方が大切です。"
                        "元ファイルは cp で残しておけば、後から聞かれても自分の手元で確認できます。",
         "practice": ["1-8", "1-4", "2-1"],
@@ -573,9 +572,8 @@ SCENARIOS = [
         "absent": ["myapp/old_notes.txt", "myapp/main.py", "myapp/utils.py", "myapp/test_main.py", "myapp/test_utils.py",
                    "myapp/README.md", "myapp/src/test_main.py", "myapp/src/test_utils.py"],
         "hints": ["*.py は test_ で始まるファイルにも一致します。どちらを先に動かすかで結果が変わります。",
-                  'ls と cat で対象の名前・場所・内容を確かめます。先に test_*.py を tests へ移すと、残った *.py は main.py と utils.py だけになります。old_notes.txt は cp で backup に写してから rm するか、mv で backup へ移せば一度で済みます。',
-                  "mkdir -p myapp/src myapp/tests myapp/docs backup → mv myapp/old_notes.txt backup/ → mv myapp/test_*.py myapp/tests → "
-                  "mv myapp/*.py myapp/src → mv myapp/README.md myapp/docs"],
+                  "ls と cat で対象の名前・場所・内容を確かめます。先に test_ で始まる .py を tests へ移すと、残った .py は main.py と utils.py だけになります。old_notes.txt は cp で backup に写してから rm するか、mv で backup へ移せば一度で済みます。",
+                  "mkdir は -p を付けて4つのフォルダを一度に作れます。そのあと、特別なパターン（test_）を先に、広いパターン（*.py）を後に mv します。README は docs へ移します。"],
         "explanation": "ワイルドカードで動かすときは、「狭いパターンを先に、広いパターンを後に」が鉄則です。"
                        "また、消す前に控えを取る（あるいは消す代わりに退避先へ移す）習慣があれば、「やっぱり要る」と言われても困りません。",
         "practice": ["1-4", "1-6", "1-8"],
@@ -609,9 +607,8 @@ SCENARIOS = [
                            "album/count.txt": "4\n", "camera/.camera_id": "CAMERA-TRAINING-01\n"},
         "absent": [f"camera/DSC_000{n}.jpg" for n in (1, 2, 3, 4)] + ["camera/thumb_0001.tmp", "camera/thumb_0002.tmp"],
         "hints": ["(1)〜(4) を1つずつ片付けます。写真を移す前に控えを取る、数えるのは移した後、が自然な順番です。",
-                  'ls と cat で対象の名前・場所・内容を確かめます。mkdir -p で入れ物を作り、cp で控え、mv で本体を移し、rm で .tmp を消します。枚数は ls の結果を | で wc -l に渡すと数えられ、> で保存できます。',
-                  "mkdir -p backup/camera album/2025-06 → cp camera/DSC_*.jpg backup/camera → mv camera/DSC_*.jpg album/2025-06 → "
-                  "rm camera/*.tmp → ls album/2025-06 | wc -l > album/count.txt"],
+                  "ls と cat で対象の名前・場所・内容を確かめます。mkdir -p で入れ物を作り、cp で控え、mv で本体を移し、rm で .tmp を消します。枚数は ls の結果を | で wc -l に渡すと数えられ、> で保存できます。",
+                  "camera の隠しファイルは ls に -a を付けて確かめます。控えと移動は同じ DSC_ のパターンを使い、枚数は移した先のフォルダで数えて album の中のファイルに保存します。"],
         "explanation": "写真のように取り直しのきかないデータは、動かす前に控えを取るのが鉄則です。"
                        "また、隠しファイルは ls では見えないので、フォルダを片付ける前に ls -a で全体を確かめると、機器の設定などを誤って消さずに済みます。",
         "practice": ["1-5", "1-1", "2-1"],
@@ -651,9 +648,8 @@ SCENARIOS = [
         "absent": ["server_logs/app/app_2025-05.log", "server_logs/web/access_2025-05.log", "server_logs/app/core.1201",
                    "server_logs/web/core.1388", "archive/2025-05/list_2025-05.txt"],
         "hints": ["まず find で対象の場所を全部洗い出してから手を動かします。一覧づくりは最後です。",
-                  'ls と cat で対象の名前・場所・内容を確かめます。find server_logs -name "*2025-05*" と find server_logs -name "core.*" で場所が分かります。一覧は ls の結果を > で、archive/2025-05 の外（archive の直下）に保存します。',
-                  "mkdir -p archive/2025-05 → mv server_logs/app/app_2025-05.log server_logs/web/access_2025-05.log archive/2025-05 → "
-                  "rm server_logs/app/core.1201 server_logs/web/core.1388 → ls archive/2025-05 > archive/list_2025-05.txt"],
+                  "ls と cat で対象の名前・場所・内容を確かめます。find に server_logs を指定し、-name に 2025-05 を含むパターンと core. で始まるパターンの2回で場所が分かります。一覧は ls の結果を > で、archive/2025-05 の外（archive の直下）に保存します。",
+                  "find が示した場所のパスを、mv と rm にそのまま書きます。mkdir で2025-05 のフォルダを作ってから移動し、最後に ls でそのフォルダの中身を一覧ファイルに保存します。"],
         "explanation": "大掃除では「探す → 移す → 消す → 記録する」の順を守ると、消しすぎや記録漏れが起きにくくなります。"
                        "フォルダごと * で消すと今月のログまで失い、障害調査ができなくなります。",
         "practice": ["2-6", "3-8", "1-6"],
@@ -691,9 +687,8 @@ SCENARIOS = [
                            "release_tree.txt": ".\n└── CHANGELOG.txt\n└── index.html\n└── style.css\n", **_SITE_NEW},
         "packages": ["tree"],
         "hints": ["(1) の控えは、(2) の差し替えより先でないと取れません。tree は apt で入れます。",
-                  'ls と cat で対象の名前・場所・内容を確かめます。mkdir -p backup/v1.0 → cp で控え → cp new/… site で上書き → echo … >> で追記。tree は sudo apt update のあと sudo apt install tree で入れ、> で保存します。',
-                  "mkdir -p backup/v1.0 → cp site/index.html site/style.css backup/v1.0 → cp new/index.html new/style.css site → "
-                  "echo v1.1 デザイン更新 >> site/CHANGELOG.txt → sudo apt update → sudo apt install tree → tree site > release_tree.txt"],
+                  "ls と cat で対象の名前・場所・内容を確かめます。mkdir -p でバージョンのフォルダを作り、cp で控え、cp で new から site へ上書きします。変更履歴は echo と >> で追記します。tree は apt の update のあと install で入れ、> で保存します。",
+                  "控えは site の2つのファイルを backup 側のバージョンのフォルダへ cp します。差し替えは new の2つのファイルを site フォルダへ cp します。追記は > ではなく >> です。"],
         "explanation": "本番のファイルを差し替える作業は「控え → 差し替え → 変更履歴 → 結果の記録」がひと続きです。"
                        "控えがあれば不具合が出てもすぐ v1.0 に戻せ、記録があれば後から何をしたか説明できます。",
         "practice": ["1-5", "2-1", "1-8"],

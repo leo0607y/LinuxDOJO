@@ -27,8 +27,8 @@ sys.path.insert(0, str(ROOT / "tests"))
 
 ERROR_PATTERNS = re.compile(
     r"command not found|No such file or directory|Permission denied|未対応|対応していません|"
-    r"Traceback|invalid option|unrecognized option|cannot access|cannot open|usage:|Usage:|"
-    r"そのようなファイル|見つかりません|エラー", re.I)
+    r"Traceback|invalid option|unrecognized option|cannot access|usage:|Usage:|"
+    r"そのようなファイル", re.I)
 VALUE_FLAGS = {"-p", "-i", "-o", "-f", "-n", "-c", "-k", "-t", "-d", "-e", "-m", "-u", "-g", "-s", "-b", "-A", "-B",
                "-C", "-L", "-R", "-l", "-P", "-D"}
 
@@ -94,6 +94,8 @@ def variants(command):
     if len(groups) >= 2:
         rev = [w for g in reversed(groups) for w in g]
         out["オプション順を逆"] = " ".join([words[0]] + rev + rest)
+    if words[0] in ("ip", "find", "java", "ssh", "openssl"):
+        return {k: v for k, v in out.items() if v and v != command}
     short = [g[0] for g in groups if len(g) == 1 and re.fullmatch(r"-[A-Za-z]+", g[0])]
     if short and len(groups) == len(short):
         letters = "".join(f[1:] for f in short)

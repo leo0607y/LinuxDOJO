@@ -20,7 +20,7 @@ def _drill(number, level, title, brief, solution, alts, traps, hints, explanatio
     """課題1題を組み立てる。ヒントの3段階目（入力例）は solution から自動で作る。"""
     return {"id": f"fes-drills-{number:02d}", "level": level, "title": title, "brief": brief,
             "solution": solution, "alt_solutions": alts, "traps": traps,
-            "hints": [hints[0], hints[1], "入力例: " + " → ".join(solution)],
+            "hints": list(hints) if len(hints) >= 3 else [hints[0], hints[1], "入力例: " + " → ".join(solution)],
             "explanation": explanation, "practice": practice, **keys}
 
 
@@ -385,7 +385,8 @@ SCENARIOS = [
            [["pgrep crawler", "kill -9 5120"], ["ps aux", "kill -KILL 5120"], ["ps aux", "kill -15 5120", "kill -9 5120"]],
            [["kill 5120"], ["kill -9 800"], ["sudo kill -9 5120 810"]],
            ["まず一覧で、CPU を使いすぎているものを探します。止めたあとは本当に止まったかも確かめます。",
-            "ps aux で番号（PID）を調べ、kill で止めます。穏やかな合図で止まらなければ、強い合図を送ります。"],
+            "ps の aux 表示や pgrep で番号（PID）を調べ、kill で止めます。穏やかな合図で止まらなければ、強い合図を送ります。",
+            "止める対象は crawler だけです。postgres と nginx は巻き込みません。通常の合図のあとに残っていたら、-9 を付けた kill で強制終了し、最後にもう一度一覧で確かめます。"],
            "kill は「終了してください」という合図（TERM）を送る道具で、相手が無視すると生き残ります。そのときだけ -9（KILL）で強制終了します。無関係なプロセスは巻き込みません。",
            ["3-5"], processes=[{"pid": 5120, "user": "learner", "cmd": "python3 crawler.py", "cpu": 98.0, "mem": 10.0,
                                 "ignores_term": True}, _PS_DB, _PS_WEB],

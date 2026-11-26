@@ -665,6 +665,12 @@ class Terminal:
         plugin = commands.lookup(cmd)
         if plugin is not None:
             result = plugin(self, rest, stdin=stdin, admin=admin)
+            if result is None and cmd in CLUSTER_SAFE:
+                # -tln と -t -l -n のように、束ねても分けても同じ意味の書き方を相互に試す。
+                for alternative in _flag_forms(rest):
+                    result = plugin(self, alternative, stdin=stdin, admin=admin)
+                    if result is not None:
+                        break
             if result is not None:
                 return result
         raise TrainingError(f"{cmd}: この模擬ターミナルでは未対応の入力です。スペルを確認し、hint で手がかりを見てみましょう。")
@@ -1175,8 +1181,46 @@ ORDER_FREE_VALUE_FLAGS = {
 }
 
 
+# 短いフラグを束ねても分けても同じ意味になるコマンド（-tf と -t -f など）。
+CLUSTER_SAFE = {"tar", "ss", "curl", "ls", "rm", "cp", "mv", "grep", "sort", "uniq", "wc", "df", "du", "mkdir",
+                "chmod", "head", "tail", "cut", "ps", "netstat", "diff", "cat", "touch", "free", "journalctl"}
+
+
+def _expand_clusters(words):
+    """-tf のように文字だけが束ねられた短いフラグを -t -f に展開する（対象コマンドのみ）。"""
+    if not words or words[0] not in CLUSTER_SAFE:
+        return words
+    out = [words[0]]
+    for w in words[1:]:
+        if re.fullmatch(r"-[A-Za-z]{2,}", w):
+            out.extend("-" + ch for ch in w[1:])
+        else:
+            out.append(w)
+    return out
+
+
+def _flag_forms(args):
+    """先頭側の短いフラグを「分けた形」と「束ねた形」にした引数列（元と同じものは除く）。"""
+    forms = []
+    split = []
+    for a in args:
+        if re.fullmatch(r"-[A-Za-z]{2,}", a):
+            split.extend("-" + ch for ch in a[1:])
+        else:
+            split.append(a)
+    if split != list(args):
+        forms.append(split)
+    i = 0
+    while i < len(args) and re.fullmatch(r"-[A-Za-z]+", args[i]):
+        i += 1
+    if i >= 2:
+        forms.append(["-" + "".join(a[1:] for a in args[:i]), *args[i:]])
+    return forms
+
+
 def _canonical_options(words):
     """先頭の「-フラグ [値]」群を並べ替えた語の並び。対象外のコマンドはそのまま返す。"""
+    words = _expand_clusters(words)
     flags = ORDER_FREE_VALUE_FLAGS.get(words[0]) if words else None
     if not flags:
         return words
