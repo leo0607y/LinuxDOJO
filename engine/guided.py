@@ -940,6 +940,10 @@ class ShellWord(str):
         word.glob_pattern, word.has_glob = pattern, has_glob
         return word
 
+    def __getnewargs__(self):
+        # copy.deepcopy / pickle が引数なしで再構築しようとして失敗しないようにする。
+        return (str(self), self.glob_pattern, self.has_glob)
+
 
 def shell_operator(word, allowed=("<", ">", ">>", "<<", "|", "||", "&&", ";", "&", "2>")):
     return not isinstance(word, ShellWord) and word in allowed

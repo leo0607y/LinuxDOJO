@@ -257,6 +257,18 @@ def browser_request(request_json):
         if selected:
             return json.dumps(_web_select(selected['mode'], selected['index']), ensure_ascii=False)
         return json.dumps(_web_view('保存データを読み込みました。'), ensure_ascii=False)
+    if kind == 'resetMode':
+        reset_mode = request.get('mode')
+        if reset_mode != 'festival' and reset_mode not in LESSONS:
+            raise ValueError('初期化するモードを選んでください。')
+        prefix = reset_mode + ':'
+        for key in [k for k in _web_sessions if k.startswith(prefix)]:
+            del _web_sessions[key]
+        for key in [k for k in _web_review if k.startswith(prefix)]:
+            del _web_review[key]
+        _web_completed['festival' if reset_mode == 'festival' else reset_mode] = {} if reset_mode == 'festival' else []
+        _web_selected = _web_terminal = _web_step = None
+        return json.dumps(_web_select(reset_mode, 0, fresh=True), ensure_ascii=False)
     if kind == 'select':
         return json.dumps(_web_select(request.get('mode'), request.get('index', 0)), ensure_ascii=False)
     if kind == 'review':

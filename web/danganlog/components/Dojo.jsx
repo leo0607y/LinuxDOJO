@@ -11,7 +11,7 @@ import SupportRail from './SupportRail.jsx';
 import { applyTheme, readPrefs, savePrefs } from './preferences.js';
 
 const MAX_ENTRIES = 200;
-const LOCAL_COMMANDS = ['help', 'hint', 'answer', 'review', 'next', 'prev', 'menu', 'modes', 'progress', 'goto', 'theme', 'simple', 'completion', 'clear', 'data', 'course', 'reset', 'check'];
+const LOCAL_COMMANDS = ['help', 'hint', 'answer', 'review', 'next', 'prev', 'menu', 'modes', 'progress', 'goto', 'theme', 'simple', 'completion', 'clear', 'data', 'course', 'reset', 'restart', 'check'];
 const HELP_TEXT = [
   'help           このヘルプ',
   'hint           ヒントを1つ (何度でも可。減点なし)',
@@ -23,6 +23,7 @@ const HELP_TEXT = [
   'goto N         このコースの N 番へ',
   'progress       進み具合',
   'reset          課題を初期状態に戻す',
+  'restart        このコースの進捗を消して最初からやり直す (確認あり)',
   'theme          dark / light 切り替え (theme auto で端末の設定に従う)',
   'simple         シンプル表示 (大きな文字とボタン)',
   'completion     Tab 補完の入/切 (打つ練習のため、初期は切。completion on で入る)',
@@ -263,6 +264,20 @@ export default function Dojo() {
         }
         addEntry('', null, courses.map((c, i) => pad2(i + 1) + '  ' + (c.id === (course && course.id) ? '>' : ' ') + ' ' + c.name + '  (' + c.done + '/' + c.total + ')').join('\n') + '\n番号を入力すると開きます。', '');
         pendingRef.current = { kind: 'mode' }; return true;
+      }
+      case 'restart': {
+        echo();
+        if (!course) { say('NG', 'コースを開いてから実行します。'); return true; }
+        if (args[0] !== 'yes') {
+          say('INFO', course.name + ' の達成記録・復習対象・作業ファイルを消して、1 番から始め直します。他のコースには影響しません。実行するときは restart yes と入力します。');
+          return true;
+        }
+        try {
+          const v = await call({ type: 'resetMode', mode: course.id });
+          setEntries([{ id: ++entrySeq, prompt: '', command: null, output: '[OK] ' + course.name + ' を最初からやり直せる状態にしました。' }]);
+          applyView(v);
+        } catch (error) { say('NG', friendly(error)); }
+        return true;
       }
       case 'progress': {
         echo();
