@@ -1,6 +1,22 @@
 # 引き継ぎ書（LinuxQuest 教材拡張）
 
-最終更新: 2026-11-23（Codex 作業継続） / ブランチ: `learning-expansion` / 状態を変えたら必ずこの表も更新する。
+最終更新: 2026-11-26（Codex 作業継続） / ブランチ: `learning-expansion` / 状態を変えたら必ずこの表も更新する。
+
+## 2026-11-26 最新チェックポイント（この節を最優先）
+
+ブランチ `main`。以下はすべてコミット済み・未push・**未デプロイ**。
+
+- 利用者の最終指示: 「最終的には本番環境（danganlog.com）まで仕上げる」。ただし下の失敗4件を解消してから。
+- **直した不具合**: `engine/guided.ShellWord`（str派生）が進捗に残り、ブラウザ版の状態コピー（deepcopy）が例外→はじめて問22付近で「正解なのに無反応」・JSON書き出し失敗。`__getnewargs__` で修正。回帰テスト `tests/test_web_bridge.py`（全課題をブラウザ橋渡し経由で通す）。
+- **判定の改善**（サブエージェント監査）: `./x` `~/x` 末尾`/` を同一パスとして受理、sudo誤用時に理由表示（`guided.rejection_note`）、sudo必須なのに課題文に無かった4課題へ「（管理者権限が必要です）」、`apt-get install/remove` を apt と同じ扱いに。テスト `tests/test_alternative_answers.py`。
+- **保存データ**: 全モード全課題＋festival259件でJSON書き出し→読み込みが往復一致することを確認。localStorage保存失敗時は警告表示。進捗はlocalStorageなのでChromeアカウント同期では引き継がれない。端末間はJSON書き出し／読み込み。
+- **新機能**: `data` ダイアログに「好きな課題から始める」「このコースを初期化」「全データを初期化」。コマンド `restart` / `restart yes`。E2E追加済み。
+
+### 未解決・次にやること
+1. **Python全体テストで4件失敗**（`python3 -m unittest discover -s tests -q`、664件中）。直前のapt-get変更か、監査エージェントの変更（`matches()` のパス正規化・`Terminal.path` の `~` 展開）が原因の可能性。最初に失敗名を確認して直す。Web build / npm test 8件 / E2E 20件は成功。
+2. 全テスト成功後、`cd web/danganlog && scripts/deploy.sh --dry-run` → 本番反映。デプロイ前に、`/privacy/` の支援者情報問い合わせ窓口が未設定（前節参照）であることを利用者に確認する。
+3. 公開後に danganlog.com で、はじめて問22の通過とJSON書き出しを実画面で確認。
+4. 未対応の既知事項: `sudo ls` など無害な課題でのsudo付き入力は「未対応」扱い。festivalの状態が大きい（最大約300KB/セッション）。
 
 ## 2026-11-23 最新チェックポイント（この節を優先）
 
