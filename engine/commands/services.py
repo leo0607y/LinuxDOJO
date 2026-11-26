@@ -578,6 +578,9 @@ def _pending(terminal):
 def apt_get(terminal, rest, stdin=None, admin=False):
     flags = [a for a in rest if a.startswith("-")]
     words = [a for a in rest if not a.startswith("-")]
+    if words and words[0] in ("install", "remove") and len(words) > 1 and all(f in ("-y", "--yes") for f in flags):
+        # apt-get install/remove は apt と同じ扱い（パッケージの状態を共有する）
+        return terminal._apt([words[0], *words[1:]], admin)
     if any(f not in ("-y", "-s", "--simulate", "--dry-run") for f in flags) or len(words) != 1 or words[0] not in ("update", "upgrade"):
         return None
     simulate = any(f in ("-s", "--simulate", "--dry-run") for f in flags)

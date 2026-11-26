@@ -62,6 +62,21 @@ class AlternativeAnswersTest(unittest.TestCase):
         self.assertIn("sudo を付けずに", note("ex-users-23", "sudo chgrp developers report.txt"))
         self.assertIn("sudo を付けて", note("ex-network-20", "ufw delete allow 8080/tcp"))
 
+class AptGetInstallTest(unittest.TestCase):
+    def test_apt_get_install_is_accepted_like_apt(self):
+        import pathlib, tempfile
+        from engine import guided
+        from curriculum.beginner_lessons import LESSONS
+        guided.Terminal.VIRTUAL_MODES = True
+        for mode, i, pkg in (("intro", 21, "tree"), ("basic", 21, "tree"), ("basic", 51, "vim")):
+            step = LESSONS[mode][i]
+            for line in (f"sudo apt-get install {pkg}", f"sudo apt-get install -y {pkg}"):
+                t = guided.Terminal(pathlib.Path(tempfile.mkdtemp()) / "w", {})
+                guided.prepare_step(t, step, fresh=True)
+                r = t.execute(line)
+                self.assertTrue(guided.accepted(line, r, step, t), (step["id"], line, r.output))
+
+
 
 if __name__ == "__main__":
     unittest.main()
