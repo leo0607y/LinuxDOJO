@@ -73,16 +73,21 @@ html.app-lock, html.app-lock body { height: 100%; overflow: hidden; overscroll-b
   .mission { grid-column: 1; grid-row: 2; }
   .prompt { grid-column: 1; grid-row: 3; }
   .actions { grid-column: 1; grid-row: 4; }
-  .support-rail { display: flex; width: 300px; grid-column: 2; grid-row: 1 / 5; align-self: start; flex-direction: column; gap: 1.25rem; min-width: 0; max-height: 100%; overflow-y: auto; padding-top: .75rem; color: var(--dim); font: .8rem/1.5 var(--mono); }
-  .ad-unit { min-width: 0; }
-  .ad-label { display: block; margin-bottom: .35rem; }
+  .support-rail { display: flex; width: 300px; grid-column: 2; grid-row: 1 / 5; align-self: start; flex-direction: column; gap: 1.5rem; min-width: 0; max-height: 100%; overflow-y: auto; padding-top: .75rem; color: var(--dim); font: .8rem/1.5 var(--mono); }
+  .rail-section { min-width: 0; }
+  .rail-title { margin: 0 0 .45rem; padding-bottom: .25rem; border-bottom: 1px solid var(--line); color: var(--dim); font: inherit; font-weight: 400; letter-spacing: .04em; }
   .ad-slot { min-height: 250px; max-width: 100%; overflow: hidden; }
   .ad-consent { margin-top: .35rem; padding: 0; border: 0; background: none; color: var(--dim); font: inherit; text-decoration: underline; cursor: pointer; }
   .ad-consent:hover, .ad-consent:focus-visible { color: var(--fg); }
   .ad-placeholder { width: 300px; height: 250px; display: grid; place-content: center; background: #e8e8e8; color: #333; text-align: center; }
-  .coffee-link { display: flex; justify-content: center; align-items: center; gap: .45rem; min-height: 3.1rem; padding: .45rem .5rem; border: 1px solid var(--user); background: var(--user); color: var(--bg); font-weight: 700; text-align: center; text-decoration: none; }
-  .coffee-link svg { width: 1.45rem; height: 1.45rem; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-  .coffee-link:hover { background: transparent; color: var(--user); text-decoration: underline; }
+  .coffee-link { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .7rem; padding: .7rem .8rem; border: 1px solid var(--user); color: var(--user); text-decoration: none; }
+  .coffee-link svg { width: 1.7rem; height: 1.7rem; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .coffee-text { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
+  .coffee-text b { font-weight: 700; font-size: .9rem; }
+  .coffee-text small { color: var(--dim); font-size: .72rem; line-height: 1.35; }
+  .coffee-arrow { font-size: 1rem; }
+  .coffee-link:hover, .coffee-link:focus-visible { background: var(--user); color: var(--bg); }
+  .coffee-link:hover .coffee-text small, .coffee-link:focus-visible .coffee-text small { color: var(--bg); }
 }
 
 /* 説明 (レッスンの題と本文) */

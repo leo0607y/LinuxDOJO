@@ -39,8 +39,8 @@ function AdSlot() {
     if (fc?.callbackQueue) fc.callbackQueue.push({ CONSENT_DATA_READY: () => fc.showRevocationMessage?.() });
   };
   return (
-    <div className="ad-unit">
-      <span className="ad-label">広告</span>
+    <div className="ad-unit rail-section">
+      <h2 className="rail-title">広告</h2>
       <ins ref={ref} className="adsbygoogle ad-slot" style={{ display: 'block' }}
         data-ad-client={adsenseClient} data-ad-slot={adSlot} data-ad-format="rectangle" data-full-width-responsive="false" />
       {hasConsentTool ? <button type="button" className="ad-consent" onClick={reopenConsent}>広告の同意設定</button> : null}
@@ -63,16 +63,20 @@ export default function SupportRail() {
 
   return (
     <aside className="support-rail" aria-label="広告とサイトの支援">
-      {coffeeUrl ? <a className="coffee-link" href={coffeeUrl} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">
-        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path d="M5 9h12v6a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V9Z" />
-          <path d="M17 10h1.5a2.5 2.5 0 0 1 0 5H17M4 21h15M8 5c1-1 1-2 0-3m5 3c1-1 1-2 0-3" />
-        </svg>
-        <span>作者にCoffeeを送る</span><span aria-hidden="true">↗</span>
-      </a> : null}
+      {coffeeUrl ? <section className="rail-section" aria-labelledby="rail-support">
+        <h2 id="rail-support" className="rail-title">サイトを支える</h2>
+        <a className="coffee-link" href={coffeeUrl} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M5 9h12v6a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V9Z" />
+            <path d="M17 10h1.5a2.5 2.5 0 0 1 0 5H17M4 21h15M8 5c1-1 1-2 0-3m5 3c1-1 1-2 0-3" />
+          </svg>
+          <span className="coffee-text"><b>作者にCoffeeを送る</b><small>無料で使えます。支援は任意です。</small></span>
+          <span className="coffee-arrow" aria-hidden="true">↗</span>
+        </a>
+      </section> : null}
       {adsLive ? <AdSlot /> : null}
-      {adsPreview ? <div className="ad-unit">
-        <span className="ad-label">広告</span>
+      {adsPreview ? <div className="ad-unit rail-section">
+        <h2 className="rail-title">広告</h2>
         <div className="ad-placeholder">広告のイメージ 300x250<br />広告通信は発生しません</div>
       </div> : null}
     </aside>
