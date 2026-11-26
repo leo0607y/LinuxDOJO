@@ -253,3 +253,36 @@ test('Tab 補完を入れると、コマンド名・ファイル名・隠しフ�
   assert.equal(await page.locator('.foot button[aria-pressed="true"]', { hasText: 'Tab補完' }).count(), 1);
   await context.close();
 });
+
+test('学習データ画面: 好きな課題から開始・コース初期化・全データ初期化', async () => {
+  const { context, page } = await openApp(env.browser, env.url);
+  page.on('dialog', (d) => d.accept());
+  await run(page, 'echo こんにちは');
+  await page.waitForSelector('.tag-ok');
+  assert.match(await progressLine(page, 'はじめての'), /1\/24/);
+
+  // 好きな課題から始める
+  await run(page, 'data');
+  await page.fill('dialog input[type=number]', '5');
+  await page.click('text=ここから始める');
+  await page.waitForFunction(() => document.querySelector('#lesson-title').textContent.includes('ファイルの中を読む'));
+
+  // このコースを初期化 (他コースは残る確認のため、先に基礎コースも1問達成)
+  await run(page, 'modes'); await run(page, '2');
+  await page.waitForFunction(() => document.querySelector('.motd').textContent.includes('基本コマンド'));
+  await run(page, 'data');
+  await page.click('text=このコースを初期化');
+  await page.waitForSelector('.tag-ok');
+  await page.waitForFunction(() => document.querySelector('#lesson-title').textContent.length > 0);
+  assert.match(await progressLine(page, 'はじめての'), /1\/24/);
+
+  // 全データ初期化
+  await run(page, 'data');
+  await page.click('text=全データを初期化');
+  await page.waitForFunction(() => document.querySelector('#lesson-title').textContent.includes('お願いする'));
+  assert.match(await progressLine(page, 'はじめての'), /\b0\/24/);
+  await page.reload();
+  await page.waitForSelector('.rt.ready', { timeout: 120000 });
+  assert.match(await progressLine(page, 'はじめての'), /\b0\/24/);
+  await context.close();
+});
