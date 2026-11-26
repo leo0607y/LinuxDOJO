@@ -340,6 +340,9 @@ def browser_request(request_json):
     if mode != 'festival' and guided.accepted(line, result, _web_step, _web_terminal):
         reviewed = _web_complete(); output += '\n[OK] '+_web_step.get('success', '達成しました。')
         if reviewed: output += '\n[OK] 自力で解き直したので復習対象から外しました。'
+    elif mode != 'festival' and not _web_terminal.progress.get('editor'):
+        note = guided.rejection_note(line, result, _web_step)
+        if note: output += '\n' + note
     return json.dumps(_web_view(output, result.code), ensure_ascii=False)
 `;
 
