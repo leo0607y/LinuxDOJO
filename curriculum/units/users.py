@@ -409,7 +409,7 @@ LESSONS = [
     lesson("ex-users-41", "退職したユーザーをロックする",
            "退職者のアカウントは、すぐ削除せず、まずロック（無効化）するのが安全です。ファイルは残り、いつでも復旧できます。"
            "usermod の -L は lock の頭文字です。",
-           "bob のアカウントを、削除はせずにログインできない状態にしましょう。", "sudo usermod -L bob",
+           "bob のアカウントを、削除はせずにログインできない状態にしましょう（管理者権限が必要です）。", "sudo usermod -L bob",
            "bob はロックされました。パスワードの前に ! を付けて無効にする仕組みです。",
            goal=lambda t: _u().user_info(t, "bob")["locked"], accept=["sudo passwd -l bob"],
            hints=["消すのではなく、使えなくする方法があります。",
@@ -423,7 +423,7 @@ LESSONS = [
                   "sudo passwd に、status の頭文字のオプションとユーザー名です。", "入力例: sudo passwd -S bob"]),
     lesson("ex-users-43", "ロックを解除する",
            "復職などで、ロックしたアカウントを使えるように戻します。-L の反対は -U（unlock）です。",
-           "ロックされている bob のアカウントを、使える状態に戻しましょう。", "sudo usermod -U bob",
+           "ロックされている bob のアカウントを、使える状態に戻しましょう（管理者権限が必要です）。", "sudo usermod -U bob",
            "ロック解除。ファイルや所属は元のままです。",
            users_setup=_lock_bob, goal=lambda t: not _u().user_info(t, "bob")["locked"], accept=["sudo passwd -u bob"],
            hints=["ロックの反対の操作です。",
