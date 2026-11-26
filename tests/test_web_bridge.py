@@ -7,9 +7,15 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+_RESTORE = []
 
 
 def _load_bridge(work):
+    # ブリッジは Terminal.VIRTUAL_MODES を True にするため、他のテストへ漏らさないよう戻す。
+    from engine import guided
+    sys.path.insert(0, str(ROOT))
+    old = guided.Terminal.VIRTUAL_MODES
+    _RESTORE.append(old)
     src = (ROOT / "web/danganlog/public/worker.js").read_text(encoding="utf-8")
     code = re.search(r"PYTHON_BRIDGE = String\.raw`(.*?)\n`;", src, re.S).group(1)
     code = code.replace("/dojo-src/curriculum", str(ROOT / "curriculum")).replace("/dojo-work/session", str(work))
@@ -20,6 +26,12 @@ def _load_bridge(work):
 
 
 class WebBridgeTest(unittest.TestCase):
+    def tearDown(self):
+        from engine import guided
+        if _RESTORE:
+            guided.Terminal.VIRTUAL_MODES = _RESTORE[0]
+            _RESTORE.clear()
+
     def test_every_guided_lesson_completes_through_browser_bridge(self):
         with tempfile.TemporaryDirectory() as work:
             ns = _load_bridge(Path(work) / "session")

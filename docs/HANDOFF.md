@@ -13,7 +13,7 @@
 - **新機能**: `data` ダイアログに「好きな課題から始める」「このコースを初期化」「全データを初期化」。コマンド `restart` / `restart yes`。E2E追加済み。
 
 ### 未解決・次にやること
-1. **Python全体テストで4件失敗**（`python3 -m unittest discover -s tests -q`、664件中）。直前のapt-get変更か、監査エージェントの変更（`matches()` のパス正規化・`Terminal.path` の `~` 展開）が原因の可能性。最初に失敗名を確認して直す。Web build / npm test 8件 / E2E 20件は成功。
+1. **Python全体テストの4件失敗は原因判明・修正済み（コミット前）**: 追加テストが `Terminal.VIRTUAL_MODES = True` を戻さず後続テストに漏れていただけで、実装の不具合ではない。`tests/test_alternative_answers.py` と `tests/test_web_bridge.py` で元に戻すよう修正し、関連4ファイル66件は成功。**全体実行（`python3 -m unittest discover -s tests`、約3分）の最終確認だけ未了**。再開したら最初にこれを実行する。
 2. 全テスト成功後、`cd web/danganlog && scripts/deploy.sh --dry-run` → 本番反映。デプロイ前に、`/privacy/` の支援者情報問い合わせ窓口が未設定（前節参照）であることを利用者に確認する。
 3. 公開後に danganlog.com で、はじめて問22の通過とJSON書き出しを実画面で確認。
 4. 未対応の既知事項: `sudo ls` など無害な課題でのsudo付き入力は「未対応」扱い。festivalの状態が大きい（最大約300KB/セッション）。

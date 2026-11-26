@@ -67,6 +67,8 @@ class AptGetInstallTest(unittest.TestCase):
         import pathlib, tempfile
         from engine import guided
         from curriculum.beginner_lessons import LESSONS
+        old = guided.Terminal.VIRTUAL_MODES
+        self.addCleanup(setattr, guided.Terminal, "VIRTUAL_MODES", old)
         guided.Terminal.VIRTUAL_MODES = True
         for mode, i, pkg in (("intro", 21, "tree"), ("basic", 21, "tree"), ("basic", 51, "vim")):
             step = LESSONS[mode][i]
