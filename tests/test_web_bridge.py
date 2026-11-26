@@ -53,6 +53,18 @@ class WebBridgeTest(unittest.TestCase):
             self.assertTrue(state["completed"]["basic"])
             self.assertFalse([k for k in state["sessions"] if k.startswith("intro:") and k != "intro:intro-01"])
 
+    def test_reset_all_clears_every_mode(self):
+        with tempfile.TemporaryDirectory() as work:
+            ns = _load_bridge(Path(work) / "session")
+            req = ns["browser_request"]
+            for mode in ("intro", "basic"):
+                req(json.dumps({"type": "select", "mode": mode, "index": 0}))
+                req(json.dumps({"type": "execute", "line": ns["LESSONS"][mode][0]["command"]}))
+            view = json.loads(req(json.dumps({"type": "resetAll"})))
+            self.assertFalse(view["completed"])
+            self.assertTrue(all(not v for k, v in view["state"]["completed"].items() if k != "festival"))
+            self.assertEqual(view["state"]["review"], {})
+
 
 if __name__ == "__main__":
     unittest.main()

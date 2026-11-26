@@ -71,6 +71,8 @@ export default function Dojo() {
   const [busy, setBusy] = useState(false);
   const [entries, setEntries] = useState([]);
   const [dataMessage, setDataMessage] = useState('');
+  const [jumpMode, setJumpMode] = useState('');
+  const [jumpNum, setJumpNum] = useState('1');
   const [line, setLine] = useState('');
   const [attempt, setAttempt] = useState(0);
   const [loadInfo, setLoadInfo] = useState({ loaded: 0, total: 0 });
@@ -430,6 +432,32 @@ export default function Dojo() {
     input.value = '';
   };
 
+  const restartCourse = async (id, name) => {
+    if (!window.confirm(name + ' の達成記録・復習対象・作業ファイルを消して、最初からやり直します。他のコースには影響しません。よろしいですか？')) return;
+    try {
+      const v = await call({ type: 'resetMode', mode: id });
+      setEntries([{ id: ++entrySeq, prompt: '', command: null, output: '[OK] ' + name + ' を最初からやり直せる状態にしました。' }]);
+      applyView(v); setDataMessage(name + ' を初期化しました。'); closeDialog(dataRef);
+    } catch (error) { setDataMessage(friendly(error)); }
+  };
+
+  const resetEverything = async () => {
+    if (!window.confirm('このブラウザーに保存した全コースの学習データを消して、最初からやり直します。元に戻せません（先に書き出しておくと復元できます）。よろしいですか？')) return;
+    try {
+      const v = await call({ type: 'resetAll' });
+      setEntries([{ id: ++entrySeq, prompt: '', command: null, output: '[OK] 全ての学習データを初期化しました。' }]);
+      applyView(v); setDataMessage('全データを初期化しました。'); closeDialog(dataRef);
+    } catch (error) { setDataMessage(friendly(error)); }
+  };
+
+  const startFrom = async () => {
+    const c = courses.find((x) => x.id === (jumpMode || (course && course.id)));
+    const n = parseInt(jumpNum, 10);
+    if (!c || !(n >= 1 && n <= c.total)) { setDataMessage('1 から ' + (c ? c.total : 0) + ' までの番号を入力してください。'); return; }
+    closeDialog(dataRef);
+    await selectLesson(c.id, n - 1);
+  };
+
   const openDialog = (ref) => { const d = ref.current; if (d) { if (d.showModal) d.showModal(); else d.setAttribute('open', ''); } };
   const closeDialog = (ref) => { const d = ref.current; if (d) { if (d.close) d.close(); else d.removeAttribute('open'); } };
 
@@ -573,6 +601,20 @@ export default function Dojo() {
           <label className="kbtn import-button">保存データを読み込む<input type="file" accept="application/json,.json" onChange={importData} /></label>
         </div>
         <p className="dim">読み込むと、現在の練習状態が保存データに置き換わります。保存データはサーバーへ送信されません。</p>
+        <h3>好きな課題から始める</h3>
+        <div className="data-actions">
+          <select aria-label="コース" value={jumpMode || (course ? course.id : '')} onChange={(e) => setJumpMode(e.target.value)}>
+            {courses.map((c) => <option key={c.id} value={c.id}>{c.name}（{c.total}問）</option>)}
+          </select>
+          <input type="number" min="1" aria-label="問題番号" value={jumpNum} onChange={(e) => setJumpNum(e.target.value)} />
+          <button type="button" className="kbtn enter" onClick={startFrom}>ここから始める</button>
+        </div>
+        <h3>最初からやり直す</h3>
+        <div className="data-actions">
+          {course && <button type="button" className="kbtn" onClick={() => restartCourse(course.id, course.name)}>このコースを初期化</button>}
+          <button type="button" className="kbtn" onClick={resetEverything}>全データを初期化</button>
+        </div>
+        <p className="dim">初期化は元に戻せません。必要なら先に書き出してください。</p>
         <div id="data-message" role="status">{dataMessage}</div>
       </dialog>
     </div>
