@@ -1167,10 +1167,34 @@ def _same_command(typed, answer, terminal):
     return True
 
 
+# 値を取る指定の順序が入れ替わっても同じ意味になるコマンド（先頭のオプション群だけ並べ替えて比べる）。
+ORDER_FREE_VALUE_FLAGS = {
+    "ssh": {"-p", "-i", "-l", "-o", "-J", "-F", "-L", "-R", "-D", "-b", "-c"},
+    "scp": {"-P", "-i", "-o", "-F", "-J", "-c", "-l"},
+    "rsync": {"-e", "--exclude", "--include", "--port"},
+}
+
+
+def _canonical_options(words):
+    """先頭の「-フラグ [値]」群を並べ替えた語の並び。対象外のコマンドはそのまま返す。"""
+    flags = ORDER_FREE_VALUE_FLAGS.get(words[0]) if words else None
+    if not flags:
+        return words
+    groups, i = [], 1
+    while i < len(words) and words[i].startswith("-") and len(words[i]) > 1:
+        if words[i] in flags and i + 1 < len(words):
+            groups.append((words[i], words[i + 1])); i += 2
+        else:
+            groups.append((words[i],)); i += 1
+    return [words[0], *[w for g in sorted(groups) for w in g], *words[i:]]
+
+
 def matches(line, step, terminal=None):
     try:
         typed = shlex.split(line)
-        return any(_same_command(typed, shlex.split(answer), terminal) for answer in answers(step))
+        canon = _canonical_options(typed)
+        return any(_same_command(typed, shlex.split(answer), terminal)
+                   or _same_command(canon, _canonical_options(shlex.split(answer)), terminal) for answer in answers(step))
     except ValueError:
         return False
 

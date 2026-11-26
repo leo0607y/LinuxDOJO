@@ -15,7 +15,8 @@ def contains_full_solution(hint, solutions):
         return False
     for solution in solutions:
         expected = _plain(solution)
-        if expected and expected in candidate:
+        # 英数字の途中（undo の u など）には一致させず、語として現れた場合だけ漏れとみなす。
+        if expected and re.search(r"(?<![A-Za-z0-9_./-])" + re.escape(expected) + r"(?![A-Za-z0-9_./-])", candidate):
             return True
     return False
 
