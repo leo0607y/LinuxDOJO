@@ -52,7 +52,7 @@ export default function SupportRail() {
   const [wide, setWide] = useState(false);
 
   useEffect(() => {
-    const query = window.matchMedia('(min-width: 1280px) and (min-height: 800px)');
+    const query = window.matchMedia('(min-width: 1280px) and (min-height: 600px)');
     const update = () => setWide(query.matches);
     update();
     query.addEventListener('change', update);

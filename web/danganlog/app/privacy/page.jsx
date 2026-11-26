@@ -47,7 +47,7 @@ export default function PrivacyPage() {
 
       <section>
         <h2>広告について</h2>
-        <p>{support.adsLive ? 'このサイトでは、学習画面の右側にGoogle AdSenseの広告を表示します。広告は幅1280px以上・高さ800px以上の画面でだけ読み込み、操作欄の近くには表示しません。同意が必要な地域では、広告の下の「広告の同意設定」から変更・撤回できます。' : '現在、このサイトでは広告を配信していません。'}Google AdSenseでは、Googleや広告パートナーがCookie等を用いて広告を配信・測定することがあります。Googleによるデータ利用は<a href="https://policies.google.com/technologies/partner-sites?hl=ja" target="_blank" rel="noopener noreferrer">Googleのパートナーサイトでのデータ利用について</a>、パーソナライズ広告の設定は<a href="https://adssettings.google.com/" target="_blank" rel="noopener noreferrer">Google広告設定</a>をご確認ください。</p>
+        <p>{support.adsLive ? 'このサイトでは、学習画面の右側にGoogle AdSenseの広告を表示します。広告は幅1280px以上・高さ600px以上の画面でだけ読み込み、操作欄の近くには表示しません。同意が必要な地域では、広告の下の「広告の同意設定」から変更・撤回できます。' : '現在、このサイトでは広告を配信していません。'}Google AdSenseでは、Googleや広告パートナーがCookie等を用いて広告を配信・測定することがあります。Googleによるデータ利用は<a href="https://policies.google.com/technologies/partner-sites?hl=ja" target="_blank" rel="noopener noreferrer">Googleのパートナーサイトでのデータ利用について</a>、パーソナライズ広告の設定は<a href="https://adssettings.google.com/" target="_blank" rel="noopener noreferrer">Google広告設定</a>をご確認ください。</p>
         <p>欧州経済領域、英国、スイスの利用者へ広告を配信する場合は、Google認定・IAB TCF対応の同意管理プラットフォーム（CMP）と同意内容の変更・撤回手段を設定してから広告を有効にします。Cookieを使わない広告であっても、適用される地域・設定に応じた同意要件を確認します。</p>
       </section>
 
