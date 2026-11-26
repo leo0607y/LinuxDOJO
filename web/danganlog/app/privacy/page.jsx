@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { loadCourse } from '../../lib/course-data.js';
+import { support } from '../../lib/support.js';
 import styles from '../course/course.module.css';
 
 export const metadata = {
@@ -13,12 +14,12 @@ export default function PrivacyPage() {
     <article className={styles.article}>
       <p className={styles.crumbs}><Link href="/">DANGAN LOG</Link> / サイト情報</p>
       <h1>サイト情報・プライバシーポリシー</h1>
-      <p>最終更新日: 2026年11月23日</p>
+      <p>最終更新日: 2026年11月27日</p>
 
       <section>
         <h2>運営者・お問い合わせ</h2>
         <p>運営者: LinuxDOJOプロジェクト（DANGAN LOG）</p>
-        <p>教材やサイトについての連絡は、<a href="https://github.com/leo0607y/LinuxDOJO/issues" target="_blank" rel="noopener noreferrer">LinuxDOJOのGitHub Issues</a>からお願いします。個人情報や支援決済に関する問い合わせは、公開の課題に書かず、各サービスの窓口をご利用ください。</p>
+        <p>教材やサイトについての連絡は、<a href="https://github.com/leo0607y/LinuxDOJO/issues" target="_blank" rel="noopener noreferrer">LinuxDOJOのGitHub Issues</a>からお願いします。個人情報や支援決済に関する問い合わせは、公開の課題に書かず、{support.contactEmail ? <>次のメールアドレスへお送りください: <a href={`mailto:${support.contactEmail}`}>{support.contactEmail}</a>。</> : '各サービスの窓口をご利用ください。'}</p>
       </section>
 
       <section>
@@ -35,8 +36,8 @@ export default function PrivacyPage() {
             <tbody>
               <tr><td>Cloudflare Pages</td><td>ページ配信に伴うIPアドレス、ブラウザー情報、リクエスト先など</td><td>サイトの配信・保護。現在使用中です。</td></tr>
               <tr><td>GitHub</td><td>リンクを開く際のIPアドレス・ブラウザー情報など。投稿時はアカウント情報・投稿内容など</td><td>連絡・不具合報告。リンクを開くとGitHubへ接続します。</td></tr>
-              <tr><td>Google AdSense</td><td>広告配信時のIPアドレス、Cookie等の識別子、ブラウザー・広告表示情報など</td><td>広告配信と測定。現在は広告コードを設定しておらず、送信はありません。広告を開始する前にこの案内を更新します。</td></tr>
-              <tr><td>Buy Me a Coffee</td><td>リンク先を開いた後、同サービスがページ表示・支援決済に必要とする情報</td><td>任意の支援受付。現在リンクは未設定です。埋め込みウィジェットは使わず、外部ページへのリンクを予定しています。</td></tr>
+              <tr><td>Google AdSense</td><td>広告配信時のIPアドレス、Cookie等の識別子、ブラウザー・広告表示情報など</td><td>{support.adsLive ? '広告配信と測定。学習画面を広い画面で開いたときだけ、GoogleのスクリプトとCookie等を読み込みます。同意が必要な地域では、同意メッセージで選択するまで個人情報に基づく広告は配信されません。' : '広告配信と測定。現在は広告コードを設定しておらず、送信はありません。広告を開始する前にこの案内を更新します。'}</td></tr>
+              <tr><td>Buy Me a Coffee</td><td>リンク先を開いた後、同サービスがページ表示・支援決済に必要とする情報</td><td>{support.coffeeUrl ? '任意の支援受付。学習画面の右側のリンクを開いたときだけ接続します。埋め込みウィジェットは使いません。' : '任意の支援受付。現在リンクは未設定です。埋め込みウィジェットは使わず、外部ページへのリンクを予定しています。'}</td></tr>
             </tbody>
           </table>
         </div>
@@ -46,7 +47,7 @@ export default function PrivacyPage() {
 
       <section>
         <h2>広告について</h2>
-        <p>現在、このサイトでは広告を配信していません。Google AdSenseを開始した場合、Googleや広告パートナーがCookie等を用いて広告を配信・測定することがあります。Googleによるデータ利用は<a href="https://policies.google.com/technologies/partner-sites?hl=ja" target="_blank" rel="noopener noreferrer">Googleのパートナーサイトでのデータ利用について</a>、パーソナライズ広告の設定は<a href="https://adssettings.google.com/" target="_blank" rel="noopener noreferrer">Google広告設定</a>をご確認ください。</p>
+        <p>{support.adsLive ? 'このサイトでは、学習画面の右側にGoogle AdSenseの広告を表示します。広告は幅1280px以上・高さ800px以上の画面でだけ読み込み、操作欄の近くには表示しません。同意が必要な地域では、広告の下の「広告の同意設定」から変更・撤回できます。' : '現在、このサイトでは広告を配信していません。'}Google AdSenseでは、Googleや広告パートナーがCookie等を用いて広告を配信・測定することがあります。Googleによるデータ利用は<a href="https://policies.google.com/technologies/partner-sites?hl=ja" target="_blank" rel="noopener noreferrer">Googleのパートナーサイトでのデータ利用について</a>、パーソナライズ広告の設定は<a href="https://adssettings.google.com/" target="_blank" rel="noopener noreferrer">Google広告設定</a>をご確認ください。</p>
         <p>欧州経済領域、英国、スイスの利用者へ広告を配信する場合は、Google認定・IAB TCF対応の同意管理プラットフォーム（CMP）と同意内容の変更・撤回手段を設定してから広告を有効にします。Cookieを使わない広告であっても、適用される地域・設定に応じた同意要件を確認します。</p>
       </section>
 
