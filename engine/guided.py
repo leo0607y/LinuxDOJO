@@ -127,6 +127,8 @@ class Terminal:
         return "/home/learner" + ("/" + self.cwd if self.cwd != "." else "")
 
     def path(self, value):
+        if value == "~" or value.startswith("~/"):
+            value = "/home/learner" + value[1:]
         if value.startswith("/"):
             if value == "/home/learner":
                 value = "."
@@ -1116,10 +1118,59 @@ def answers(step):
     return [step["command"], *step.get("accept", [])]
 
 
-def matches(line, step):
+PATH_COMMANDS = {"cat", "ls", "cd", "touch", "mkdir", "rmdir", "rm", "cp", "mv", "chmod", "wc", "head", "tail",
+                 "sort", "uniq", "cut", "find", "tar", "gzip", "gunzip", "du", "file", "stat", "less", "vim", "vi", "grep"}
+# 値を取る指定（その直後の語はファイルではない）
+VALUE_OPTIONS = {"-d", "-f", "-n", "-c", "-k", "-t", "-m", "-A", "-B", "-C", "-e", "-name", "-iname", "-type", "-size",
+                 "-maxdepth", "-mindepth", "-mtime", "-perm", "-user", "-group"}
+
+
+def _same_place(typed, answer, terminal):
+    def real(word):
+        word = "/home/learner" + word[1:] if word == "~" or word.startswith("~/") else word
+        return terminal.path(word)
+    try:
+        return real(typed) == real(answer)
+    except (TrainingError, OSError):
+        return False
+
+
+def _same_command(typed, answer, terminal):
+    """入力が正解と同じか。./name・~/name・末尾の / など、同じ場所を指す書き方の違いは同じとみなす。"""
+    if typed == answer:
+        return True
+    if terminal is None or len(typed) != len(answer):
+        return False
+    command, previous, args = None, None, 0
+    for t, a in zip(typed, answer):
+        if a in ("|", ";", "&&"):
+            if t != a:
+                return False
+            command, previous, args = None, a, 0
+            continue
+        if command is None:
+            command = a
+            if t != a:
+                return False
+        elif not a.startswith("-") and previous not in VALUE_OPTIONS:
+            args += 1
+            first_grep_word = command == "grep" and args == 1
+            if t != a:
+                if (first_grep_word or (command not in PATH_COMMANDS and previous not in (">", ">>")) or t.startswith("-")
+                        or not (t.startswith(("./", "~/", "/home/learner")) or t.endswith("/")
+                                or a.startswith(("./", "~/")) or a.endswith("/"))
+                        or not _same_place(t, a, terminal)):
+                    return False
+        elif t != a:
+            return False
+        previous = a
+    return True
+
+
+def matches(line, step, terminal=None):
     try:
         typed = shlex.split(line)
-        return any(typed == shlex.split(answer) for answer in answers(step))
+        return any(_same_command(typed, shlex.split(answer), terminal) for answer in answers(step))
     except ValueError:
         return False
 
@@ -1162,8 +1213,19 @@ def accepted(line, result, step, terminal):
     if result.code != expected_code(step):
         return False
     if step.get("goal") is None:
-        return matches(line, step)
+        return matches(line, step, terminal)
     return goal_met(step, terminal)
+
+
+def rejection_note(line, result, step):
+    """達成にならなかった入力のうち、sudo の有無が原因の場合に直し方を返す（なければ空）。"""
+    needs = any(re.search(r"(^|[|;&]\s*)sudo\s", c) for c in "\n".join([step["command"]] if isinstance(step["command"], str) else step["command"]).split("\n"))
+    used = re.match(r"\s*sudo(\s|$)", line) is not None
+    if used and not needs:
+        return "この課題は管理者権限を使いません。sudo を付けずに入力しましょう。"
+    if needs and not used and result.code != 0:
+        return "この課題は管理者権限が必要です。先頭に sudo を付けて入力しましょう。"
+    return ""
 
 
 def goal_met(step, terminal):
@@ -1311,7 +1373,10 @@ def play(mode, start=None):
                     print(result.output)
                 remember(mode, progress)
                 if not accepted(line, result, step, terminal):
-                    if result.code == 0 and not in_editor:
+                    note = rejection_note(line, result, step)
+                    if note and not in_editor:
+                        print("  " + note)
+                    elif result.code == 0 and not in_editor:
                         print("  実行できました。今回の課題も試しましょう。hint で手がかりを見られます。")
                     continue
                 print("\n" + ui.status_line("ok", "できました！", step["success"]))

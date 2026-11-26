@@ -8,8 +8,18 @@ UNIT_TITLE = "検索とバックアップ・復元"
 ORDER = 10
 
 
+def _plain(word):
+    """./logs・~/logs・logs/ を logs と同じ場所として扱う（この課題の開始位置は練習フォルダ直下）。"""
+    if word.startswith('-') or word in ('.', '~'):
+        return word
+    for prefix in ('./', '~/'):
+        if word.startswith(prefix) and len(word) > len(prefix):
+            word = word[len(prefix):]
+    return word.rstrip('/') if len(word) > 1 else word
+
+
 def typed(check):
-    return lambda t: check(shlex.split(t.progress['command_events'][-1]['line']))
+    return lambda t: check([_plain(w) for w in shlex.split(t.progress['command_events'][-1]['line'])])
 
 
 FILES = {'project/config.ini': 'mode=production\n', 'project/data.txt': 'important data\n'}
